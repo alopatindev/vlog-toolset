@@ -9,6 +9,8 @@ require 'io/console'
 require 'logger'
 
 class DevicesFacade
+  FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
+
   def initialize(project_dir, temp_dir, arecord_args, logger)
     @project_dir = project_dir
     @temp_dir = temp_dir
@@ -29,7 +31,7 @@ class DevicesFacade
   end
 
   def get_last_clip_num
-    Dir.glob("{#{@temp_dir},#{@project_dir}}#{File::SEPARATOR}*.{wav,mp4}")
+    Dir.glob("{#{@temp_dir},#{@project_dir}}#{File::SEPARATOR}*.{wav,mp4,mkv}")
        .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }.max || 0
   end
 
@@ -62,29 +64,47 @@ class DevicesFacade
   end
 
   def save_clip
-    # output_filename = File.join @project_dir, '%016d.mkv' % @clip_num
-    #
-    # @logger.debug("saving #{output_filename}")
-    # clip_filename = @phone.clip_filename
-    # sound_filename = @microphone.sound_filename
-    #
-    # @thread_pool.post do
-    #   begin
-    #     @phone.move_clip_to(clip_filename)
-    #     processed_sound_filename = process_sound(sound_filename, clip_filename) # sync + convert to flac
-    #     system("ffmpeg -i #{clip_filename} -i #{processed_sound_filename} -codec copy #{output_filename}")
-    #     FileUtils::rm_f([clip_filename, sound_filename, processed_sound_filename])
-    #     @logger.info("saved #{output_filename}")
-    #   rescue StandardError => error
-    #     @logger.error("failed to save #{output_filename}")
-    #     @logger.error error
-    #   end
-    # end
+    output_filename = File.join @project_dir, format('%016d.mkv', @clip_num)
+    temp_clip_filename = File.join @temp_dir, format('%016d.mp4', @clip_num)
+
+    @logger.debug("saving #{output_filename}")
+    sound_filename = @microphone.sound_filename
+    phone_clip_filename = @phone.clip_filename
+
+    @thread_pool.post do
+      begin
+        @phone.move_file_to_host(phone_clip_filename, temp_clip_filename)
+        processed_sound_filename = process_sound(temp_clip_filename, sound_filename)
+        system("#{FFMPEG} -i #{processed_sound_filename} -an -i #{temp_clip_filename} -codec copy #{output_filename}")
+        FileUtils.rm_f([temp_clip_filename, sound_filename, processed_sound_filename])
+        @logger.info("saved #{output_filename}")
+      rescue StandardError => error
+        @logger.error("failed to save #{output_filename}")
+        @logger.error error
+      end
+    end
+  end
+
+  def process_sound(clip_filename, sound_filename)
+    wav_clip_filename = "#{clip_filename}.wav"
+    flac_output_filename = "#{sound_filename}.flac"
+    wav_output_filename = "#{sound_filename}.sync.wav"
+
+    command = "#{FFMPEG} -i #{clip_filename} -vn #{wav_clip_filename} && \
+            sync-audio-tracks.sh #{sound_filename} #{wav_clip_filename} #{wav_output_filename} && \
+            #{FFMPEG} -i #{wav_output_filename} -af 'pan=mono|c0=c0' #{flac_output_filename}"
+    @logger.debug "running '#{command}'"
+    system command
+
+    FileUtils.rm_f [wav_output_filename, wav_clip_filename]
+    flac_output_filename
   end
 
   def close
-    stop_recording
-    save_clip
+    if @recording
+      stop_recording
+      save_clip
+    end
 
     @phone.restore_brightness
     @phone.close_opencamera
@@ -107,7 +127,7 @@ def show_help
   puts 's - STOP and SAVE current clip'
   puts 'd - STOP and DELETE current clip'
   puts 'f - FOCUS camera on center'
-  puts 'h — show HELP'
+  puts 'h - show HELP'
   puts 'q / Ctrl+C - QUIT'
   puts
 end

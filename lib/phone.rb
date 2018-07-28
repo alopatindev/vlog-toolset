@@ -19,15 +19,21 @@ class Phone
   end
 
   def clip_filename
-    `#{ADB_SHELL} ls #{CLIPS_PATH}/*.mp4`
+    `#{ADB_SHELL} 'ls #{CLIPS_PATH}/*.mp4 2>> /dev/null'`
       .split(NEWLINE_SPLITTER)
+      .reject(&:empty?)
       .last
+  end
+
+  def move_file_to_host(phone_file, local_file)
+    system "adb pull -a '#{phone_file}' '#{local_file}' 2>> /dev/null && \
+            #{ADB_SHELL} rm -f '#{phone_file}'", out: File::NULL
   end
 
   def delete_clip
     filename = clip_filename
     @logger.debug "removing #{filename}"
-    system("#{ADB_SHELL} rm #{filename}")
+    system("#{ADB_SHELL} rm -f '#{filename}'")
   end
 
   def toggle_recording
