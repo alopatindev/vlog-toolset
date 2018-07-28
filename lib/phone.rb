@@ -3,7 +3,7 @@ class Phone
   MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
   ADB_SHELL = 'adb shell'.freeze
 
-  def initialize(_project_dir, _temp_dir, logger)
+  def initialize(_temp_dir, logger)
     @logger = logger
 
     wakeup
@@ -18,17 +18,17 @@ class Phone
   end
 
   def toggle_recording
-    tap(0.92, 0.5)
+    tap 0.92, 0.5
   end
 
   def focus
-    tap(0.5, 0.5)
+    tap 0.5, 0.5
   end
 
   def tap(x, y)
     screen_x = (x * @height).to_i
     screen_y = (y * @width).to_i
-    system("#{ADB_SHELL} input tap #{screen_x} #{screen_y}")
+    system "#{ADB_SHELL} input tap #{screen_x} #{screen_y}"
   end
 
   def locked?
@@ -40,7 +40,7 @@ class Phone
   end
 
   def wakeup
-    system("#{ADB_SHELL} input keyevent KEYCODE_WAKEUP")
+    system "#{ADB_SHELL} input keyevent KEYCODE_WAKEUP"
   end
 
   def opencamera_active?
@@ -48,12 +48,11 @@ class Phone
   end
 
   def run_opencamera
-    @logger.info 'starting opencamera'
-    system("#{ADB_SHELL} am start -n #{MAIN_ACTIVITY}")
+    system "#{ADB_SHELL} am start -n #{MAIN_ACTIVITY}", out: File::NULL
   end
 
   def close_opencamera
-    system("#{ADB_SHELL} input keyevent KEYCODE_BACK")
+    system "#{ADB_SHELL} input keyevent KEYCODE_BACK"
   end
 
   def get_size
