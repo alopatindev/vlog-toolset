@@ -3,6 +3,7 @@ class Phone
   ADB_SHELL = 'adb shell'.freeze
   MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
   CLIPS_PATH = '/mnt/sdcard/DCIM/OpenCamera'.freeze
+  NEWLINE_SPLITTER = "\r\n".freeze
 
   def initialize(_temp_dir, logger)
     @logger = logger
@@ -18,9 +19,15 @@ class Phone
   end
 
   def clip_filename
-    `adb shell ls #{CLIPS_PATH}`
-      .split("\r\n")
+    `#{ADB_SHELL} ls #{CLIPS_PATH}/*.mp4`
+      .split(NEWLINE_SPLITTER)
       .last
+  end
+
+  def delete_clip
+    filename = clip_filename
+    @logger.debug "removing #{filename}"
+    system("#{ADB_SHELL} rm #{filename}")
   end
 
   def toggle_recording
@@ -63,7 +70,7 @@ class Phone
 
   def get_size
     dumpsys = `#{ADB_SHELL} dumpsys display`
-    if dumpsys =~ /mDisplayWidth=([0-9]*?)\r\n\s*mDisplayHeight=([0-9]*?)\r\n/
+    if dumpsys =~ /mDisplayWidth=([0-9]*?)#{NEWLINE_SPLITTER}\s*mDisplayHeight=([0-9]*?)#{NEWLINE_SPLITTER}/
       width = Regexp.last_match(1).to_i
       height = Regexp.last_match(2).to_i
       [width, height]

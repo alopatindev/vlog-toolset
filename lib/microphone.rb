@@ -1,3 +1,4 @@
+require 'fileutils'
 require 'io/console'
 
 class Microphone
@@ -22,5 +23,9 @@ class Microphone
       @arecord_pipe.close
       @arecord_pipe = nil
     end
+  end
+
+  def delete_clip
+    FileUtils.rm_f @sound_filename unless @sound_filename.nil?
   end
 end

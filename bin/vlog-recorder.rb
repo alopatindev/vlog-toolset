@@ -43,12 +43,6 @@ class DevicesFacade
     toggle_recording if @recording
   end
 
-  def restart_recording
-    stop_recording
-    show_status
-    start_recording
-  end
-
   def toggle_recording
     @recording = !@recording
     @clip_num += 1 if @recording
@@ -63,11 +57,11 @@ class DevicesFacade
   end
 
   def delete_clip
-    # TODO
+    @microphone.delete_clip
+    @phone.delete_clip
   end
 
   def save_clip
-    stop_recording
     # output_filename = File.join @project_dir, '%016d.mkv' % @clip_num
     #
     # @logger.debug("saving #{output_filename}")
@@ -89,6 +83,7 @@ class DevicesFacade
   end
 
   def close
+    stop_recording
     save_clip
 
     @phone.restore_brightness
@@ -126,8 +121,12 @@ def run_main_loop(devices)
       print "Quit? y/n\r"
       break if STDIN.getch == 'y'
     when 'r'
-      devices.restart_recording
+      devices.stop_recording
+      devices.show_status
+      devices.delete_clip
+      devices.start_recording
     when 's'
+      devices.stop_recording
       devices.save_clip
     when 'd'
       devices.stop_recording
