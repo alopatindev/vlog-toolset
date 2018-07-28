@@ -9,14 +9,16 @@ require 'io/console'
 require 'logger'
 
 class DevicesFacade
-  def initialize(project_dir, temp_dir, logger)
+  def initialize(project_dir, temp_dir, arecord_args, logger)
     @project_dir = project_dir
+    @temp_dir = temp_dir
     @logger = logger
 
     @recording = false
-    @clip = 0
+    @clip_num = get_last_clip_num
+    @logger.debug "clip_num is #{@clip_num}"
 
-    @microphone = Microphone.new(temp_dir, logger)
+    @microphone = Microphone.new(temp_dir, arecord_args, logger)
 
     @phone = Phone.new(temp_dir, logger)
     @phone.set_brightness(0)
@@ -24,6 +26,11 @@ class DevicesFacade
     @thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
     logger.info('initialized')
+  end
+
+  def get_last_clip_num
+    Dir.glob("{#{@temp_dir},#{@project_dir}}#{File::SEPARATOR}*.{wav,mp4}")
+       .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }.max || 0
   end
 
   def start_recording
@@ -44,10 +51,10 @@ class DevicesFacade
 
   def toggle_recording
     @recording = !@recording
-    @clip += 1 if @recording
+    @clip_num += 1 if @recording
 
     @phone.toggle_recording
-    @microphone.toggle_recording
+    @microphone.toggle_recording @clip_num
   end
 
   def focus
@@ -61,11 +68,11 @@ class DevicesFacade
 
   def save_clip
     stop_recording
-    # output_filename = File.join(@project_dir, '%016d' % @clip)
+    # output_filename = File.join @project_dir, '%016d.mkv' % @clip_num
     #
     # @logger.debug("saving #{output_filename}")
-    # clip_filename = @phone.get_clip_filename
-    # sound_filename = @microphone.get_sound_filename
+    # clip_filename = @phone.clip_filename
+    # sound_filename = @microphone.sound_filename
     #
     # @thread_pool.post do
     #   begin
@@ -134,7 +141,7 @@ def run_main_loop(devices)
 end
 
 if ARGV.empty?
-  puts 'syntax phone-and-mic-rec.rb project_dir/'
+  puts 'syntax phone-and-mic-rec.rb project_dir/ [arecord-args]'
   exit 1
 end
 
@@ -143,10 +150,12 @@ begin
   temp_dir = File.join project_dir, 'tmp'
   FileUtils.mkdir_p(temp_dir)
 
-  logger = Logger.new(File.join(project_dir, 'log.txt'))
-  logger.level = Logger::WARN
+  arecord_args = ARGV[1].nil? ? 'default' : ARGV[1]
 
-  devices = DevicesFacade.new project_dir, temp_dir, logger
+  logger = Logger.new(File.join(project_dir, 'log.txt'))
+  # logger.level = Logger::WARN
+
+  devices = DevicesFacade.new project_dir, temp_dir, arecord_args, logger
   show_help
   run_main_loop(devices)
 rescue SystemExit, Interrupt

@@ -1,7 +1,8 @@
 class Phone
   APP_ID = 'net.sourceforge.opencamera'.freeze
-  MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
   ADB_SHELL = 'adb shell'.freeze
+  MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
+  CLIPS_PATH = '/mnt/sdcard/DCIM/OpenCamera'.freeze
 
   def initialize(_temp_dir, logger)
     @logger = logger
@@ -13,8 +14,13 @@ class Phone
       run_opencamera unless opencamera_active?
       @width, @height = get_size
       @initial_brightness = get_brightness
-      # TODO: get current recording state?
     end
+  end
+
+  def clip_filename
+    `adb shell ls #{CLIPS_PATH}`
+      .split("\r\n")
+      .last
   end
 
   def toggle_recording
