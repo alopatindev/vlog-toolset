@@ -21,6 +21,7 @@ class Phone
   def clip_filename
     `#{ADB_SHELL} 'ls #{@opencamera_dir}/*.mp4 2>> /dev/null'`
       .split(NEWLINE_SPLITTER)
+      .map(&:strip)
       .reject(&:empty?)
       .last
   end
@@ -33,8 +34,10 @@ class Phone
 
   def delete_clip
     filename = clip_filename
-    @logger.debug "removing #{filename}"
-    system("#{ADB_SHELL} rm -f '#{filename}'")
+    unless filename.nil?
+      @logger.debug "removing #{filename}"
+      system("#{ADB_SHELL} rm -f '#{filename}'")
+    end
   end
 
   def toggle_recording

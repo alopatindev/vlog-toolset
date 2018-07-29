@@ -36,16 +36,22 @@ class DevicesFacade
   end
 
   def start_recording
-    @logger.debug 'start recording'
-    toggle_recording unless @recording
+    unless @recording
+      @logger.debug 'start recording'
+      toggle_recording
+    end
   end
 
   def stop_recording
-    @logger.debug 'stop recording'
-    toggle_recording if @recording
+    if @recording
+      @logger.debug 'stop recording'
+      toggle_recording
+    end
   end
 
   def toggle_recording
+    @logger.debug "toggle_recording from #{@recording}"
+
     @recording = !@recording
     @clip_num += 1 if @recording
 
@@ -84,11 +90,14 @@ class DevicesFacade
         end
 
         system("#{FFMPEG} -i #{processed_sound_filename} -an -i #{temp_clip_filename} -codec copy #{output_filename}")
-        FileUtils.rm_f([temp_clip_filename, sound_filename, processed_sound_filename])
 
-        @logger.info("saved #{output_filename}")
+        temp_files = [temp_clip_filename, sound_filename, processed_sound_filename]
+        @logger.debug "removing #{temp_files}"
+        FileUtils.rm_f temp_files
+
+        @logger.info "saved #{output_filename}"
       rescue StandardError => error
-        @logger.error("failed to save #{output_filename}")
+        @logger.error "failed to save #{output_filename}"
         @logger.error error
       end
     end
@@ -105,7 +114,10 @@ class DevicesFacade
     @logger.debug "running '#{command}'"
     system command, out: File::NULL
 
-    FileUtils.rm_f [wav_output_filename, wav_clip_filename]
+    temp_files = [wav_output_filename, wav_clip_filename]
+    @logger.debug "removing #{temp_files}"
+    FileUtils.rm_f temp_files
+
     flac_output_filename
   end
 
@@ -123,7 +135,7 @@ class DevicesFacade
   end
 
   def show_status
-    size = 10
+    size = 30
     text = @recording ? 'LIVE' : 'stopped'
     postfix = ' ' * (size - text.length)
     print "[ #{text} ]#{postfix}\r"
@@ -181,7 +193,7 @@ begin
   arecord_args = ARGV[1].nil? ? '--device=default --format=dat' : ARGV[1]
   opencamera_dir = ARGV[2].nil? ? '/mnt/sdcard/DCIM/OpenCamera' : ARGV[2]
 
-  logger = Logger.new(File.join(project_dir, 'log.txt'))
+  logger = Logger.new File.join(project_dir, 'log.txt')
   # logger.level = Logger::WARN
 
   devices = DevicesFacade.new project_dir, temp_dir, arecord_args, opencamera_dir, logger
