@@ -11,7 +11,7 @@ require 'logger'
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
 
-  def initialize(project_dir, temp_dir, arecord_args, logger)
+  def initialize(project_dir, temp_dir, arecord_args, opencamera_dir, logger)
     @project_dir = project_dir
     @temp_dir = temp_dir
     @logger = logger
@@ -22,7 +22,7 @@ class DevicesFacade
 
     @microphone = Microphone.new(temp_dir, arecord_args, logger)
 
-    @phone = Phone.new(temp_dir, logger)
+    @phone = Phone.new(opencamera_dir, logger)
     @phone.set_brightness(0)
 
     @thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
@@ -74,9 +74,18 @@ class DevicesFacade
     @thread_pool.post do
       begin
         @phone.move_file_to_host(phone_clip_filename, temp_clip_filename)
+        unless File.file?(temp_clip_filename)
+          raise "Failed to move #{temp_clip_filename}"
+        end
+
         processed_sound_filename = process_sound(temp_clip_filename, sound_filename)
+        unless File.file?(processed_sound_filename)
+          raise "Failed to process #{processed_sound_filename}"
+        end
+
         system("#{FFMPEG} -i #{processed_sound_filename} -an -i #{temp_clip_filename} -codec copy #{output_filename}")
         FileUtils.rm_f([temp_clip_filename, sound_filename, processed_sound_filename])
+
         @logger.info("saved #{output_filename}")
       rescue StandardError => error
         @logger.error("failed to save #{output_filename}")
@@ -94,7 +103,7 @@ class DevicesFacade
             sync-audio-tracks.sh #{sound_filename} #{wav_clip_filename} #{wav_output_filename} && \
             #{FFMPEG} -i #{wav_output_filename} -af 'pan=mono|c0=c0' #{flac_output_filename}"
     @logger.debug "running '#{command}'"
-    system command
+    system command, out: File::NULL
 
     FileUtils.rm_f [wav_output_filename, wav_clip_filename]
     flac_output_filename
@@ -159,8 +168,8 @@ def run_main_loop(devices)
   end
 end
 
-if ARGV.empty?
-  puts 'syntax phone-and-mic-rec.rb project_dir/ [arecord-args]'
+if ARGV.empty? || ARGV[0] == '-h' || ARGV[0] == '--help'
+  puts 'syntax phone-and-mic-rec.rb project_dir/ [arecord-args] [opencamera-dir]'
   exit 1
 end
 
@@ -169,12 +178,13 @@ begin
   temp_dir = File.join project_dir, 'tmp'
   FileUtils.mkdir_p(temp_dir)
 
-  arecord_args = ARGV[1].nil? ? 'default' : ARGV[1]
+  arecord_args = ARGV[1].nil? ? '--device=default --format=dat' : ARGV[1]
+  opencamera_dir = ARGV[2].nil? ? '/mnt/sdcard/DCIM/OpenCamera' : ARGV[2]
 
   logger = Logger.new(File.join(project_dir, 'log.txt'))
   # logger.level = Logger::WARN
 
-  devices = DevicesFacade.new project_dir, temp_dir, arecord_args, logger
+  devices = DevicesFacade.new project_dir, temp_dir, arecord_args, opencamera_dir, logger
   show_help
   run_main_loop(devices)
 rescue SystemExit, Interrupt

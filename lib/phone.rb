@@ -2,10 +2,10 @@ class Phone
   APP_ID = 'net.sourceforge.opencamera'.freeze
   ADB_SHELL = 'adb shell'.freeze
   MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
-  CLIPS_PATH = '/mnt/sdcard/DCIM/OpenCamera'.freeze
   NEWLINE_SPLITTER = "\r\n".freeze
 
-  def initialize(_temp_dir, logger)
+  def initialize(opencamera_dir, logger)
+    @opencamera_dir = opencamera_dir
     @logger = logger
 
     wakeup
@@ -19,13 +19,14 @@ class Phone
   end
 
   def clip_filename
-    `#{ADB_SHELL} 'ls #{CLIPS_PATH}/*.mp4 2>> /dev/null'`
+    `#{ADB_SHELL} 'ls #{@opencamera_dir}/*.mp4 2>> /dev/null'`
       .split(NEWLINE_SPLITTER)
       .reject(&:empty?)
       .last
   end
 
   def move_file_to_host(phone_file, local_file)
+    @logger.debug "move_file_to_host #{phone_file}, #{local_file}"
     system "adb pull -a '#{phone_file}' '#{local_file}' 2>> /dev/null && \
             #{ADB_SHELL} rm -f '#{phone_file}'", out: File::NULL
   end
