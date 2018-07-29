@@ -2,6 +2,7 @@
 
 require 'phone.rb'
 require 'microphone.rb'
+require 'numeric.rb'
 
 require 'concurrent'
 require 'fileutils'
@@ -22,10 +23,11 @@ class DevicesFacade
 
     @microphone = Microphone.new(temp_dir, arecord_args, logger)
 
-    @phone = Phone.new(opencamera_dir, logger)
+    @phone = Phone.new(temp_dir, opencamera_dir, logger)
     @phone.set_brightness(0)
 
     @thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
+    @saving_clips = Set.new
 
     logger.info('initialized')
   end
@@ -33,10 +35,6 @@ class DevicesFacade
   def get_last_clip_num
     Dir.glob("{#{@temp_dir},#{@project_dir}}#{File::SEPARATOR}*.{wav,mp4,mkv}")
        .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }.max || 0
-  end
-
-  def clip_with_leading_zeros
-    format('%016d', @clip_num)
   end
 
   def start_recording
@@ -54,14 +52,13 @@ class DevicesFacade
   end
 
   def toggle_recording
-    @logger.debug "toggle_recording from #{@recording}"
-
     @recording = !@recording
     @clip_num += 1 if @recording
 
-    sound_filename = File.join @temp_dir, clip_with_leading_zeros + '.wav'
-    @microphone.toggle_recording sound_filename
-    @phone.toggle_recording
+    @logger.debug "toggle_recording to #{@recording} clip_num=#{@clip_num}"
+
+    @microphone.toggle_recording @clip_num
+    @phone.toggle_recording @clip_num, @recording
   end
 
   def focus
@@ -70,58 +67,64 @@ class DevicesFacade
   end
 
   def delete_clip
-    @microphone.delete_clip
-    @phone.delete_clip
+    unless @saving_clips.include? @clip_num
+      @microphone.delete_clip @clip_num
+      @phone.delete_clip @clip_num
+    end
   end
 
   def save_clip
-    output_filename = File.join @project_dir, clip_with_leading_zeros + '.mkv'
-    temp_clip_filename = File.join @temp_dir, clip_with_leading_zeros + '.mp4'
+    clip_num = @clip_num
+    phone_filename = @phone.filename(clip_num)
+    sound_filename = @microphone.filename(clip_num)
 
-    sound_filename = @microphone.sound_filename
-    phone_clip_filename = @phone.clip_filename
-    @logger.debug "saving #{output_filename} ; sound=#{sound_filename} video=#{phone_clip_filename}"
+    if @saving_clips.include?(clip_num) || phone_filename.nil? || sound_filename.nil?
+      $logger.debug "save_clip: skipping #{clip_num}"
+    else
+      output_filename = File.join @project_dir, clip_num.with_leading_zeros + '.mkv'
+      @logger.info "save_clip #{@clip_num} as #{output_filename}"
 
-    @thread_pool.post do
-      begin
-        @phone.move_file_to_host(phone_clip_filename, temp_clip_filename)
-        unless File.file?(temp_clip_filename)
-          raise "Failed to move #{temp_clip_filename}"
+      @thread_pool.post do
+        begin
+          camera_filename = @phone.move_to_host(phone_filename, clip_num)
+          @logger.debug "save_clip: camera_filename=#{camera_filename} sound_filename=#{sound_filename}"
+          processed_sound_filename = process_sound(camera_filename, sound_filename)
+          @logger.debug "save_clip: processed_sound_filename=#{processed_sound_filename}"
+
+          command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{camera_filename}' -codec copy '#{output_filename}'"
+          @logger.debug command
+          system command
+
+          temp_files = [camera_filename, sound_filename, processed_sound_filename]
+          @logger.debug "save_clip: removing temp files: #{temp_files}"
+          FileUtils.rm_f temp_files
+
+          @logger.info "save_clip: #{clip_num} as #{output_filename} ok"
+        rescue StandardError => error
+          @logger.info "ignoring saving of #{clip_num} as #{output_filename}"
         end
-
-        processed_sound_filename = process_sound(temp_clip_filename, sound_filename)
-        unless File.file?(processed_sound_filename)
-          raise "Failed to process #{processed_sound_filename}"
-        end
-
-        system("#{FFMPEG} -i #{processed_sound_filename} -an -i #{temp_clip_filename} -codec copy #{output_filename}")
-
-        temp_files = [temp_clip_filename, sound_filename, processed_sound_filename]
-        @logger.debug "removing #{temp_files}"
-        FileUtils.rm_f temp_files
-
-        @logger.info "saved #{output_filename}"
-      rescue StandardError => error
-        @logger.error "failed to save #{output_filename}"
-        @logger.error error
       end
     end
   end
 
-  def process_sound(clip_filename, sound_filename)
-    wav_clip_filename = "#{clip_filename}.wav"
+  def process_sound(camera_filename, sound_filename)
+    wav_camera_filename = "#{camera_filename}.wav"
     flac_output_filename = "#{sound_filename}.flac"
     wav_output_filename = "#{sound_filename}.sync.wav"
 
-    command = "#{FFMPEG} -i #{clip_filename} -vn #{wav_clip_filename} && \
-            sync-audio-tracks.sh #{sound_filename} #{wav_clip_filename} #{wav_output_filename} && \
+    command = "#{FFMPEG} -i #{camera_filename} -vn #{wav_camera_filename} && \
+            sync-audio-tracks.sh #{sound_filename} #{wav_camera_filename} #{wav_output_filename} && \
             #{FFMPEG} -i #{wav_output_filename} -af 'pan=mono|c0=c0' #{flac_output_filename}"
-    @logger.debug "running '#{command}'"
+    @logger.debug command
     system command, out: File::NULL
 
-    temp_files = [wav_output_filename, wav_clip_filename]
+    temp_files = [wav_output_filename, wav_camera_filename]
     @logger.debug "removing #{temp_files}"
     FileUtils.rm_f temp_files
+
+    unless File.file?(flac_output_filename)
+      raise "Failed to process #{flac_output_filename}"
+    end
 
     flac_output_filename
   end
