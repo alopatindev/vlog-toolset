@@ -35,6 +35,10 @@ class DevicesFacade
        .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }.max || 0
   end
 
+  def clip_with_leading_zeros
+    format('%016d', @clip_num)
+  end
+
   def start_recording
     unless @recording
       @logger.debug 'start recording'
@@ -55,8 +59,9 @@ class DevicesFacade
     @recording = !@recording
     @clip_num += 1 if @recording
 
+    sound_filename = File.join @temp_dir, clip_with_leading_zeros + '.wav'
+    @microphone.toggle_recording sound_filename
     @phone.toggle_recording
-    @microphone.toggle_recording @clip_num
   end
 
   def focus
@@ -70,12 +75,12 @@ class DevicesFacade
   end
 
   def save_clip
-    output_filename = File.join @project_dir, format('%016d.mkv', @clip_num)
-    temp_clip_filename = File.join @temp_dir, format('%016d.mp4', @clip_num)
+    output_filename = File.join @project_dir, clip_with_leading_zeros + '.mkv'
+    temp_clip_filename = File.join @temp_dir, clip_with_leading_zeros + '.mp4'
 
-    @logger.debug("saving #{output_filename}")
     sound_filename = @microphone.sound_filename
     phone_clip_filename = @phone.clip_filename
+    @logger.debug "saving #{output_filename} ; sound=#{sound_filename} video=#{phone_clip_filename}"
 
     @thread_pool.post do
       begin

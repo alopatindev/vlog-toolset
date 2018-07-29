@@ -12,9 +12,9 @@ class Microphone
     @arecord_pipe = nil
   end
 
-  def toggle_recording(sound_num)
+  def toggle_recording(sound_filename)
     if @arecord_pipe.nil?
-      @sound_filename = File.join @temp_dir, format('%016d.wav', sound_num)
+      @sound_filename = sound_filename
       command = "exec #{@arecord_command} #{@sound_filename} >/dev/null 2>&1"
       @logger.debug "running #{command}"
       @arecord_pipe = IO.popen command
