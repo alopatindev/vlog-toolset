@@ -4,15 +4,18 @@ require 'set'
 
 class Phone
   APP_ID = 'net.sourceforge.opencamera'.freeze
-  ADB_SHELL = 'adb shell'.freeze
   MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
   NEWLINE_SPLITTER = "\r\n".freeze
   POLL_WAIT_TIME = 0.3
 
-  def initialize(temp_dir, opencamera_dir, logger)
+  def initialize(temp_dir, adb_args, opencamera_dir, logger)
     @temp_dir = temp_dir
+    @adb_args = adb_args
     @opencamera_dir = opencamera_dir
     @logger = logger
+
+    @adb = "adb #{adb_args}"
+    @adb_shell = "#{@adb} shell"
 
     @clip_num_to_filename = {}
     @filenames = Set.new
@@ -33,8 +36,8 @@ class Phone
     local_filename = File.join @temp_dir, clip_num.with_leading_zeros + '.mp4'
     @logger.debug "move_to_host #{phone_filename} => #{local_filename}"
 
-    system "adb pull -a '#{phone_filename}' '#{local_filename}' 2>> /dev/null && \
-            #{ADB_SHELL} rm -f '#{phone_filename}'", out: File::NULL
+    system "#{@adb} pull -a '#{phone_filename}' '#{local_filename}' 2>> /dev/null && \
+            #{@adb_shell} rm -f '#{phone_filename}'", out: File::NULL
 
     raise "Failed to move #{phone_filename} => #{local_filename}" unless File.file?(local_filename)
     @logger.debug "move_to_host #{phone_filename} => #{local_filename} ok"
@@ -46,7 +49,7 @@ class Phone
     filename = filename(clip_num)
     unless filename.nil?
       @logger.debug "phone.delete_clip #{clip_num} #{filename}"
-      system("#{ADB_SHELL} rm -f '#{filename}'")
+      system("#{@adb_shell} rm -f '#{filename}'")
       @clip_num_to_filename.delete(clip_num)
     end
   end
@@ -63,7 +66,7 @@ class Phone
   end
 
   def get_new_filenames
-    `#{ADB_SHELL} 'ls #{@opencamera_dir}/*.mp4 2>> /dev/null'`
+    `#{@adb_shell} 'ls #{@opencamera_dir}/*.mp4 2>> /dev/null'`
       .split(NEWLINE_SPLITTER)
       .map(&:strip)
       .reject { |f| @filenames.include?(f) }
@@ -97,11 +100,11 @@ class Phone
   def tap(x, y)
     screen_x = (x * @height).to_i
     screen_y = (y * @width).to_i
-    system "#{ADB_SHELL} input tap #{screen_x} #{screen_y}"
+    system "#{@adb_shell} input tap #{screen_x} #{screen_y}"
   end
 
   def locked?
-    if `#{ADB_SHELL} dumpsys window` =~ /mShowingLockscreen=(.*?)\s/
+    if `#{@adb_shell} dumpsys window` =~ /mShowingLockscreen=(.*?)\s/
       Regexp.last_match(1) == 'true'
     else
       raise 'Failed to check if device is locked'
@@ -109,23 +112,23 @@ class Phone
   end
 
   def wakeup
-    system "#{ADB_SHELL} input keyevent KEYCODE_WAKEUP"
+    system "#{@adb_shell} input keyevent KEYCODE_WAKEUP"
   end
 
   def opencamera_active?
-    `#{ADB_SHELL} dumpsys window windows`.match?(/mCurrentFocus=Window\{[0-9a-f]* u0 #{MAIN_ACTIVITY}/)
+    `#{@adb_shell} dumpsys window windows`.match?(/mCurrentFocus=Window\{[0-9a-f]* u0 #{MAIN_ACTIVITY}/)
   end
 
   def run_opencamera
-    system "#{ADB_SHELL} am start -n #{MAIN_ACTIVITY}", out: File::NULL
+    system "#{@adb_shell} am start -n #{MAIN_ACTIVITY}", out: File::NULL
   end
 
   def close_opencamera
-    system "#{ADB_SHELL} input keyevent KEYCODE_BACK"
+    system "#{@adb_shell} input keyevent KEYCODE_BACK"
   end
 
   def get_size
-    dumpsys = `#{ADB_SHELL} dumpsys display`
+    dumpsys = `#{@adb_shell} dumpsys display`
     if dumpsys =~ /mDisplayWidth=([0-9]*?)#{NEWLINE_SPLITTER}\s*mDisplayHeight=([0-9]*?)#{NEWLINE_SPLITTER}/
       width = Regexp.last_match(1).to_i
       height = Regexp.last_match(2).to_i
@@ -136,11 +139,11 @@ class Phone
   end
 
   def get_brightness
-    `#{ADB_SHELL} settings get system screen_brightness`.to_i
+    `#{@adb_shell} settings get system screen_brightness`.to_i
   end
 
   def set_brightness(brightness)
-    `#{ADB_SHELL} settings put system screen_brightness #{brightness}`.to_i
+    `#{@adb_shell} settings put system screen_brightness #{brightness}`.to_i
   end
 
   def restore_brightness
@@ -148,7 +151,7 @@ class Phone
   end
 
   def get_battery_info
-    dumpsys = `#{ADB_SHELL} dumpsys battery`.split(NEWLINE_SPLITTER)
+    dumpsys = `#{@adb_shell} dumpsys battery`.split(NEWLINE_SPLITTER)
     level = dumpsys.select { |line| line.include? 'level: ' }
                    .map { |line| line.gsub(/.*: /, '') }
                    .first

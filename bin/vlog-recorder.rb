@@ -12,7 +12,7 @@ require 'logger'
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
 
-  def initialize(project_dir, temp_dir, arecord_args, opencamera_dir, logger)
+  def initialize(project_dir, temp_dir, arecord_args, adb_args, opencamera_dir, logger)
     @project_dir = project_dir
     @temp_dir = temp_dir
     @logger = logger
@@ -23,7 +23,7 @@ class DevicesFacade
 
     @microphone = Microphone.new(temp_dir, arecord_args, logger)
 
-    @phone = Phone.new(temp_dir, opencamera_dir, logger)
+    @phone = Phone.new(temp_dir, adb_args, opencamera_dir, logger)
     @phone.set_brightness(0)
 
     @thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
@@ -193,7 +193,7 @@ def run_main_loop(devices)
 end
 
 if ARGV.empty? || ARGV[0] == '-h' || ARGV[0] == '--help'
-  puts 'syntax phone-and-mic-rec.rb project_dir/ [arecord-args] [opencamera-dir]'
+  puts 'syntax phone-and-mic-rec.rb project_dir/ [arecord-args] [android-device-id] [opencamera-dir]'
   exit 1
 end
 
@@ -203,12 +203,13 @@ begin
   FileUtils.mkdir_p(temp_dir)
 
   arecord_args = ARGV[1].nil? ? '--device=default --format=dat' : ARGV[1]
-  opencamera_dir = ARGV[2].nil? ? '/mnt/sdcard/DCIM/OpenCamera' : ARGV[2]
+  adb_args = ARGV[2].nil? ? '' : "-s #{ARGV[2]}"
+  opencamera_dir = ARGV[3].nil? ? '/mnt/sdcard/DCIM/OpenCamera' : ARGV[3]
 
   logger = Logger.new File.join(project_dir, 'log.txt')
   # logger.level = Logger::WARN
 
-  devices = DevicesFacade.new project_dir, temp_dir, arecord_args, opencamera_dir, logger
+  devices = DevicesFacade.new project_dir, temp_dir, arecord_args, adb_args, opencamera_dir, logger
   show_help
   run_main_loop(devices)
 rescue SystemExit, Interrupt
