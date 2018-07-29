@@ -142,11 +142,15 @@ class DevicesFacade
     @thread_pool.wait_for_termination
   end
 
-  def show_status
-    size = 30
-    text = @recording ? 'LIVE' : 'stopped'
+  def show_status(text)
+    size = 80
+    if text.nil?
+      recording = @recording ? 'LIVE' : 'stopped'
+      battery_level, battery_temperature = @phone.get_battery_info
+      text = "[ #{recording} ] [ battery: #{battery_level}% / #{battery_temperature}°C ]"
+    end
     postfix = ' ' * (size - text.length)
-    print "[ #{text} ]#{postfix}\r"
+    print "#{text}#{postfix}\r"
     STDOUT.flush
   end
 end
@@ -163,15 +167,15 @@ end
 
 def run_main_loop(devices)
   loop do
-    devices.show_status
+    devices.show_status nil
 
     case STDIN.getch
     when 'q'
-      print "Quit? y/n\r"
+      devices.show_status 'Quit? y/n'
       break if STDIN.getch == 'y'
     when 'r'
       devices.stop_recording
-      devices.show_status
+      devices.show_status nil
       devices.delete_clip
       devices.start_recording
     when 's'

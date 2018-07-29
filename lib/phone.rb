@@ -146,4 +146,15 @@ class Phone
   def restore_brightness
     set_brightness @initial_brightness
   end
+
+  def get_battery_info
+    dumpsys = `#{ADB_SHELL} dumpsys battery`.split(NEWLINE_SPLITTER)
+    level = dumpsys.select { |line| line.include? 'level: ' }
+                   .map { |line| line.gsub(/.*: /, '') }
+                   .first
+    temperature = dumpsys.select { |line| line.include? 'temperature: ' }
+                         .map { |line| line.gsub(/.*: /, '').to_i / 10 }
+                         .first
+    [level, temperature]
+  end
 end
