@@ -8,22 +8,27 @@ require 'concurrent'
 require 'fileutils'
 require 'io/console'
 require 'logger'
+require 'optparse'
 
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
 
-  def initialize(project_dir, temp_dir, trim_seconds, arecord_args, adb_args, opencamera_dir, logger)
-    @project_dir = project_dir
+  def initialize(options, temp_dir, logger)
+    @project_dir = options[:project_dir]
     @temp_dir = temp_dir
-    @trim_seconds = trim_seconds
+    @trim_duration = options[:trim_duration]
     @logger = logger
 
     @recording = false
     @clip_num = get_last_clip_num
     @logger.debug "clip_num is #{@clip_num}"
 
+    arecord_args = options[:arecord_args]
     @microphone = Microphone.new(temp_dir, arecord_args, logger)
 
+    android_id = options[:android_id]
+    adb_args = android_id.empty? ? '' : "-s #{android_id}"
+    opencamera_dir = options[:opencamera_dir]
     @phone = Phone.new(temp_dir, adb_args, opencamera_dir, logger)
     @phone.set_brightness(0)
 
@@ -93,12 +98,12 @@ class DevicesFacade
           @logger.debug "save_clip: processed_sound_filename=#{processed_sound_filename}"
 
           duration = [get_duration(camera_filename), get_duration(processed_sound_filename)].min
-          end_position = duration - @trim_seconds
+          end_position = duration - @trim_duration
 
-          if @trim_seconds >= end_position
+          if @trim_duration >= end_position
             @logger.info "skipping too short clip #{clip_num}"
           else
-            command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{camera_filename}' -ss #{@trim_seconds} -to #{end_position} -shortest -codec copy '#{output_filename}'"
+            command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{camera_filename}' -ss #{@trim_duration} -to #{end_position} -shortest -codec copy '#{output_filename}'"
             @logger.debug command
             system command
           end
@@ -205,25 +210,38 @@ def run_main_loop(devices)
   end
 end
 
-if ARGV.empty? || ARGV[0] == '-h' || ARGV[0] == '--help'
-  puts 'syntax phone-and-mic-rec.rb project_dir/ [trim-seconds] [arecord-args] [android-device-id] [opencamera-dir]'
-  exit 1
+def parse_options!(options)
+  OptionParser.new do |opts|
+    opts.banner = 'Usage: vlog-recorder.rb -p project_dir/ [other options]'
+    opts.on('-p', '--project [dir]', 'Project directory') { |p| options[:project_dir] = p }
+    opts.on('-t', '--trim [duration]', 'Trim duration of beginning and ending of each clip (default 0.15)') { |t| options[:trim_duration] = t.to_f }
+    opts.on('-s', '--sound-settings [arecord-args]', 'Additional arecord arguments (default " --device=default --format=dat"') { |s| options[:arecord_args] = s }
+    opts.on('-a', '--android-device [device-id]', 'Android device id') { |a| options[:android_id] = a }
+    opts.on('-o', '--opencamera-dir [dir]', 'Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")') { |o| options[:opencamera_dir] = o }
+  end.parse!
+
+  p options
+
+  raise OptionParser::MissingArgument if options[:project_dir].nil?
 end
 
+options = {
+  trim_duration: 0.15,
+  arecord_args: ' --device=default --format=dat',
+  android_id: '',
+  opencamera_dir: '/mnt/sdcard/DCIM/OpenCamera'
+}
+parse_options!(options)
+
 begin
-  project_dir = ARGV[0]
+  project_dir = options[:project_dir]
   temp_dir = File.join project_dir, 'tmp'
   FileUtils.mkdir_p(temp_dir)
-
-  trim_seconds = ARGV[1].nil? ? '0.15' : ARGV[1]
-  arecord_args = ARGV[2].nil? ? '--device=default --format=dat' : ARGV[2]
-  adb_args = ARGV[3].nil? ? '' : "-s #{ARGV[3]}"
-  opencamera_dir = ARGV[4].nil? ? '/mnt/sdcard/DCIM/OpenCamera' : ARGV[4]
 
   logger = Logger.new File.join(project_dir, 'log.txt')
   # logger.level = Logger::WARN
 
-  devices = DevicesFacade.new project_dir, temp_dir, trim_seconds.to_f, arecord_args, adb_args, opencamera_dir, logger
+  devices = DevicesFacade.new options, temp_dir, logger
   show_help
   run_main_loop(devices)
 rescue SystemExit, Interrupt
