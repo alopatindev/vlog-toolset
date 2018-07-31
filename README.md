@@ -1,5 +1,5 @@
 # vlog-recorder
-This tool is designed to record clipping videos for Vlogs
+This tool is designed to record clipping videos for Vlogs or audios for Podcasts
 
 ## How it works
 - records video (using camera of Android-based device)
@@ -12,8 +12,18 @@ This tool is designed to record clipping videos for Vlogs
 ```
 git clone git@github.com:alopatindev/vlog-recorder.git
 cd vlog-recorder
-RUBYOPT="-Ilib" ./bin/vlog-recorder.rb ~/video/new-cool-video-project
 
+RUBYOPT="-Ilib" ./bin/vlog-recorder.rb -h
+Usage: vlog-recorder.rb -p project_dir/ [other options]
+    -p, --project [dir]              Project directory
+    -t, --trim [duration]            Trim duration of beginning and ending of each clip (default 0.15)
+    -s [arecord-args],               Additional arecord arguments (default " --device=default --format=dat"
+        --sound-settings
+    -a, --android-device [device-id] Android device id
+    -o, --opencamera-dir [dir]       Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")
+    -u, --use-camera [true|false]    Whether we use Android device at all (default "true")
+
+RUBYOPT="-Ilib" ./bin/vlog-recorder.rb -p ~/video/new-cool-video-project
 r - (RE)START recording
 s - STOP and SAVE current clip
 d - STOP and DELETE current clip

@@ -8,11 +8,16 @@ class Phone
   NEWLINE_SPLITTER = "\r\n".freeze
   POLL_WAIT_TIME = 0.3
 
-  def initialize(temp_dir, adb_args, opencamera_dir, logger)
+  def initialize(temp_dir, options, logger)
     @temp_dir = temp_dir
-    @adb_args = adb_args
-    @opencamera_dir = opencamera_dir
+
+    @no_camera = !options[:use_camera]
+    return if @no_camera
+
     @logger = logger
+    android_id = options[:android_id]
+    adb_args = android_id.empty? ? '' : "-s #{android_id}"
+    @opencamera_dir = options[:opencamera_dir]
 
     @adb = "adb #{adb_args}"
     @adb_shell = "#{@adb} shell"
@@ -33,6 +38,8 @@ class Phone
   end
 
   def move_to_host(phone_filename, clip_num)
+    return if @no_camera
+
     local_filename = File.join @temp_dir, clip_num.with_leading_zeros + '.mp4'
     @logger.debug "move_to_host #{phone_filename} => #{local_filename}"
 
@@ -46,6 +53,8 @@ class Phone
   end
 
   def delete_clip(clip_num)
+    return if @no_camera
+
     filename = filename(clip_num)
     unless filename.nil?
       @logger.debug "phone.delete_clip #{clip_num} #{filename}"
@@ -55,6 +64,7 @@ class Phone
   end
 
   def filename(clip_num)
+    return nil if @no_camera
     @clip_num_to_filename[clip_num]
   end
 
@@ -88,12 +98,16 @@ class Phone
   end
 
   def toggle_recording(clip_num, recording)
+    return if @no_camera
+
     tap 0.92, 0.5
 
     wait_for_new_filename clip_num if recording
   end
 
   def focus
+    return if @no_camera
+
     tap 0.5, 0.5
   end
 
@@ -124,6 +138,7 @@ class Phone
   end
 
   def close_opencamera
+    return if @no_camera
     system "#{@adb_shell} input keyevent KEYCODE_BACK"
   end
 
@@ -143,14 +158,18 @@ class Phone
   end
 
   def set_brightness(brightness)
+    return if @no_camera
     `#{@adb_shell} settings put system screen_brightness #{brightness}`.to_i
   end
 
   def restore_brightness
+    return if @no_camera
     set_brightness @initial_brightness
   end
 
   def get_battery_info
+    return [0, 0] if @no_camera
+
     dumpsys = `#{@adb_shell} dumpsys battery`.split(NEWLINE_SPLITTER)
     level = dumpsys.select { |line| line.include? 'level: ' }
                    .map { |line| line.gsub(/.*: /, '') }

@@ -17,6 +17,7 @@ class DevicesFacade
     @project_dir = options[:project_dir]
     @temp_dir = temp_dir
     @trim_duration = options[:trim_duration]
+    @use_camera = options[:use_camera]
     @logger = logger
 
     @recording = false
@@ -26,10 +27,7 @@ class DevicesFacade
     arecord_args = options[:arecord_args]
     @microphone = Microphone.new(temp_dir, arecord_args, logger)
 
-    android_id = options[:android_id]
-    adb_args = android_id.empty? ? '' : "-s #{android_id}"
-    opencamera_dir = options[:opencamera_dir]
-    @phone = Phone.new(temp_dir, adb_args, opencamera_dir, logger)
+    @phone = Phone.new(temp_dir, options, logger)
     @phone.set_brightness(0)
 
     @thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
@@ -39,7 +37,7 @@ class DevicesFacade
   end
 
   def get_last_clip_num
-    Dir.glob("{#{@temp_dir},#{@project_dir}}#{File::SEPARATOR}*.{wav,mp4,mkv}")
+    Dir.glob("{#{@temp_dir},#{@project_dir}}#{File::SEPARATOR}*.{wav,mp4,mkv,flac}")
        .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }.max || 0
   end
 
@@ -84,10 +82,11 @@ class DevicesFacade
     phone_filename = @phone.filename(clip_num)
     sound_filename = @microphone.filename(clip_num)
 
-    if @saving_clips.include?(clip_num) || phone_filename.nil? || sound_filename.nil?
+    if @saving_clips.include?(clip_num) || (@use_camera && phone_filename.nil?) || sound_filename.nil?
       @logger.debug "save_clip: skipping #{clip_num}"
     else
-      output_filename = File.join @project_dir, clip_num.with_leading_zeros + '.mkv'
+      extension = @use_camera ? '.mkv' : '.flac'
+      output_filename = File.join @project_dir, clip_num.with_leading_zeros + extension
       @logger.info "save_clip #{@clip_num} as #{output_filename}"
 
       @thread_pool.post do
@@ -97,18 +96,27 @@ class DevicesFacade
           processed_sound_filename = process_sound(camera_filename, sound_filename)
           @logger.debug "save_clip: processed_sound_filename=#{processed_sound_filename}"
 
-          duration = [get_duration(camera_filename), get_duration(processed_sound_filename)].min
+          processed_sound_duration = get_duration(processed_sound_filename)
+          duration = @use_camera ? [get_duration(camera_filename), processed_sound_duration].min
+                                 : processed_sound_duration
           end_position = duration - @trim_duration
 
-          if @trim_duration >= end_position
-            @logger.info "skipping too short clip #{clip_num}"
+          if @use_camera
+            if @trim_duration >= end_position
+              @logger.info "skipping too short clip #{clip_num}"
+            else
+              command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{camera_filename}' -ss #{@trim_duration} -to #{end_position} -shortest -codec copy '#{output_filename}'"
+              @logger.debug command
+              system command
+            end
+            temp_files = [camera_filename, sound_filename, processed_sound_filename]
           else
-            command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{camera_filename}' -ss #{@trim_duration} -to #{end_position} -shortest -codec copy '#{output_filename}'"
+            command = "#{FFMPEG} -i '#{processed_sound_filename}' -ss #{@trim_duration} -to #{end_position} -codec copy '#{output_filename}'"
             @logger.debug command
             system command
+            temp_files = [sound_filename, processed_sound_filename]
           end
 
-          temp_files = [camera_filename, sound_filename, processed_sound_filename]
           @logger.debug "save_clip: removing temp files: #{temp_files}"
           FileUtils.rm_f temp_files
 
@@ -126,19 +134,25 @@ class DevicesFacade
   end
 
   def process_sound(camera_filename, sound_filename)
-    wav_camera_filename = "#{camera_filename}.wav"
     flac_output_filename = "#{sound_filename}.flac"
-    wav_output_filename = "#{sound_filename}.sync.wav"
 
-    command = "#{FFMPEG} -i #{camera_filename} -vn #{wav_camera_filename} && \
-            sync-audio-tracks.sh #{sound_filename} #{wav_camera_filename} #{wav_output_filename} && \
-            #{FFMPEG} -i #{wav_output_filename} -af 'pan=mono|c0=c0' #{flac_output_filename}"
-    @logger.debug command
-    system command, out: File::NULL
+    if @use_camera
+      wav_output_filename = "#{sound_filename}.sync.wav"
+      wav_camera_filename = "#{camera_filename}.wav"
+      command = "#{FFMPEG} -i #{camera_filename} -vn #{wav_camera_filename} && \
+              sync-audio-tracks.sh #{sound_filename} #{wav_camera_filename} #{wav_output_filename} && \
+              #{FFMPEG} -i #{wav_output_filename} -af 'pan=mono|c0=c0' #{flac_output_filename}"
+      @logger.debug command
+      system command, out: File::NULL
 
-    temp_files = [wav_output_filename, wav_camera_filename]
-    @logger.debug "removing #{temp_files}"
-    FileUtils.rm_f temp_files
+      temp_files = [wav_output_filename, wav_camera_filename]
+      @logger.debug "removing #{temp_files}"
+      FileUtils.rm_f temp_files
+    else
+      command = "#{FFMPEG} -i '#{sound_filename}' -af 'pan=mono|c0=c0' '#{flac_output_filename}'"
+      @logger.debug command
+      system command, out: File::NULL
+    end
 
     unless File.file?(flac_output_filename)
       raise "Failed to process #{flac_output_filename}"
@@ -218,6 +232,7 @@ def parse_options!(options)
     opts.on('-s', '--sound-settings [arecord-args]', 'Additional arecord arguments (default " --device=default --format=dat"') { |s| options[:arecord_args] = s }
     opts.on('-a', '--android-device [device-id]', 'Android device id') { |a| options[:android_id] = a }
     opts.on('-o', '--opencamera-dir [dir]', 'Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")') { |o| options[:opencamera_dir] = o }
+    opts.on('-u', '--use-camera [true|false]', 'Whether we use Android device at all (default "true")') { |u| options[:use_camera] = u == 'true' }
   end.parse!
 
   p options
@@ -229,7 +244,8 @@ options = {
   trim_duration: 0.15,
   arecord_args: ' --device=default --format=dat',
   android_id: '',
-  opencamera_dir: '/mnt/sdcard/DCIM/OpenCamera'
+  opencamera_dir: '/mnt/sdcard/DCIM/OpenCamera',
+  use_camera: true
 }
 parse_options!(options)
 
