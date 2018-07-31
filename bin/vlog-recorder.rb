@@ -12,9 +12,10 @@ require 'logger'
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
 
-  def initialize(project_dir, temp_dir, arecord_args, adb_args, opencamera_dir, logger)
+  def initialize(project_dir, temp_dir, trim_seconds, arecord_args, adb_args, opencamera_dir, logger)
     @project_dir = project_dir
     @temp_dir = temp_dir
+    @trim_seconds = trim_seconds
     @logger = logger
 
     @recording = false
@@ -79,7 +80,7 @@ class DevicesFacade
     sound_filename = @microphone.filename(clip_num)
 
     if @saving_clips.include?(clip_num) || phone_filename.nil? || sound_filename.nil?
-      $logger.debug "save_clip: skipping #{clip_num}"
+      @logger.debug "save_clip: skipping #{clip_num}"
     else
       output_filename = File.join @project_dir, clip_num.with_leading_zeros + '.mkv'
       @logger.info "save_clip #{@clip_num} as #{output_filename}"
@@ -91,9 +92,16 @@ class DevicesFacade
           processed_sound_filename = process_sound(camera_filename, sound_filename)
           @logger.debug "save_clip: processed_sound_filename=#{processed_sound_filename}"
 
-          command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{camera_filename}' -codec copy '#{output_filename}'"
-          @logger.debug command
-          system command
+          duration = [get_duration(camera_filename), get_duration(processed_sound_filename)].min
+          end_position = duration - @trim_seconds
+
+          if @trim_seconds >= end_position
+            @logger.info "skipping too short clip #{clip_num}"
+          else
+            command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{camera_filename}' -ss #{@trim_seconds} -to #{end_position} -shortest -codec copy '#{output_filename}'"
+            @logger.debug command
+            system command
+          end
 
           temp_files = [camera_filename, sound_filename, processed_sound_filename]
           @logger.debug "save_clip: removing temp files: #{temp_files}"
@@ -102,9 +110,14 @@ class DevicesFacade
           @logger.info "save_clip: #{clip_num} as #{output_filename} ok"
         rescue StandardError => error
           @logger.info "ignoring saving of #{clip_num} as #{output_filename}"
+          @logger.debug error
         end
       end
     end
+  end
+
+  def get_duration(filename)
+    `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '#{filename}'`.to_f
   end
 
   def process_sound(camera_filename, sound_filename)
@@ -193,7 +206,7 @@ def run_main_loop(devices)
 end
 
 if ARGV.empty? || ARGV[0] == '-h' || ARGV[0] == '--help'
-  puts 'syntax phone-and-mic-rec.rb project_dir/ [arecord-args] [android-device-id] [opencamera-dir]'
+  puts 'syntax phone-and-mic-rec.rb project_dir/ [trim-seconds] [arecord-args] [android-device-id] [opencamera-dir]'
   exit 1
 end
 
@@ -202,14 +215,15 @@ begin
   temp_dir = File.join project_dir, 'tmp'
   FileUtils.mkdir_p(temp_dir)
 
-  arecord_args = ARGV[1].nil? ? '--device=default --format=dat' : ARGV[1]
-  adb_args = ARGV[2].nil? ? '' : "-s #{ARGV[2]}"
-  opencamera_dir = ARGV[3].nil? ? '/mnt/sdcard/DCIM/OpenCamera' : ARGV[3]
+  trim_seconds = ARGV[1].nil? ? '0.15' : ARGV[1]
+  arecord_args = ARGV[2].nil? ? '--device=default --format=dat' : ARGV[2]
+  adb_args = ARGV[3].nil? ? '' : "-s #{ARGV[3]}"
+  opencamera_dir = ARGV[4].nil? ? '/mnt/sdcard/DCIM/OpenCamera' : ARGV[4]
 
   logger = Logger.new File.join(project_dir, 'log.txt')
   # logger.level = Logger::WARN
 
-  devices = DevicesFacade.new project_dir, temp_dir, arecord_args, adb_args, opencamera_dir, logger
+  devices = DevicesFacade.new project_dir, temp_dir, trim_seconds.to_f, arecord_args, adb_args, opencamera_dir, logger
   show_help
   run_main_loop(devices)
 rescue SystemExit, Interrupt
