@@ -12,6 +12,7 @@ require 'optparse'
 
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
+  MEDIA_PLAYER = 'mpv --no-terminal'.freeze
 
   def initialize(options, temp_dir, logger)
     @project_dir = options[:project_dir]
@@ -85,9 +86,9 @@ class DevicesFacade
     if @saving_clips.include?(clip_num) || (@use_camera && phone_filename.nil?) || sound_filename.nil?
       @logger.debug "save_clip: skipping #{clip_num}"
     else
-      extension = @use_camera ? '.mkv' : '.flac'
-      output_filename = File.join @project_dir, clip_num.with_leading_zeros + extension
-      @logger.info "save_clip #{@clip_num} as #{output_filename}"
+      output_filename = get_output_filename clip_num
+      @logger.info "save_clip #{clip_num} as #{output_filename}"
+      @saving_clips.add(clip_num)
 
       @thread_pool.post do
         begin
@@ -127,6 +128,11 @@ class DevicesFacade
         end
       end
     end
+  end
+
+  def get_output_filename(clip_num)
+    extension = @use_camera ? '.mkv' : '.flac'
+    File.join @project_dir, clip_num.with_leading_zeros + extension
   end
 
   def get_duration(filename)
@@ -185,12 +191,24 @@ class DevicesFacade
     print "#{text}#{postfix}\r"
     STDOUT.flush
   end
+
+  def play
+    output_filename = get_output_filename @clip_num
+    @logger.debug "play: #{output_filename}"
+    @logger.debug "play: #{@saving_clips.include?(@clip_num)} #{File.file?(output_filename)}"
+    if @saving_clips.include?(@clip_num) && File.file?(output_filename)
+      command = "#{MEDIA_PLAYER} #{output_filename}"
+      @logger.debug command
+      system command
+    end
+  end
 end
 
 def show_help
   puts 'r - (RE)START recording'
   puts 's - STOP and SAVE current clip'
   puts 'd - STOP and DELETE current clip'
+  puts 'p - PLAY last saved clip'
   puts 'f - FOCUS camera on center'
   puts 'h - show HELP'
   puts 'q / Ctrl+C - QUIT'
@@ -216,6 +234,8 @@ def run_main_loop(devices)
     when 'd'
       devices.stop_recording
       devices.delete_clip
+    when 'p'
+      devices.play
     when 'f'
       devices.focus
     when 'h'

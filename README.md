@@ -27,6 +27,7 @@ RUBYOPT="-Ilib" ./bin/vlog-recorder.rb -p ~/video/new-cool-video-project
 r - (RE)START recording
 s - STOP and SAVE current clip
 d - STOP and DELETE current clip
+p - PLAY last saved clip
 f - FOCUS camera on center
 h - show HELP
 q / Ctrl+C - QUIT
@@ -34,6 +35,8 @@ q / Ctrl+C - QUIT
 
 ## Dependencies
 - ruby (tested with 2.5.1)
+- ffmpeg (tested with 3.3.6)
 - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH variable)
 - alsa-utils
 - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))
+- mpv (tested with 0.27.2)
