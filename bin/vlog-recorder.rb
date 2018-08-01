@@ -22,7 +22,7 @@ class DevicesFacade
     @logger = logger
 
     @recording = false
-    @clip_num = get_last_clip_num
+    @clip_num = get_last_clip_num || 0
     @logger.debug "clip_num is #{@clip_num}"
 
     arecord_args = options[:arecord_args]
@@ -39,7 +39,7 @@ class DevicesFacade
 
   def get_last_clip_num
     Dir.glob("{#{@temp_dir},#{@project_dir}}#{File::SEPARATOR}*.{wav,mp4,mkv,flac}")
-       .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }.max || 0
+       .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }.max
   end
 
   def start_recording
@@ -193,13 +193,15 @@ class DevicesFacade
   end
 
   def play
-    output_filename = get_output_filename @clip_num
-    @logger.debug "play: #{output_filename}"
-    @logger.debug "play: #{@saving_clips.include?(@clip_num)} #{File.file?(output_filename)}"
-    if @saving_clips.include?(@clip_num) && File.file?(output_filename)
-      command = "#{MEDIA_PLAYER} #{output_filename}"
-      @logger.debug command
-      system command
+    clip_num = get_last_clip_num
+    unless clip_num.nil?
+      output_filename = get_output_filename clip_num
+      @logger.debug "play: #{output_filename}"
+      if File.file?(output_filename)
+        command = "#{MEDIA_PLAYER} #{output_filename}"
+        @logger.debug command
+        system command
+      end
     end
   end
 end
@@ -255,8 +257,6 @@ def parse_options!(options)
     opts.on('-u', '--use-camera [true|false]', 'Whether we use Android device at all (default "true")') { |u| options[:use_camera] = u == 'true' }
   end.parse!
 
-  p options
-
   raise OptionParser::MissingArgument if options[:project_dir].nil?
 end
 
@@ -276,6 +276,8 @@ begin
 
   logger = Logger.new File.join(project_dir, 'log.txt')
   # logger.level = Logger::WARN
+
+  logger.debug options
 
   devices = DevicesFacade.new options, temp_dir, logger
   show_help
