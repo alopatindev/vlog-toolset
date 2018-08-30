@@ -12,7 +12,7 @@ require 'optparse'
 
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
-  MEDIA_PLAYER = 'mpv --no-terminal'.freeze
+  MPV = 'mpv --no-terminal -vf=mirror --fs'.freeze
 
   def initialize(options, temp_dir, logger)
     @project_dir = options[:project_dir]
@@ -37,9 +37,17 @@ class DevicesFacade
     logger.info('initialized')
   end
 
+  def get_clips(dirs)
+    dirs_joined = dirs.join ','
+    Dir.glob("{#{dirs_joined}}#{File::SEPARATOR}0*.{wav,mp4,mkv,flac}")
+       .sort
+  end
+
   def get_last_clip_num
-    Dir.glob("{#{@temp_dir},#{@project_dir}}#{File::SEPARATOR}*.{wav,mp4,mkv,flac}")
-       .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }.max
+    dirs = [@temp_dir, @project_dir]
+    get_clips(dirs)
+      .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }
+      .max
   end
 
   def start_recording
@@ -193,15 +201,15 @@ class DevicesFacade
   end
 
   def play
-    clip_num = get_last_clip_num
-    unless clip_num.nil?
-      output_filename = get_output_filename clip_num
+    clips = get_clips [@project_dir]
+    unless clips.empty?
+      output_filename = clips.last
       @logger.debug "play: #{output_filename}"
-      if File.file?(output_filename)
-        command = "#{MEDIA_PLAYER} #{output_filename}"
-        @logger.debug command
-        system command
-      end
+
+      last_playlist_position = clips.length - 1
+      command = "#{MPV} --playlist-start=#{last_playlist_position} #{clips.join(' ')}"
+      @logger.debug command
+      system command
     end
   end
 end
