@@ -11,6 +11,8 @@ class Phone
   def initialize(temp_dir, options, logger)
     @temp_dir = temp_dir
 
+    @change_brightness = options[:change_brightness]
+
     @no_camera = !options[:use_camera]
     return if @no_camera
 
@@ -158,7 +160,7 @@ class Phone
   end
 
   def set_brightness(brightness)
-    return if @no_camera
+    return if @no_camera || !@change_brightness
     `#{@adb_shell} settings put system screen_brightness #{brightness}`.to_i
   end
 

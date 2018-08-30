@@ -255,6 +255,7 @@ def parse_options!(options)
     opts.on('-a', '--android-device [device-id]', 'Android device id') { |a| options[:android_id] = a }
     opts.on('-o', '--opencamera-dir [dir]', 'Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")') { |o| options[:opencamera_dir] = o }
     opts.on('-u', '--use-camera [true|false]', 'Whether we use Android device at all (default "true")') { |u| options[:use_camera] = u == 'true' }
+    opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default "false")') { |_u| options[:change_brightness] = b == 'true' }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -265,7 +266,8 @@ options = {
   arecord_args: ' --device=default --format=dat',
   android_id: '',
   opencamera_dir: '/mnt/sdcard/DCIM/OpenCamera',
-  use_camera: true
+  use_camera: true,
+  change_brightness: false
 }
 parse_options!(options)
 
