@@ -12,13 +12,17 @@ require 'optparse'
 
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
-  MPV = 'mpv --no-terminal -vf=mirror --fs'.freeze
+  MPV = 'mpv --no-terminal --fs'.freeze
 
   def initialize(options, temp_dir, logger)
     @project_dir = options[:project_dir]
     @temp_dir = temp_dir
     @trim_duration = options[:trim_duration]
     @use_camera = options[:use_camera]
+    @fps = options[:fps]
+    @speed = options[:speed]
+    @video_filters = options[:video_filters]
+    @video_compression = options[:video_compression]
     @logger = logger
 
     @recording = false
@@ -102,28 +106,27 @@ class DevicesFacade
         begin
           camera_filename = @phone.move_to_host(phone_filename, clip_num)
           @logger.debug "save_clip: camera_filename=#{camera_filename} sound_filename=#{sound_filename}"
-          processed_sound_filename = process_sound(camera_filename, sound_filename)
-          @logger.debug "save_clip: processed_sound_filename=#{processed_sound_filename}"
-
-          processed_sound_duration = get_duration(processed_sound_filename)
-          duration = @use_camera ? [get_duration(camera_filename), processed_sound_duration].min
-                                 : processed_sound_duration
+          sound_duration = get_duration(sound_filename)
+          duration = @use_camera ? [get_duration(camera_filename), sound_duration].min
+                                 : sound_duration
           end_position = duration - @trim_duration
+
+          processed_sound_filename = process_sound(camera_filename, sound_filename, @trim_duration, end_position)
+          @logger.debug "save_clip: processed_sound_filename=#{processed_sound_filename}"
 
           if @use_camera
             if @trim_duration >= end_position
               @logger.info "skipping too short clip #{clip_num}"
             else
-              command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{camera_filename}' -ss #{@trim_duration} -to #{end_position} -shortest -codec copy '#{output_filename}'"
+              processed_video_filename = process_video(camera_filename, @trim_duration, end_position)
+              command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{processed_video_filename}' -shortest -codec copy '#{output_filename}'"
               @logger.debug command
               system command
             end
-            temp_files = [camera_filename, sound_filename, processed_sound_filename]
+            temp_files = [camera_filename, processed_video_filename, sound_filename, processed_sound_filename]
           else
-            command = "#{FFMPEG} -i '#{processed_sound_filename}' -ss #{@trim_duration} -to #{end_position} -codec copy '#{output_filename}'"
-            @logger.debug command
-            system command
-            temp_files = [sound_filename, processed_sound_filename]
+            FileUtils.mv processed_sound_filename, output_filename, force: true
+            temp_files = [sound_filename]
           end
 
           @logger.debug "save_clip: removing temp files: #{temp_files}"
@@ -138,6 +141,15 @@ class DevicesFacade
     end
   end
 
+  def process_video(camera_filename, trim_duration, end_position)
+    output_filename = "#{camera_filename}_processed.mp4"
+    video_filters = ["fps=#{@fps}", "setpts=(1/#{@speed})*PTS"] + @video_filters.split(',')
+    command = "#{FFMPEG} -i #{camera_filename} -ss #{trim_duration} -to #{end_position} -an -vcodec libx264 #{@video_compression} -vf '#{video_filters.join(',')}' #{output_filename}"
+    @logger.debug command
+    system command
+    output_filename
+  end
+
   def get_output_filename(clip_num)
     extension = @use_camera ? '.mkv' : '.flac'
     File.join @project_dir, clip_num.with_leading_zeros + extension
@@ -147,15 +159,16 @@ class DevicesFacade
     `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '#{filename}'`.to_f
   end
 
-  def process_sound(camera_filename, sound_filename)
+  def process_sound(camera_filename, sound_filename, trim_duration, end_position)
     flac_output_filename = "#{sound_filename}.flac"
 
     if @use_camera
       wav_output_filename = "#{sound_filename}.sync.wav"
       wav_camera_filename = "#{camera_filename}.wav"
+      audio_filters = ['pan=mono|c0=c0', "atempo=#{@speed}"]
       command = "#{FFMPEG} -i #{camera_filename} -vn #{wav_camera_filename} && \
               sync-audio-tracks.sh #{sound_filename} #{wav_camera_filename} #{wav_output_filename} && \
-              #{FFMPEG} -i #{wav_output_filename} -af 'pan=mono|c0=c0' #{flac_output_filename}"
+              #{FFMPEG} -i #{wav_output_filename} -ss #{trim_duration} -to #{end_position} -af '#{audio_filters.join(',')}'  #{flac_output_filename}"
       @logger.debug command
       system command, out: File::NULL
 
@@ -263,7 +276,11 @@ def parse_options!(options)
     opts.on('-a', '--android-device [device-id]', 'Android device id') { |a| options[:android_id] = a }
     opts.on('-o', '--opencamera-dir [dir]', 'Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")') { |o| options[:opencamera_dir] = o }
     opts.on('-u', '--use-camera [true|false]', 'Whether we use Android device at all (default "true")') { |u| options[:use_camera] = u == 'true' }
-    opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default "false")') { |_u| options[:change_brightness] = b == 'true' }
+    opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default "false")') { |b| options[:change_brightness] = b == 'true' }
+    opts.on('-f', '--fps [num]', 'Constant frame rate (default "30")') { |f| options[:fps] = f.to_i }
+    opts.on('-S', '--speed [num]', 'Speed factor (default "1.2")') { |s| options[:speed] = s.to_f }
+    opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default "hflip,atadenoise,vignette")') { |v| options[:video_filters] = v }
+    opts.on('-C', '--video-compression [options]', 'libx264 options (default " -preset veryslow -crf 17")') { |c| options[:video_compression] = c }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -275,7 +292,11 @@ options = {
   android_id: '',
   opencamera_dir: '/mnt/sdcard/DCIM/OpenCamera',
   use_camera: true,
-  change_brightness: false
+  change_brightness: false,
+  fps: 30,
+  speed: 1.2,
+  video_filters: 'hflip,atadenoise,vignette',
+  video_compression: '-preset veryslow -crf 17'
 }
 parse_options!(options)
 
