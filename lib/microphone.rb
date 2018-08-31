@@ -8,7 +8,7 @@ class Microphone
     @logger = logger
     @temp_dir = temp_dir
 
-    @arecord_command = "LIBASOUND_THREAD_SAFE=0 exec arecord --quiet --nonblock #{arecord_args}"
+    @arecord_command = "exec arecord --quiet --nonblock #{arecord_args}"
     @arecord_pipe = nil
   end
 
