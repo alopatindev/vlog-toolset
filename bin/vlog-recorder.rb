@@ -92,6 +92,7 @@ class DevicesFacade
   end
 
   def save_clip(trim_noise_and_bad_shots)
+    @logger.debug "save_clip: trim_noise_and_bad_shots = #{trim_noise_and_bad_shots}"
     clip_num = @clip_num
     phone_filename = @phone.filename(clip_num)
     sound_filename = @microphone.filename(clip_num)
@@ -118,7 +119,7 @@ class DevicesFacade
               @logger.info "skipping too short clip #{clip_num}"
             else
               processed_video_filename = process_video(camera_filename, start_position, end_position)
-              command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{processed_video_filename}' -shortest -codec copy '#{output_filename}'"
+              command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -codec copy #{output_filename}"
               @logger.debug command
               system command
             end
@@ -146,30 +147,39 @@ class DevicesFacade
                            : sound_duration
 
     start_position = @trim_duration
+    end_position = duration - start_position - @trim_duration
+
     if trim_noise_and_bad_shots
       shot_position = detect_last_shot sound_filename
-      @logger.debug "detect_last_shot: vadnet says #{shot_position}"
       unless shot_position.nil?
+        vadnet_correction = 1.5
+
         shot_start, shot_end = shot_position
-        start_position = [0.0, shot_start - @trim_duration].max
-        new_duration = shot_end - shot_start + @trim_duration
-        @logger.debug "detect_last_shot: new_duration = #{new_duration} ; duration = #{duration}"
-        duration = [new_duration, duration].min
+        shot_start -= vadnet_correction
+        shot_end += vadnet_correction
+        clip_duration = shot_end - shot_start
+
+        start_position = [shot_start, start_position].max
+        end_position = [shot_start + clip_duration, end_position].min
       end
+      @logger.debug "detect_last_shot => #{[start_position, end_position]} duration=#{duration}"
     end
 
-    end_position = start_position + duration
-    @logger.debug "detect_last_shot => #{[start_position, end_position]}"
     [start_position, end_position]
   end
 
   def detect_last_shot(sound_filename)
     min_shot_size = 1.0
     script_filename = File.join(File.dirname(__FILE__), '..', 'lib', 'voice', 'detect_voice.py')
-    range = `#{script_filename} #{sound_filename} #{min_shot_size} #{@min_pause_between_shots} | tail -n1`
-            .split(' ')
-            .map(&:to_f)
-    range if range.length == 2 && range[0] < range[1]
+
+    ranges = `#{script_filename} #{sound_filename} #{min_shot_size} #{@min_pause_between_shots}`.split("\n")
+    @logger.debug "vadnet says: #{ranges.join(',')}"
+
+    ranges
+      .map { |line| line.split(' ') }
+      .select { |r| r.length == 2 && r[0] < r[1] }
+      .map { |r| r.map(&:to_f) }
+      .last
   end
 
   def process_video(camera_filename, start_position, end_position)
@@ -187,19 +197,21 @@ class DevicesFacade
   end
 
   def get_duration(filename)
-    `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '#{filename}'`.to_f
+    `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 #{filename}`.to_f
   end
 
   def process_sound(camera_filename, sound_filename, start_position, end_position)
     flac_output_filename = "#{sound_filename}.flac"
 
+    audio_filters = ['pan=mono|c0=c0', "atempo=#{@speed}"]
+    ffmpeg_output_args = "-ss #{start_position} -to #{end_position} -af '#{audio_filters.join(',')}' #{flac_output_filename}"
+
     if @use_camera
       wav_output_filename = "#{sound_filename}.sync.wav"
       wav_camera_filename = "#{camera_filename}.wav"
-      audio_filters = ['pan=mono|c0=c0', "atempo=#{@speed}"]
       command = "#{FFMPEG} -i #{camera_filename} -vn #{wav_camera_filename} && \
               sync-audio-tracks.sh #{sound_filename} #{wav_camera_filename} #{wav_output_filename} && \
-              #{FFMPEG} -i #{wav_output_filename} -ss #{start_position} -to #{end_position} -af '#{audio_filters.join(',')}'  #{flac_output_filename}"
+              #{FFMPEG} -i #{wav_output_filename} #{ffmpeg_output_args}"
       @logger.debug command
       system command, out: File::NULL
 
@@ -207,7 +219,7 @@ class DevicesFacade
       @logger.debug "removing #{temp_files}"
       FileUtils.rm_f temp_files
     else
-      command = "#{FFMPEG} -i '#{sound_filename}' -af 'pan=mono|c0=c0' '#{flac_output_filename}'"
+      command = "#{FFMPEG} -i #{sound_filename} #{ffmpeg_output_args}"
       @logger.debug command
       system command, out: File::NULL
     end
