@@ -18,6 +18,7 @@ class DevicesFacade
     @project_dir = options[:project_dir]
     @temp_dir = temp_dir
     @trim_duration = options[:trim_duration]
+    @min_pause_between_shots = options[:pause_between_shots]
     @use_camera = options[:use_camera]
     @fps = options[:fps]
     @speed = options[:speed]
@@ -90,7 +91,7 @@ class DevicesFacade
     end
   end
 
-  def save_clip
+  def save_clip(trim_noise_and_bad_shots)
     clip_num = @clip_num
     phone_filename = @phone.filename(clip_num)
     sound_filename = @microphone.filename(clip_num)
@@ -106,19 +107,17 @@ class DevicesFacade
         begin
           camera_filename = @phone.move_to_host(phone_filename, clip_num)
           @logger.debug "save_clip: camera_filename=#{camera_filename} sound_filename=#{sound_filename}"
-          sound_duration = get_duration(sound_filename)
-          duration = @use_camera ? [get_duration(camera_filename), sound_duration].min
-                                 : sound_duration
-          end_position = duration - @trim_duration
 
-          processed_sound_filename = process_sound(camera_filename, sound_filename, @trim_duration, end_position)
+          start_position, end_position = compute_cut_position(sound_filename, camera_filename, trim_noise_and_bad_shots)
+
+          processed_sound_filename = process_sound(camera_filename, sound_filename, start_position, end_position)
           @logger.debug "save_clip: processed_sound_filename=#{processed_sound_filename}"
 
           if @use_camera
-            if @trim_duration >= end_position
+            if start_position >= end_position
               @logger.info "skipping too short clip #{clip_num}"
             else
-              processed_video_filename = process_video(camera_filename, @trim_duration, end_position)
+              processed_video_filename = process_video(camera_filename, start_position, end_position)
               command = "#{FFMPEG} -i '#{processed_sound_filename}' -an -i '#{processed_video_filename}' -shortest -codec copy '#{output_filename}'"
               @logger.debug command
               system command
@@ -141,10 +140,42 @@ class DevicesFacade
     end
   end
 
-  def process_video(camera_filename, trim_duration, end_position)
+  def compute_cut_position(sound_filename, camera_filename, trim_noise_and_bad_shots)
+    sound_duration = get_duration(sound_filename)
+    duration = @use_camera ? [get_duration(camera_filename), sound_duration].min
+                           : sound_duration
+
+    start_position = @trim_duration
+    if trim_noise_and_bad_shots
+      shot_position = detect_last_shot sound_filename
+      @logger.debug "detect_last_shot: vadnet says #{shot_position}"
+      unless shot_position.nil?
+        shot_start, shot_end = shot_position
+        start_position = [0.0, shot_start - @trim_duration].max
+        new_duration = shot_end - shot_start + @trim_duration
+        @logger.debug "detect_last_shot: new_duration = #{new_duration} ; duration = #{duration}"
+        duration = [new_duration, duration].min
+      end
+    end
+
+    end_position = start_position + duration
+    @logger.debug "detect_last_shot => #{[start_position, end_position]}"
+    [start_position, end_position]
+  end
+
+  def detect_last_shot(sound_filename)
+    min_shot_size = 1.0
+    script_filename = File.join(File.dirname(__FILE__), '..', 'lib', 'voice', 'detect_voice.py')
+    range = `#{script_filename} #{sound_filename} #{min_shot_size} #{@min_pause_between_shots} | tail -n1`
+            .split(' ')
+            .map(&:to_f)
+    range if range.length == 2 && range[0] < range[1]
+  end
+
+  def process_video(camera_filename, start_position, end_position)
     output_filename = "#{camera_filename}_processed.mp4"
     video_filters = ["fps=#{@fps}", "setpts=(1/#{@speed})*PTS"] + @video_filters.split(',')
-    command = "#{FFMPEG} -i #{camera_filename} -ss #{trim_duration} -to #{end_position} -an -vcodec libx264 #{@video_compression} -vf '#{video_filters.join(',')}' #{output_filename}"
+    command = "#{FFMPEG} -i #{camera_filename} -ss #{start_position} -to #{end_position} -an -vcodec libx264 #{@video_compression} -vf '#{video_filters.join(',')}' #{output_filename}"
     @logger.debug command
     system command
     output_filename
@@ -159,7 +190,7 @@ class DevicesFacade
     `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '#{filename}'`.to_f
   end
 
-  def process_sound(camera_filename, sound_filename, trim_duration, end_position)
+  def process_sound(camera_filename, sound_filename, start_position, end_position)
     flac_output_filename = "#{sound_filename}.flac"
 
     if @use_camera
@@ -168,7 +199,7 @@ class DevicesFacade
       audio_filters = ['pan=mono|c0=c0', "atempo=#{@speed}"]
       command = "#{FFMPEG} -i #{camera_filename} -vn #{wav_camera_filename} && \
               sync-audio-tracks.sh #{sound_filename} #{wav_camera_filename} #{wav_output_filename} && \
-              #{FFMPEG} -i #{wav_output_filename} -ss #{trim_duration} -to #{end_position} -af '#{audio_filters.join(',')}'  #{flac_output_filename}"
+              #{FFMPEG} -i #{wav_output_filename} -ss #{start_position} -to #{end_position} -af '#{audio_filters.join(',')}'  #{flac_output_filename}"
       @logger.debug command
       system command, out: File::NULL
 
@@ -191,7 +222,7 @@ class DevicesFacade
   def close
     if @recording
       stop_recording
-      save_clip
+      save_clip true
     end
 
     @phone.restore_brightness
@@ -230,6 +261,7 @@ end
 def show_help
   puts 'r - (RE)START recording'
   puts 's - STOP and SAVE current clip'
+  puts "S - STOP and SAVE current clip, don't use auto trimming"
   puts 'd - STOP and DELETE current clip'
   puts 'p - PLAY last saved clip'
   puts 'f - FOCUS camera on center'
@@ -253,7 +285,10 @@ def run_main_loop(devices)
       devices.start_recording
     when 's'
       devices.stop_recording
-      devices.save_clip
+      devices.save_clip true
+    when 'S'
+      devices.stop_recording
+      devices.save_clip false
     when 'd'
       devices.stop_recording
       devices.delete_clip
@@ -281,6 +316,7 @@ def parse_options!(options)
     opts.on('-S', '--speed [num]', 'Speed factor (default "1.2")') { |s| options[:speed] = s.to_f }
     opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default "hflip,atadenoise,vignette")') { |v| options[:video_filters] = v }
     opts.on('-C', '--video-compression [options]', 'libx264 options (default " -preset veryslow -crf 17")') { |c| options[:video_compression] = c }
+    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default 3)') { |p| options[:pause_between_shots] = p }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -296,7 +332,8 @@ options = {
   fps: 30,
   speed: 1.2,
   video_filters: 'hflip,atadenoise,vignette',
-  video_compression: '-preset veryslow -crf 17'
+  video_compression: '-preset veryslow -crf 17',
+  pause_between_shots: 3.0
 }
 parse_options!(options)
 
