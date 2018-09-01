@@ -33,9 +33,11 @@ class Phone
     if locked?
       raise 'You need to unlock the screen'
     else
-      run_opencamera unless opencamera_active?
+      opencamera_was_active = opencamera_active?
+      run_opencamera unless opencamera_was_active
       @width, @height = get_size
       @initial_brightness = get_brightness
+      set_front_camera unless opencamera_was_active
     end
   end
 
@@ -136,12 +138,17 @@ class Phone
   end
 
   def run_opencamera
-    system "#{@adb_shell} am start -n #{MAIN_ACTIVITY}", out: File::NULL
+    system "#{@adb_shell} am start -n #{MAIN_ACTIVITY} && sleep 3", out: File::NULL
   end
 
   def close_opencamera
     return if @no_camera
     system "#{@adb_shell} input keyevent KEYCODE_BACK"
+  end
+
+  def set_front_camera
+    @logger.debug 'set_front_camera'
+    tap 0.955, 0.292
   end
 
   def get_size
