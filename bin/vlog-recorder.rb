@@ -327,7 +327,7 @@ def parse_options!(options)
     opts.on('-f', '--fps [num]', 'Constant frame rate (default "30")') { |f| options[:fps] = f.to_i }
     opts.on('-S', '--speed [num]', 'Speed factor (default "1.2")') { |s| options[:speed] = s.to_f }
     opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default "hflip,atadenoise,vignette")') { |v| options[:video_filters] = v }
-    opts.on('-C', '--video-compression [options]', 'libx264 options (default " -preset veryslow -crf 17")') { |c| options[:video_compression] = c }
+    opts.on('-C', '--video-compression [options]', 'libx264 options (default " -preset ultrafast -crf 18")') { |c| options[:video_compression] = c }
     opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default 3)') { |p| options[:pause_between_shots] = p }
   end.parse!
 
@@ -336,7 +336,7 @@ end
 
 options = {
   trim_duration: 0.15,
-  arecord_args: ' --device=default --format=dat',
+  arecord_args: '--device=default --format=dat',
   android_id: '',
   opencamera_dir: '/mnt/sdcard/DCIM/OpenCamera',
   use_camera: true,
@@ -344,7 +344,7 @@ options = {
   fps: 30,
   speed: 1.2,
   video_filters: 'hflip,atadenoise,vignette',
-  video_compression: '-preset veryslow -crf 17',
+  video_compression: '-preset ultrafast -crf 18',
   pause_between_shots: 3.0
 }
 parse_options!(options)

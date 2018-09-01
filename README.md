@@ -31,7 +31,7 @@ Usage: vlog-recorder.rb -p project_dir/ [other options]
     -f, --fps [num]                  Constant frame rate (default "30")
     -S, --speed [num]                Speed factor (default "1.2")
     -V, --video-filters [filters]    ffmpeg video filters (default "hflip,atadenoise,vignette")
-    -C [options],                    libx264 options (default " -preset veryslow -crf 17")
+    -C [options],                    libx264 options (default " -preset ultrafast -crf 18")
         --video-compression
     -P [seconds],                    Minimum pause between shots for auto trimming (default 3)
         --pause-between-shots
