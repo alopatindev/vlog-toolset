@@ -29,9 +29,12 @@ class Microphone
 
   def delete_clip(clip_num)
     sound_filename = filename(clip_num)
-    unless sound_filename.nil?
+    if sound_filename.nil? || !(File.file? sound_filename)
+      false
+    else
       @logger.debug "mic.delete_clip #{clip_num}: #{sound_filename}"
       FileUtils.rm_f sound_filename
+      true
     end
   end
 

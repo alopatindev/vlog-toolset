@@ -85,10 +85,38 @@ class DevicesFacade
     @phone.focus
   end
 
-  def delete_clip
-    unless @saving_clips.include? @clip_num
-      @microphone.delete_clip @clip_num
+  def delete_unsaved_clip
+    if @saving_clips.include? @clip_num
+      false
+    else
+      ok = @microphone.delete_clip @clip_num
       @phone.delete_clip @clip_num
+      ok
+    end
+  end
+
+  def delete_clip
+    @logger.debug 'delete_clip'
+    if @saving_clips.include? @clip_num
+      delete_last_clip_output
+    else
+      ok = delete_unsaved_clip
+      delete_last_clip_output unless ok
+    end
+  end
+
+  def delete_last_clip_output
+    @logger.debug 'delete_last_clip_output'
+    clip_num = get_last_clip_num
+    unless clip_num.nil?
+      output_filename = get_output_filename clip_num
+      if File.file? output_filename
+        show_status "Delete #{output_filename}? y/n"
+        if STDIN.getch == 'y'
+          @logger.info "delete_last_clip_output: removing #{output_filename}"
+          FileUtils.rm_f output_filename
+        end
+      end
     end
   end
 
@@ -291,7 +319,7 @@ def run_main_loop(devices)
     when 'r'
       devices.stop_recording
       devices.show_status nil
-      devices.delete_clip
+      devices.delete_unsaved_clip
       devices.start_recording
     when 's'
       devices.stop_recording
