@@ -13,6 +13,7 @@ require 'optparse'
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
   MPV = 'mpv --no-terminal --fs'.freeze
+  VADNET_CORRECTION = 1.5
 
   def initialize(options, temp_dir, logger)
     @project_dir = options[:project_dir]
@@ -147,20 +148,17 @@ class DevicesFacade
                            : sound_duration
 
     start_position = @trim_duration
-    end_position = duration - start_position - @trim_duration
+    end_position = duration - @trim_duration
 
     if trim_noise_and_bad_shots
       shot_position = detect_last_shot sound_filename
       unless shot_position.nil?
-        vadnet_correction = 1.5
-
         shot_start, shot_end = shot_position
-        shot_start -= vadnet_correction
-        shot_end += vadnet_correction
-        clip_duration = shot_end - shot_start
+        shot_start -= VADNET_CORRECTION
+        shot_end += VADNET_CORRECTION
 
         start_position = [shot_start, start_position].max
-        end_position = [shot_start + clip_duration, end_position].min
+        end_position = [shot_end, end_position].min
       end
       @logger.debug "detect_last_shot => #{[start_position, end_position]} duration=#{duration}"
     end
@@ -177,8 +175,8 @@ class DevicesFacade
 
     ranges
       .map { |line| line.split(' ') }
-      .select { |r| r.length == 2 && r[0] < r[1] }
       .map { |r| r.map(&:to_f) }
+      .select { |r| r.length == 2 && r[0] < r[1] }
       .last
   end
 

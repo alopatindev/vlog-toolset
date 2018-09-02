@@ -121,7 +121,8 @@ if __name__ == '__main__':
     min_shot_size = float(sys.argv[2])
     min_pause_between_shots = float(sys.argv[3])
 
-    model = 'lib/voice/vadnet/models/vad'
+    voice_dir = os.path.dirname(sys.argv[0])
+    model = os.path.join(voice_dir, 'vadnet', 'models', 'vad')
     n_batch = 8
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
