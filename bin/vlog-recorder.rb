@@ -45,7 +45,7 @@ class DevicesFacade
 
   def get_clips(dirs)
     dirs_joined = dirs.join ','
-    Dir.glob("{#{dirs_joined}}#{File::SEPARATOR}0*.{wav,mp4,mkv,flac}")
+    Dir.glob("{#{dirs_joined}}#{File::SEPARATOR}0*.{wav,mp4,mkv,m4a}")
        .sort
   end
 
@@ -148,7 +148,7 @@ class DevicesFacade
               @logger.info "skipping too short clip #{clip_num}"
             else
               processed_video_filename = process_video(camera_filename, start_position, end_position)
-              command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -codec copy #{output_filename}"
+              command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -codec copy -f ipod #{output_filename}"
               @logger.debug command
               system command
             end
@@ -218,7 +218,7 @@ class DevicesFacade
   end
 
   def get_output_filename(clip_num)
-    extension = @use_camera ? '.mkv' : '.flac'
+    extension = @use_camera ? '.mp4' : '.m4a'
     File.join @project_dir, clip_num.with_leading_zeros + extension
   end
 
@@ -227,10 +227,10 @@ class DevicesFacade
   end
 
   def process_sound(camera_filename, sound_filename, start_position, end_position)
-    flac_output_filename = "#{sound_filename}.flac"
+    output_filename = "#{sound_filename}.m4a"
 
     audio_filters = ['pan=mono|c0=c0', "atempo=#{@speed}"]
-    ffmpeg_output_args = "-ss #{start_position} -to #{end_position} -af '#{audio_filters.join(',')}' #{flac_output_filename}"
+    ffmpeg_output_args = "-ss #{start_position} -to #{end_position} -af '#{audio_filters.join(',')}' -acodec alac #{output_filename}"
 
     if @use_camera
       wav_output_filename = "#{sound_filename}.sync.wav"
@@ -250,11 +250,11 @@ class DevicesFacade
       system command, out: File::NULL
     end
 
-    unless File.file?(flac_output_filename)
-      raise "Failed to process #{flac_output_filename}"
+    unless File.file?(output_filename)
+      raise "Failed to process #{output_filename}"
     end
 
-    flac_output_filename
+    output_filename
   end
 
   def close

@@ -51,7 +51,7 @@ q / Ctrl+C - QUIT
 Concatenate them
 ```
 cd ~/video/new-cool-video-project
-printf "file '%s'\n" ./0*.flac | ffmpeg -y -f concat -safe 0 -protocol_whitelist file,pipe -i - output.flac
+printf "file '%s'\n" ./0*.m4a | ffmpeg -y -f concat -safe 0 -protocol_whitelist file,pipe -i - output.m4a
 ```
 
 ## Installation
