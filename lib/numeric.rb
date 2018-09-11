@@ -1,5 +1,5 @@
 class Numeric
   def with_leading_zeros
-    format('%016d', self)
+    format('0%05d', self)
   end
 end

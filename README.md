@@ -25,7 +25,6 @@ Usage: vlog-recorder.rb -p project_dir/ [other options]
         --sound-settings
     -a, --android-device [device-id] Android device id
     -o, --opencamera-dir [dir]       Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")
-    -u, --use-camera [true|false]    Whether we use Android device at all (default "true")
     -b [true|false],                 Set lowest brightness to save device power (default "false")
         --change-brightness
     -f, --fps [num]                  Constant frame rate (default "30")
@@ -47,20 +46,13 @@ h - show HELP
 q / Ctrl+C - QUIT
 ```
 
-### You've got bunch of files, now what?
-Concatenate them
-```
-cd ~/video/new-cool-video-project
-printf "file '%s'\n" ./0*.m4a | ffmpeg -y -f concat -safe 0 -protocol_whitelist file,pipe -i - output.m4a
-```
-
 ## Installation
 `git clone git@github.com:alopatindev/vlog-recorder.git`
 
 ### Dependencies
 - GNU/Linux
 - ruby (tested with 2.5.1)
-- ffmpeg (tested with 3.3.6)
+- ffmpeg (tested with 3.4.4)
 - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH variable)
 - alsa-utils
 - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))

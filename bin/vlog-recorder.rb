@@ -13,14 +13,14 @@ require 'optparse'
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
   MPV = 'mpv --no-terminal --fs'.freeze
-  VADNET_CORRECTION = 1.5
+  VADNET_CORRECTION = 0.5
+  MIN_SHOT_SIZE = 1.0
 
   def initialize(options, temp_dir, logger)
     @project_dir = options[:project_dir]
     @temp_dir = temp_dir
     @trim_duration = options[:trim_duration]
     @min_pause_between_shots = options[:pause_between_shots]
-    @use_camera = options[:use_camera]
     @fps = options[:fps]
     @speed = options[:speed]
     @video_filters = options[:video_filters]
@@ -52,8 +52,15 @@ class DevicesFacade
   def get_last_clip_num
     dirs = [@temp_dir, @project_dir]
     get_clips(dirs)
-      .map { |f| f.gsub(/.*#{File::SEPARATOR}0*/, '').gsub(/\..*$/, '').to_i }
+      .map { |f| parse_clip_num f }
       .max
+  end
+
+  def parse_clip_num(filename)
+    filename
+      .gsub(/.*#{File::SEPARATOR}0*/, '')
+      .gsub(/_.*\..*$/, '')
+      .to_i
   end
 
   def start_recording
@@ -98,39 +105,32 @@ class DevicesFacade
   def delete_clip
     @logger.debug 'delete_clip'
     if @saving_clips.include? @clip_num
-      delete_last_clip_output
+      delete_last_subclip
     else
       ok = delete_unsaved_clip
-      delete_last_clip_output unless ok
+      delete_last_subclip unless ok
     end
   end
 
-  def delete_last_clip_output
-    @logger.debug 'delete_last_clip_output'
-    clip_num = get_last_clip_num
-    unless clip_num.nil?
-      output_filename = get_output_filename clip_num
-      if File.file? output_filename
-        show_status "Delete #{output_filename}? y/n"
-        if STDIN.getch == 'y'
-          @logger.info "delete_last_clip_output: removing #{output_filename}"
-          FileUtils.rm_f output_filename
-        end
-      end
+  def delete_last_subclip
+    @logger.debug 'delete_last_subclip'
+    filename = get_clips([@project_dir]).last
+    if !filename.nil? && (File.file? filename)
+      show_status "Delete #{filename}? y/n"
+      remove_files filename if STDIN.getch == 'y'
     end
   end
 
-  def save_clip(trim_noise_and_bad_shots)
-    @logger.debug "save_clip: trim_noise_and_bad_shots = #{trim_noise_and_bad_shots}"
+  def save_clip(trim_noise)
+    @logger.debug "save_clip: trim_noise = #{trim_noise}"
     clip_num = @clip_num
     phone_filename = @phone.filename(clip_num)
     sound_filename = @microphone.filename(clip_num)
 
-    if @saving_clips.include?(clip_num) || (@use_camera && phone_filename.nil?) || sound_filename.nil?
+    if @saving_clips.include?(clip_num) || phone_filename.nil? || sound_filename.nil?
       @logger.debug "save_clip: skipping #{clip_num}"
     else
-      output_filename = get_output_filename clip_num
-      @logger.info "save_clip #{clip_num} as #{output_filename}"
+      @logger.info "save_clip #{clip_num}"
       @saving_clips.add(clip_num)
 
       @thread_pool.post do
@@ -138,30 +138,17 @@ class DevicesFacade
           camera_filename = @phone.move_to_host(phone_filename, clip_num)
           @logger.debug "save_clip: camera_filename=#{camera_filename} sound_filename=#{sound_filename}"
 
-          start_position, end_position = compute_cut_position(sound_filename, camera_filename, trim_noise_and_bad_shots)
+          sync_offset, sync_sound_filename = synchronize_sound(camera_filename, sound_filename)
+          @logger.debug "save_clip: sync_offset=#{sync_offset}"
 
-          processed_sound_filename = process_sound(camera_filename, sound_filename, start_position, end_position)
-          @logger.debug "save_clip: processed_sound_filename=#{processed_sound_filename}"
+          segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, trim_noise)
+          processed_sound_filenames = process_sound(sync_sound_filename, segments)
+          @logger.debug "save_clip: processed_sound_filenames=#{processed_sound_filenames}"
 
-          if @use_camera
-            if start_position >= end_position
-              @logger.info "skipping too short clip #{clip_num}"
-            else
-              processed_video_filename = process_video(camera_filename, start_position, end_position)
-              command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -codec copy -f ipod #{output_filename}"
-              @logger.debug command
-              system command
-            end
-            temp_files = [camera_filename, processed_video_filename, sound_filename, processed_sound_filename]
-          else
-            FileUtils.mv processed_sound_filename, output_filename, force: true
-            temp_files = [sound_filename]
-          end
-
-          @logger.debug "save_clip: removing temp files: #{temp_files}"
-          FileUtils.rm_f temp_files
-
-          @logger.info "save_clip: #{clip_num} as #{output_filename} ok"
+          processed_video_filenames = process_video(camera_filename, segments)
+          output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num)
+          remove_files [camera_filename, sound_filename, sync_sound_filename] + processed_sound_filenames + processed_video_filenames
+          @logger.info "save_clip: #{clip_num} as #{output_filenames} ok"
         rescue StandardError => error
           @logger.info "ignoring saving of #{clip_num} as #{output_filename}"
           @logger.debug error
@@ -170,91 +157,136 @@ class DevicesFacade
     end
   end
 
-  def compute_cut_position(sound_filename, camera_filename, trim_noise_and_bad_shots)
-    sound_duration = get_duration(sound_filename)
-    duration = @use_camera ? [get_duration(camera_filename), sound_duration].min
-                           : sound_duration
+  def merge_files(processed_sound_filenames, processed_video_filenames, clip_num)
+    processed_sound_filenames
+      .zip(processed_video_filenames)
+      .each_with_index
+      .map do |f, subclip_num|
+      @logger.debug "save_clip: merging files #{f} #{subclip_num}"
 
-    start_position = @trim_duration
-    end_position = duration - @trim_duration
+      processed_sound_filename, processed_video_filename = f
+      output_filename = get_output_filename clip_num, subclip_num
+      @logger.debug "save_clip: output_filename=#{output_filename}"
+      command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -codec copy -f ipod #{output_filename}"
+      @logger.debug command
+      system command
 
-    if trim_noise_and_bad_shots
-      shot_position = detect_last_shot sound_filename
-      unless shot_position.nil?
-        shot_start, shot_end = shot_position
-        shot_start -= VADNET_CORRECTION
-        shot_end += VADNET_CORRECTION
-
-        start_position = [shot_start, start_position].max
-        end_position = [shot_end, end_position].min
-      end
-      @logger.debug "detect_last_shot => #{[start_position, end_position]} duration=#{duration}"
+      output_filename
     end
+  end
 
+  def correct_segment(segment)
+    start_position, end_position = segment
+    start_position -= VADNET_CORRECTION
+    end_position += VADNET_CORRECTION
     [start_position, end_position]
   end
 
-  def detect_last_shot(sound_filename)
-    min_shot_size = 1.0
+  def detect_segments(sync_sound_filename, camera_filename, sync_offset, trim_noise)
+    sound_duration = get_duration(sync_sound_filename)
+    duration = [get_duration(camera_filename), sound_duration].min
+
+    start_position = [@trim_duration, sync_offset.abs].max
+    end_position = duration - @trim_duration
+
+    segments = []
+
+    max_output_duration = end_position - start_position
+    if max_output_duration < MIN_SHOT_SIZE
+      @logger.info "skipping #{sync_sound_filename}, too short clip, duration=#{duration}, max_output_duration=#{max_output_duration}"
+      return segments
+    end
+
+    if trim_noise
+      voice_segments = detect_voice sync_sound_filename
+      unless voice_segments.empty?
+        segments = voice_segments.map { |seg| correct_segment(seg) }
+
+        segments[0][0] = [start_position, segments[0][0]].max
+        last = segments.length - 1
+        segments[last][1] = [end_position, segments[last][1]].min
+
+        segments = segments.select { |r| r[0] < r[1] }
+      end
+    end
+
+    segments = [[start_position, end_position]] if segments.empty?
+
+    @logger.debug "detect_segments: #{segments.join(',')}"
+    segments
+  end
+
+  def detect_voice(sound_filename)
     script_filename = File.join(File.dirname(__FILE__), '..', 'lib', 'voice', 'detect_voice.py')
 
-    ranges = `#{script_filename} #{sound_filename} #{min_shot_size} #{@min_pause_between_shots}`.split("\n")
+    ranges = `#{script_filename} #{sound_filename} #{MIN_SHOT_SIZE} #{@min_pause_between_shots}`.split("\n")
     @logger.debug "vadnet says: #{ranges.join(',')}"
 
     ranges
       .map { |line| line.split(' ') }
       .map { |r| r.map(&:to_f) }
-      .select { |r| r.length == 2 && r[0] < r[1] }
-      .last
+      .select { |r| r.length == 2 }
   end
 
-  def process_video(camera_filename, start_position, end_position)
-    output_filename = "#{camera_filename}_processed.mp4"
-    video_filters = ["fps=#{@fps}", "setpts=(1/#{@speed})*PTS"] + @video_filters.split(',')
-    command = "#{FFMPEG} -i #{camera_filename} -ss #{start_position} -to #{end_position} -an -vcodec libx264 #{@video_compression} -vf '#{video_filters.join(',')}' #{output_filename}"
-    @logger.debug command
-    system command
-    output_filename
+  def process_video(camera_filename, segments)
+    segments.each_with_index.map do |seg, subclip_num|
+      start_position, end_position = seg
+      output_filename = "#{camera_filename}_#{subclip_num}.processed.mp4"
+      temp_filename = "#{camera_filename}_#{subclip_num}.cut.mp4"
+
+      video_filters = ["fps=#{@fps}", "setpts=(1/#{@speed})*PTS"] + @video_filters.split(',')
+      command = "#{FFMPEG} -ss #{start_position} -i #{camera_filename} -to #{end_position - start_position} -an -c copy #{temp_filename} && \
+        #{FFMPEG} -i #{temp_filename} -vcodec libx264 #{@video_compression} -vf '#{video_filters.join(',')}' #{output_filename}"
+      @logger.debug command
+      system command
+      remove_files temp_filename
+
+      output_filename
+    end
   end
 
-  def get_output_filename(clip_num)
-    extension = @use_camera ? '.mp4' : '.m4a'
-    File.join @project_dir, clip_num.with_leading_zeros + extension
+  def get_output_filename(clip_num, subclip_num)
+    File.join @project_dir, "#{clip_num.with_leading_zeros}_#{subclip_num.with_leading_zeros}.mp4"
   end
 
   def get_duration(filename)
     `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 #{filename}`.to_f
   end
 
-  def process_sound(camera_filename, sound_filename, start_position, end_position)
-    output_filename = "#{sound_filename}.m4a"
+  def synchronize_sound(camera_filename, sound_filename)
+    output_filename = "#{sound_filename}.sync.wav"
 
-    audio_filters = ['pan=mono|c0=c0', "atempo=#{@speed}"]
-    ffmpeg_output_args = "-ss #{start_position} -to #{end_position} -af '#{audio_filters.join(',')}' -acodec alac #{output_filename}"
+    sync_offset = `sync-audio-tracks.sh #{sound_filename} #{camera_filename} #{output_filename}`
+                  .split("\n")
+                  .select { |line| line.start_with? 'offset is' }
+                  .map { |line| line.sub(/^offset is /, '').sub(/ seconds$/, '').to_f }
+                  .first || 0.0
 
-    if @use_camera
-      wav_output_filename = "#{sound_filename}.sync.wav"
-      wav_camera_filename = "#{camera_filename}.wav"
-      command = "#{FFMPEG} -i #{camera_filename} -vn #{wav_camera_filename} && \
-              sync-audio-tracks.sh #{sound_filename} #{wav_camera_filename} #{wav_output_filename} && \
-              #{FFMPEG} -i #{wav_output_filename} #{ffmpeg_output_args}"
+    [sync_offset, output_filename]
+  end
+
+  def process_sound(sync_sound_filename, segments)
+    segments.each_with_index.map do |seg, subclip_num|
+      start_position, end_position = seg
+      output_filename = "#{sync_sound_filename}_#{subclip_num}.m4a"
+
+      audio_filters = ['pan=mono|c0=c0', "atempo=#{@speed}"]
+      ffmpeg_cut_args = "-ss #{start_position} -i #{sync_sound_filename} -to #{end_position - start_position} -c copy"
+      ffmpeg_output_args = "-af '#{audio_filters.join(',')}' -acodec alac"
+
+      temp_filename = "#{sync_sound_filename}_#{subclip_num}.cut.wav"
+      command = "#{FFMPEG} #{ffmpeg_cut_args} #{temp_filename} && \
+        #{FFMPEG} -i #{temp_filename} #{ffmpeg_output_args} #{output_filename}"
       @logger.debug command
       system command, out: File::NULL
+      remove_files temp_filename
 
-      temp_files = [wav_output_filename, wav_camera_filename]
-      @logger.debug "removing #{temp_files}"
-      FileUtils.rm_f temp_files
-    else
-      command = "#{FFMPEG} -i #{sound_filename} #{ffmpeg_output_args}"
-      @logger.debug command
-      system command, out: File::NULL
+      unless File.file?(output_filename)
+        raise "Failed to process #{output_filename}"
+      end
+
+      output_filename
     end
-
-    unless File.file?(output_filename)
-      raise "Failed to process #{output_filename}"
-    end
-
-    output_filename
   end
 
   def close
@@ -285,15 +317,25 @@ class DevicesFacade
   def play
     clips = get_clips [@project_dir]
     unless clips.empty?
-      output_filename = clips.last
-      @logger.debug "play: #{output_filename}"
+      last_clip_num = parse_clip_num clips.last
+      @logger.debug "play clip: #{last_clip_num}"
 
-      last_playlist_position = clips.length - 1
-      command = "#{MPV} --playlist-start=#{last_playlist_position} #{clips.join(' ')}"
+      last_clip_filename = File.basename(get_output_filename(last_clip_num, subclip_num = 0))
+      position_in_playlist = clips
+                             .map { |f| File.basename(f) }
+                             .index(last_clip_filename) || clips.length - 1
+
+      command = "#{MPV} --playlist-start=#{position_in_playlist} #{clips.join(' ')}"
       @logger.debug command
       system command
     end
   end
+end
+
+def remove_files(filenames)
+  temp_files = filenames
+  @logger.debug "removing #{filenames}"
+  FileUtils.rm_f filenames
 end
 
 def show_help
@@ -348,7 +390,6 @@ def parse_options!(options)
     opts.on('-s', '--sound-settings [arecord-args]', 'Additional arecord arguments (default " --device=default --format=dat"') { |s| options[:arecord_args] = s }
     opts.on('-a', '--android-device [device-id]', 'Android device id') { |a| options[:android_id] = a }
     opts.on('-o', '--opencamera-dir [dir]', 'Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")') { |o| options[:opencamera_dir] = o }
-    opts.on('-u', '--use-camera [true|false]', 'Whether we use Android device at all (default "true")') { |u| options[:use_camera] = u == 'true' }
     opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default "false")') { |b| options[:change_brightness] = b == 'true' }
     opts.on('-f', '--fps [num]', 'Constant frame rate (default "30")') { |f| options[:fps] = f.to_i }
     opts.on('-S', '--speed [num]', 'Speed factor (default "1.2")') { |s| options[:speed] = s.to_f }
@@ -365,7 +406,6 @@ options = {
   arecord_args: '--device=default --format=dat',
   android_id: '',
   opencamera_dir: '/mnt/sdcard/DCIM/OpenCamera',
-  use_camera: true,
   change_brightness: false,
   fps: 30,
   speed: 1.2,
