@@ -3,6 +3,7 @@
 require 'phone.rb'
 require 'microphone.rb'
 require 'numeric.rb'
+require 'voice/detect_voice.rb'
 
 require 'concurrent'
 require 'fileutils'
@@ -199,7 +200,9 @@ class DevicesFacade
     end
 
     if trim_noise
-      voice_segments = detect_voice sync_sound_filename
+      voice_segments = detect_voice sync_sound_filename, MIN_SHOT_SIZE, @min_pause_between_shots
+      @logger.debug "vadnet says: #{voice_segments.join(',')}"
+
       unless voice_segments.empty?
         segments = voice_segments.map { |seg| correct_segment(seg) }
 
@@ -215,18 +218,6 @@ class DevicesFacade
 
     @logger.debug "detect_segments: #{segments.join(',')}"
     segments
-  end
-
-  def detect_voice(sound_filename)
-    script_filename = File.join(File.dirname(__FILE__), '..', 'lib', 'voice', 'detect_voice.py')
-
-    ranges = `#{script_filename} #{sound_filename} #{MIN_SHOT_SIZE} #{@min_pause_between_shots}`.split("\n")
-    @logger.debug "vadnet says: #{ranges.join(',')}"
-
-    ranges
-      .map { |line| line.split(' ') }
-      .map { |r| r.map(&:to_f) }
-      .select { |r| r.length == 2 }
   end
 
   def process_video(camera_filename, segments)
