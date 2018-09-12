@@ -3,6 +3,7 @@
 require 'phone.rb'
 require 'microphone.rb'
 require 'numeric.rb'
+require 'ffmpeg_utils.rb'
 require 'voice/detect_voice.rb'
 
 require 'concurrent'
@@ -12,17 +13,14 @@ require 'logger'
 require 'optparse'
 
 class DevicesFacade
-  FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
-  MPV = 'mpv --no-terminal --fs'.freeze
-  VADNET_CORRECTION_START = 0.5
-  VADNET_CORRECTION_END = 1.5
+  MPV = 'mpv --no-terminal --fs --volume=130'.freeze
   MIN_SHOT_SIZE = 1.0
 
   def initialize(options, temp_dir, logger)
     @project_dir = options[:project_dir]
     @temp_dir = temp_dir
     @trim_duration = options[:trim_duration]
-    @min_pause_between_shots = options[:pause_between_shots]
+    @min_pause_between_shots = options[:min_pause_between_shots]
     @fps = options[:fps]
     @speed = options[:speed]
     @video_filters = options[:video_filters]
@@ -177,16 +175,9 @@ class DevicesFacade
     end
   end
 
-  def correct_segment(segment)
-    start_position, end_position = segment
-    start_position -= VADNET_CORRECTION_START
-    end_position += VADNET_CORRECTION_END
-    [start_position, end_position]
-  end
-
   def detect_segments(sync_sound_filename, camera_filename, sync_offset, trim_noise)
-    sound_duration = get_duration(sync_sound_filename)
-    duration = [get_duration(camera_filename), sound_duration].min
+    sync_sound_duration = get_duration(sync_sound_filename)
+    duration = [get_duration(camera_filename), sync_sound_duration].min
 
     start_position = [@trim_duration, sync_offset.abs].max
     end_position = duration - @trim_duration
@@ -200,11 +191,11 @@ class DevicesFacade
     end
 
     if trim_noise
-      voice_segments = detect_voice sync_sound_filename, MIN_SHOT_SIZE, @min_pause_between_shots
-      @logger.debug "vadnet says: #{voice_segments.join(',')}"
+      voice_segments = detect_voice_with_ffmpeg sync_sound_filename, sync_sound_duration, MIN_SHOT_SIZE, @min_pause_between_shots
+      @logger.debug "voice segments: #{voice_segments.join(',')}"
 
       unless voice_segments.empty?
-        segments = voice_segments.map { |seg| correct_segment(seg) }
+        segments = voice_segments
 
         segments[0][0] = [start_position, segments[0][0]].max
         last = segments.length - 1
@@ -382,12 +373,12 @@ def parse_options!(options)
     opts.on('-s', '--sound-settings [arecord-args]', 'Additional arecord arguments (default " --device=default --format=dat"') { |s| options[:arecord_args] = s }
     opts.on('-a', '--android-device [device-id]', 'Android device id') { |a| options[:android_id] = a }
     opts.on('-o', '--opencamera-dir [dir]', 'Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")') { |o| options[:opencamera_dir] = o }
-    opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default "false")') { |b| options[:change_brightness] = b == 'true' }
-    opts.on('-f', '--fps [num]', 'Constant frame rate (default "30")') { |f| options[:fps] = f.to_i }
-    opts.on('-S', '--speed [num]', 'Speed factor (default "1.2")') { |s| options[:speed] = s.to_f }
+    opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default false)') { |b| options[:change_brightness] = b == 'true' }
+    opts.on('-f', '--fps [num]', 'Constant frame rate (default 30)') { |f| options[:fps] = f.to_i }
+    opts.on('-S', '--speed [num]', 'Speed factor (default 1.2)') { |s| options[:speed] = s.to_f }
     opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default "hflip,atadenoise,vignette")') { |v| options[:video_filters] = v }
     opts.on('-C', '--video-compression [options]', 'libx264 options (default " -preset ultrafast -crf 18")') { |c| options[:video_compression] = c }
-    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default 2)') { |p| options[:pause_between_shots] = p }
+    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default 2)') { |p| options[:min_pause_between_shots] = p }
     opts.on('-d', '--debug [true|false]', 'Show debug messages (default false)') { |d| options[:debug] = d == 'true' }
   end.parse!
 
@@ -404,7 +395,7 @@ options = {
   speed: 1.2,
   video_filters: 'hflip,atadenoise,vignette',
   video_compression: '-preset ultrafast -crf 18',
-  pause_between_shots: 2.0,
+  min_pause_between_shots: 2.0,
   debug: false
 }
 parse_options!(options)

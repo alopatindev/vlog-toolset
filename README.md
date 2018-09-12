@@ -4,7 +4,7 @@ This tool is designed to record clipping videos for Vlogs or audios for Podcasts
 ## How it works
 - records video (using camera of Android-based device)
 - records audio (using microphone, connected to GNU/Linux machine)
-- detects voice (to trim the output, so it will contain only last shot with voice)
+- detects voice (to trim silence)
   - if auto trimming is disabled — just removes beginning and ending of each clip (which typically contain the button click sound)
 - synchronizes audio
 - applies some effects
@@ -25,15 +25,16 @@ Usage: vlog-recorder.rb -p project_dir/ [other options]
         --sound-settings
     -a, --android-device [device-id] Android device id
     -o, --opencamera-dir [dir]       Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")
-    -b [true|false],                 Set lowest brightness to save device power (default "false")
+    -b [true|false],                 Set lowest brightness to save device power (default false)
         --change-brightness
-    -f, --fps [num]                  Constant frame rate (default "30")
-    -S, --speed [num]                Speed factor (default "1.2")
+    -f, --fps [num]                  Constant frame rate (default 30)
+    -S, --speed [num]                Speed factor (default 1.2)
     -V, --video-filters [filters]    ffmpeg video filters (default "hflip,atadenoise,vignette")
     -C [options],                    libx264 options (default " -preset ultrafast -crf 18")
         --video-compression
-    -P [seconds],                    Minimum pause between shots for auto trimming (default 3)
+    -P [seconds],                    Minimum pause between shots for auto trimming (default 2)
         --pause-between-shots
+    -d, --debug [true|false]         Show debug messages (default false)
 
 RUBYOPT="-Ilib" ./bin/vlog-recorder.rb -p ~/video/new-cool-video-project
 r - (RE)START recording
@@ -44,6 +45,21 @@ p - PLAY last saved clip
 f - FOCUS camera on center
 h - show HELP
 q / Ctrl+C - QUIT
+```
+
+## Play Longest Pauses After Montage
+```
+RUBYOPT="-Ilib" ./bin/play-segments.rb -h
+Usage: play-segments.rb [options] -v video.mp4
+    -v, --v [filename]               Video to play
+    -s, --s [true|false]             Play silent parts starting from longest or else just play all segments (default: true)
+    -P [seconds],                    Minimum pause between shots for auto trimming (default 2)
+        --pause-between-shots
+    -w, --window [num]               Time window before and after the segment (default 0)
+    -S [num in dB],                  Threshold for silence detector (default -40)
+        --silence-threshold
+
+RUBYOPT="-Ilib" ./bin/play-segments.rb ~/video/new-cool-video-project/rendered_video.mp4
 ```
 
 ## Installation
