@@ -13,7 +13,8 @@ require 'optparse'
 class DevicesFacade
   FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
   MPV = 'mpv --no-terminal --fs'.freeze
-  VADNET_CORRECTION = 0.5
+  VADNET_CORRECTION_START = 0.5
+  VADNET_CORRECTION_END = 1.5
   MIN_SHOT_SIZE = 1.0
 
   def initialize(options, temp_dir, logger)
@@ -177,8 +178,8 @@ class DevicesFacade
 
   def correct_segment(segment)
     start_position, end_position = segment
-    start_position -= VADNET_CORRECTION
-    end_position += VADNET_CORRECTION
+    start_position -= VADNET_CORRECTION_START
+    end_position += VADNET_CORRECTION_END
     [start_position, end_position]
   end
 
@@ -395,7 +396,8 @@ def parse_options!(options)
     opts.on('-S', '--speed [num]', 'Speed factor (default "1.2")') { |s| options[:speed] = s.to_f }
     opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default "hflip,atadenoise,vignette")') { |v| options[:video_filters] = v }
     opts.on('-C', '--video-compression [options]', 'libx264 options (default " -preset ultrafast -crf 18")') { |c| options[:video_compression] = c }
-    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default 3)') { |p| options[:pause_between_shots] = p }
+    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default 2)') { |p| options[:pause_between_shots] = p }
+    opts.on('-d', '--debug [true|false]', 'Show debug messages (default false)') { |d| options[:debug] = d == 'true' }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -411,7 +413,8 @@ options = {
   speed: 1.2,
   video_filters: 'hflip,atadenoise,vignette',
   video_compression: '-preset ultrafast -crf 18',
-  pause_between_shots: 3.0
+  pause_between_shots: 2.0,
+  debug: false
 }
 parse_options!(options)
 
@@ -421,7 +424,7 @@ begin
   FileUtils.mkdir_p(temp_dir)
 
   logger = Logger.new File.join(project_dir, 'log.txt')
-  # logger.level = Logger::WARN
+  logger.level = Logger::WARN unless options[:debug]
 
   logger.debug options
 
