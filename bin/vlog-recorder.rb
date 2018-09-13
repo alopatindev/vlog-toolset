@@ -191,7 +191,7 @@ class DevicesFacade
     end
 
     if trim_noise
-      voice_segments = detect_voice_with_ffmpeg sync_sound_filename, sync_sound_duration, MIN_SHOT_SIZE, @min_pause_between_shots
+      voice_segments = detect_voice sync_sound_filename, MIN_SHOT_SIZE, @min_pause_between_shots
       @logger.debug "voice segments: #{voice_segments.join(',')}"
 
       unless voice_segments.empty?

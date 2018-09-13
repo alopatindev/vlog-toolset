@@ -1,39 +1,132 @@
 #!/usr/bin/env python3
 
-# this code is based on https://github.com/hcmlab/vadnet/blob/master/vad_extract.py
-# which was made by Johannes Wagner <wagner@hcm-lab.de>
-# Copyright (C) University of Augsburg, Lab for Human Centered Multimedia
+# this code is based on py-webrtcvad/blob/master/example.py
 
-import os
-import subprocess
+import collections
+import contextlib
+import itertools
 import sys
-import json
-import glob
+import wave
 
-import tensorflow as tf
-import numpy as np
-import librosa as lr
+import webrtcvad
 
 
-def audio_from_file(path, sr=None, ext=''):
-    return lr.load('{}{}'.format(path, ext), sr=sr, mono=True, offset=0.0, duration=None, dtype=np.float32, res_type='kaiser_best')
+def read_wave(path):
+    """Reads a .wav file.
+
+    Takes the path, and returns (PCM audio data, sample rate).
+    """
+    with contextlib.closing(wave.open(path, 'rb')) as wf:
+        num_channels = wf.getnchannels()
+        assert num_channels == 1
+        sample_width = wf.getsampwidth()
+        assert sample_width == 2
+        sample_rate = wf.getframerate()
+        assert sample_rate in (8000, 16000, 32000, 48000)
+        pcm_data = wf.readframes(wf.getnframes())
+        return pcm_data, sample_rate
 
 
-def audio_to_frames(x, n_frame, n_step=None):
-    if n_step is None:
-        n_step = n_frame
+class Frame(object):
+    """Represents a "frame" of audio data."""
+    def __init__(self, bytes, timestamp, duration):
+        self.bytes = bytes
+        self.timestamp = timestamp
+        self.duration = duration
 
-    if len(x.shape) == 1:
-        x.shape = (-1,1)
 
-    n_overlap = n_frame - n_step
-    n_frames = (x.shape[0] - n_overlap) // n_step
-    n_keep = n_frames * n_step + n_overlap
+def frame_generator(frame_duration_ms, audio, sample_rate):
+    """Generates audio frames from PCM audio data.
 
-    strides = list(x.strides)
-    strides[0] = strides[1] * n_step
+    Takes the desired frame duration in milliseconds, the PCM data, and
+    the sample rate.
 
-    return np.lib.stride_tricks.as_strided(x[0:n_keep,:], (n_frames,n_frame), strides)
+    Yields Frames of the requested duration.
+    """
+    n = int(sample_rate * (frame_duration_ms / 1000.0) * 2)
+    offset = 0
+    timestamp = 0.0
+    duration = (float(n) / sample_rate) / 2.0
+    while offset + n < len(audio):
+        yield Frame(audio[offset:offset + n], timestamp, duration)
+        timestamp += duration
+        offset += n
+
+
+def vad_collector(sample_rate, frame_duration_ms,
+                  padding_duration_ms, vad, frames):
+    """Filters out non-voiced audio frames.
+
+    Given a webrtcvad.Vad and a source of audio frames, yields only
+    the voiced audio.
+
+    Uses a padded, sliding window algorithm over the audio frames.
+    When more than 90% of the frames in the window are voiced (as
+    reported by the VAD), the collector triggers and begins yielding
+    audio frames. Then the collector waits until 90% of the frames in
+    the window are unvoiced to detrigger.
+
+    The window is padded at the front and back to provide a small
+    amount of silence or the beginnings/endings of speech around the
+    voiced frames.
+
+    Arguments:
+
+    sample_rate - The audio sample rate, in Hz.
+    frame_duration_ms - The frame duration in milliseconds.
+    padding_duration_ms - The amount to pad the window, in milliseconds.
+    vad - An instance of webrtcvad.Vad.
+    frames - a source of audio frames (sequence or generator).
+
+    Returns: A generator that yields PCM audio data.
+    """
+    num_padding_frames = int(padding_duration_ms / frame_duration_ms)
+    # We use a deque for our sliding window/ring buffer.
+    ring_buffer = collections.deque(maxlen=num_padding_frames)
+    # We have two states: TRIGGERED and NOTTRIGGERED. We start in the
+    # NOTTRIGGERED state.
+    triggered = False
+
+    voiced_frames = []
+    for frame in frames:
+        is_speech = vad.is_speech(frame.bytes, sample_rate)
+
+        if not triggered:
+            ring_buffer.append((frame, is_speech))
+            num_voiced = len([f for f, speech in ring_buffer if speech])
+            # If we're NOTTRIGGERED and more than 90% of the frames in
+            # the ring buffer are voiced frames, then enter the
+            # TRIGGERED state.
+            if num_voiced > 0.9 * ring_buffer.maxlen:
+                triggered = True
+                # We want to yield all the audio we see from now until
+                # we are NOTTRIGGERED, but we have to start with the
+                # audio that's already in the ring buffer.
+                for f, s in ring_buffer:
+                    voiced_frames.append(f)
+                ring_buffer.clear()
+        else:
+            # We're in the TRIGGERED state, so collect the audio data
+            # and add it to the ring buffer.
+            voiced_frames.append(frame)
+            ring_buffer.append((frame, is_speech))
+            num_unvoiced = len([f for f, speech in ring_buffer if not speech])
+            # If more than 90% of the frames in the ring buffer are
+            # unvoiced, then enter NOTTRIGGERED and yield whatever
+            # audio we've collected.
+            if num_unvoiced > 0.9 * ring_buffer.maxlen:
+                triggered = False
+                for f in voiced_frames:
+                    yield f.timestamp
+                    yield f.timestamp + f.duration
+                ring_buffer.clear()
+                voiced_frames = []
+    # If we have any leftover voiced audio when we run out of input,
+    # yield it.
+    if voiced_frames:
+        for f in voiced_frames:
+            yield f.timestamp
+            yield f.timestamp + f.duration
 
 
 def to_shots(positions, min_pause_between_shots):
@@ -56,75 +149,31 @@ def to_shots(positions, min_pause_between_shots):
     return result
 
 
-def extract_voice(path, wav_file, n_batch, min_shot_size, min_pause_between_shots):
-    if os.path.isdir(path):
-        candidates = glob.glob(os.path.join(path, 'model.ckpt-*.meta'))
-        if candidates:
-            candidates.sort()
-            checkpoint_path, _ = os.path.splitext(candidates[-1])
-    else:
-        checkpoint_path = path
+def main(args):
+    if len(args) != 5:
+        sys.stderr.write('Usage: %s <path to wav file> <aggressiveness> <min_shot_size> <min_pause_between_shots>\n' % args[0])
+        sys.exit(1)
 
-    if not all([os.path.exists(checkpoint_path + x) for x in ['.data-00000-of-00001', '.index', '.meta']]):
-        print('ERROR: could not load model')
-        raise FileNotFoundError
+    sound_filename = args[1]
+    agressiveness = int(args[2])
+    min_shot_size = float(args[3])
+    min_pause_between_shots = float(args[4])
 
-    vocabulary_path = checkpoint_path + '.json'
-    if not os.path.exists(vocabulary_path):
-        vocabulary_path = os.path.join(os.path.dirname(checkpoint_path), 'vocab.json')
-    if not os.path.exists(vocabulary_path):
-        print('ERROR: could not load vocabulary')
-        raise FileNotFoundError
+    audio, sample_rate = read_wave(sound_filename)
+    vad = webrtcvad.Vad(agressiveness)
+    frame_duration_ms = 30
+    padding_duration_ms = 300
+    frames = frame_generator(frame_duration_ms, audio, sample_rate)
+    frames = list(frames)
+    segments = vad_collector(sample_rate, frame_duration_ms, padding_duration_ms, vad, frames)
 
-    with open(vocabulary_path, 'r') as fp:
-        vocab = json.load(fp)
+    is_large_enough = lambda i: i[1] - i[0] >= min_shot_size
 
-    graph = tf.Graph()
-
-    with graph.as_default():
-        saver = tf.train.import_meta_graph(checkpoint_path + '.meta')
-
-        x = graph.get_tensor_by_name(vocab['x'])
-        y = graph.get_tensor_by_name(vocab['y'])
-        init = graph.get_operation_by_name(vocab['init'])
-        logits = graph.get_tensor_by_name(vocab['logits'])
-        ph_n_shuffle = graph.get_tensor_by_name(vocab['n_shuffle'])
-        ph_n_repeat = graph.get_tensor_by_name(vocab['n_repeat'])
-        ph_n_batch = graph.get_tensor_by_name(vocab['n_batch'])
-        sr = vocab['sample_rate']
-
-        with tf.Session() as sess:
-            saver.restore(sess, checkpoint_path)
-            sound, _ = audio_from_file(wav_file, sr=sr)
-            input = audio_to_frames(sound, x.shape[1])
-            labels = np.zeros((input.shape[0],), dtype=np.int32)
-            sess.run(init, feed_dict = { x : input, y : labels, ph_n_shuffle : 1, ph_n_repeat : 1, ph_n_batch : n_batch })
-            count = 0
-            n_total = input.shape[0]
-            while True:
-                try:
-                    output = sess.run(logits)
-                    labels[count:count+output.shape[0]] = np.argmax(output, axis=1)
-                    count += output.shape[0]
-                except tf.errors.OutOfRangeError:
-                    break
-
-            to_tuple = lambda i: (float(i[0]), float(i[1]))
-            is_large_enough = lambda i: i[1] - i[0] >= min_shot_size
-            voice = 1
-            shots = (to_tuple(i) for i in to_shots(np.argwhere(labels == voice).reshape(-1), min_pause_between_shots) if is_large_enough(to_tuple(i)))
-            return shots
+    for i in to_shots(list(segments), min_pause_between_shots):
+        if is_large_enough(i):
+            start_position, end_position = i
+            print(start_position, end_position)
 
 
 if __name__ == '__main__':
-    wav_file = sys.argv[1]
-    min_shot_size = float(sys.argv[2])
-    min_pause_between_shots = float(sys.argv[3])
-
-    voice_dir = os.path.dirname(sys.argv[0])
-    model = os.path.join(voice_dir, 'vadnet', 'models', 'vad')
-    n_batch = 8
-
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    for start, end in extract_voice(model, wav_file, n_batch, min_shot_size, min_pause_between_shots):
-        print(start, end)
+    main(sys.argv)

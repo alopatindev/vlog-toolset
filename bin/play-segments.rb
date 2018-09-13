@@ -21,10 +21,9 @@ def detect_segments(sound_filename, options)
   silence = options[:silence]
   min_pause_between_shots = options[:min_pause_between_shots]
   time_window = options[:window]
-  silence_threshold_db = options[:silence_threshold_db]
 
   duration = get_duration(sound_filename)
-  voice_segments = detect_voice_with_ffmpeg sound_filename, duration, MIN_SHOT_SIZE, min_pause_between_shots, silence_threshold_db
+  voice_segments = detect_voice sound_filename, MIN_SHOT_SIZE, min_pause_between_shots
 
   segments =
     if silence
@@ -66,12 +65,11 @@ end
 
 def parse_options!(options)
   OptionParser.new do |opts|
-    opts.banner = 'Usage: play-segments.rb [options] -v video.mp4'
-    opts.on('-v', '--v [filename]', 'Video to play') { |v| options[:video] = v }
-    opts.on('-s', '--s [true|false]', 'Play silent parts starting from longest or else just play all segments (default: true)') { |s| options[:silence] = s == 'true' }
-    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default 2)') { |p| options[:min_pause_between_shots] = p }
+    opts.banner = 'Usage: play-segments.rb [options] -i video.mp4'
+    opts.on('-i', '--i [filename]', 'Video to play') { |i| options[:video] = i }
+    opts.on('-s', '--silence [true|false]', 'Play silent parts starting from longest segment (default: true)') { |s| options[:silence] = s == 'true' }
+    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots (default 2)') { |p| options[:min_pause_between_shots] = p }
     opts.on('-w', '--window [num]', 'Time window before and after the segment (default 0)') { |w| options[:window] = w.to_f }
-    opts.on('-S', '--silence-threshold [num in dB]', 'Threshold for silence detector (default -40)') { |s| options[:silence_threshold_db] = s.to_f }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:video].nil?
@@ -80,8 +78,7 @@ end
 options = {
   silence: true,
   min_pause_between_shots: 0.5,
-  window: 0.0,
-  silence_threshold_db: -40.0
+  window: 0.0
 }
 
 parse_options!(options)

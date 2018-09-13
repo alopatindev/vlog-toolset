@@ -50,16 +50,14 @@ q / Ctrl+C - QUIT
 ## Play Longest Pauses After Montage
 ```
 RUBYOPT="-Ilib" ./bin/play-segments.rb -h
-Usage: play-segments.rb [options] -v video.mp4
-    -v, --v [filename]               Video to play
-    -s, --s [true|false]             Play silent parts starting from longest or else just play all segments (default: true)
-    -P [seconds],                    Minimum pause between shots for auto trimming (default 2)
+Usage: play-segments.rb [options] -i video.mp4
+    -i, --i [filename]               Video to play
+    -s, --silence [true|false]       Play silent parts starting from longest segment (default: true)
+    -P [seconds],                    Minimum pause between shots (default 2)
         --pause-between-shots
     -w, --window [num]               Time window before and after the segment (default 0)
-    -S [num in dB],                  Threshold for silence detector (default -40)
-        --silence-threshold
 
-RUBYOPT="-Ilib" ./bin/play-segments.rb ~/video/new-cool-video-project/rendered_video.mp4
+RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/rendered_video.mp4
 ```
 
 ## Installation
@@ -68,17 +66,14 @@ RUBYOPT="-Ilib" ./bin/play-segments.rb ~/video/new-cool-video-project/rendered_v
 ### Dependencies
 - GNU/Linux
 - ruby (tested with 2.5.1)
+- python (tested with 3.6.5)
+- pip (tested with 9.0.1)
 - ffmpeg (tested with 3.4.4)
 - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH variable)
-- alsa-utils
+- alsa-utils (tested with 1.1.2)
 - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))
 - mpv (tested with 0.27.2)
 - android-tools (tested with 6.0.1)
-    - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
-
-#### vadnet
-`git clone git@github.com:hcmlab/vadnet.git vlog-recorder/lib/voice/vadnet && pip3 install --user tensorflow librosa termcolor`
-
-Which also requires
-- python (tested with 3.6.5)
-- pip
+  - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
+- webrtcvad (tested with 2.0.10)
+  - `pip3 install --user webrtcvad`
