@@ -25,17 +25,22 @@ def detect_segments(sound_filename, options)
   duration = get_duration(sound_filename)
   voice_segments = detect_voice sound_filename, MIN_SHOT_SIZE, min_pause_between_shots
 
+  pauses = voice_segments
+           .flatten[1..-2]
+           .each_slice(2)
+
+  pauses_with_dt = pauses.map do |start_position, end_position|
+    dt = end_position - start_position
+    [dt, start_position, end_position]
+  end
+
+  pauses_duration = pauses_with_dt.map { |dt, _start_position, _end_position| dt }.sum
+  voice_duration = voice_segments.map { |start_position, end_position| end_position - start_position }.sum
+  pauses_percentage = (pauses_duration / duration) * 100.0
+  puts "pauses take #{pauses_percentage.round(1)}% of video"
+
   segments =
     if silence
-      pauses = voice_segments
-               .flatten[1..-2]
-               .each_slice(2)
-
-      pauses_with_dt = pauses.map do |start_position, end_position|
-        dt = end_position - start_position
-        [dt, start_position, end_position]
-      end
-
       pauses_with_dt.sort_by { |dt, _start_position, _end_position| -dt }
                     .map { |_dt, start_position, end_position| [start_position, end_position] }
     else
