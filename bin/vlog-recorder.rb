@@ -26,6 +26,7 @@ class DevicesFacade
     @speed = options[:speed]
     @video_filters = options[:video_filters]
     @video_compression = options[:video_compression]
+    @reencode_video = options[:reencode_video]
     @logger = logger
 
     @recording = false
@@ -213,17 +214,20 @@ class DevicesFacade
   end
 
   def process_video(camera_filename, segments)
+    video_filters = ["fps=#{@fps}", "setpts=(1/#{@speed})*PTS"] + @video_filters.split(',')
+
     segments.each_with_index.map do |seg, subclip_num|
       start_position, end_position = seg
       output_filename = "#{camera_filename}_#{subclip_num}.processed.mp4"
       temp_filename = "#{camera_filename}_#{subclip_num}.cut.mp4"
 
-      video_filters = ["fps=#{@fps}", "setpts=(1/#{@speed})*PTS"] + @video_filters.split(',')
-      command = "#{FFMPEG} -ss #{start_position} -i #{camera_filename} -to #{end_position - start_position} -an -c copy #{temp_filename} && \
-        #{FFMPEG} -i #{temp_filename} -vcodec libx264 #{@video_compression} -vf '#{video_filters.join(',')}' #{output_filename}"
-      @logger.debug command
-      system command
-      remove_files temp_filename
+      system "#{FFMPEG} -ss #{start_position} -i #{camera_filename} -to #{end_position - start_position} -an -c copy #{temp_filename}"
+      if @reencode_video
+        system "#{FFMPEG} -i #{temp_filename} -vcodec libx264 #{@video_compression} -vf '#{video_filters.join(',')}' #{output_filename}"
+        remove_files temp_filename
+      else
+        FileUtils.mv temp_filename, output_filename, force: true
+      end
 
       output_filename
     end
@@ -250,11 +254,13 @@ class DevicesFacade
   end
 
   def process_sound(sync_sound_filename, segments)
+    audio_filters = ['pan=mono|c0=c0']
+    audio_filters.append "atempo=#{@speed}" if @reencode_video
+
     segments.each_with_index.map do |seg, subclip_num|
       start_position, end_position = seg
       output_filename = "#{sync_sound_filename}_#{subclip_num}.m4a"
 
-      audio_filters = ['pan=mono|c0=c0', "atempo=#{@speed}"]
       ffmpeg_cut_args = "-ss #{start_position} -i #{sync_sound_filename} -to #{end_position - start_position} -c copy"
       ffmpeg_output_args = "-af '#{audio_filters.join(',')}' -acodec alac"
 
@@ -309,7 +315,8 @@ class DevicesFacade
                              .map { |f| File.basename(f) }
                              .index(last_clip_filename) || clips.length - 1
 
-      command = "#{MPV} --playlist-start=#{position_in_playlist} #{clips.join(' ')}"
+      mpv_args = @reencode_video ? '' : "-vf=mirror --speed=#{@speed}"
+      command = "#{MPV} #{mpv_args} --playlist-start=#{position_in_playlist} #{clips.join(' ')}"
       @logger.debug command
       system command
     end
@@ -379,6 +386,7 @@ def parse_options!(options)
     opts.on('-S', '--speed [num]', 'Speed factor (default: 1.2)') { |s| options[:speed] = s.to_f }
     opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default: "hflip,atadenoise,vignette")') { |v| options[:video_filters] = v }
     opts.on('-C', '--video-compression [options]', 'libx264 options (default: " -preset ultrafast -crf 18")') { |c| options[:video_compression] = c }
+    opts.on('-r', '--reencode-video [true|false]', 'Whether we should apply any effects') { |r| options[:reencode_video] = r == 'true' }
     opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default: 2)') { |p| options[:min_pause_between_shots] = p }
     opts.on('-a', '--aggressiveness [0..3]', 'How aggressively to filter out non-speech (default: 2)') { |a| options[:aggressiveness] = a.to_i }
     opts.on('-d', '--debug [true|false]', 'Show debug messages (default: false)') { |d| options[:debug] = d == 'true' }
@@ -397,6 +405,7 @@ options = {
   speed: 1.2,
   video_filters: 'hflip,atadenoise,vignette',
   video_compression: '-preset ultrafast -crf 18',
+  reencode_video: true,
   min_pause_between_shots: 2.0,
   aggressiveness: 2,
   debug: false
