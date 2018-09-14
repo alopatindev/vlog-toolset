@@ -9,7 +9,7 @@ def detect_voice(sound_filename, min_shot_size, min_pause_between_shots)
 
   script_filename = File.join(File.dirname(__FILE__), 'detect_voice.py')
 
-  sound_with_single_channel_filename = take_first_channel(sound_filename)
+  sound_with_single_channel_filename = prepare_for_vad(sound_filename)
   output = `#{script_filename} #{sound_with_single_channel_filename} #{agressiveness} #{min_shot_size} #{min_pause_between_shots}`
 
   FileUtils.rm_f sound_with_single_channel_filename
