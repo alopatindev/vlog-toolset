@@ -21,6 +21,7 @@ class DevicesFacade
     @temp_dir = temp_dir
     @trim_duration = options[:trim_duration]
     @min_pause_between_shots = options[:min_pause_between_shots]
+    @aggressiveness = options[:aggressiveness]
     @fps = options[:fps]
     @speed = options[:speed]
     @video_filters = options[:video_filters]
@@ -191,7 +192,7 @@ class DevicesFacade
     end
 
     if trim_noise
-      voice_segments = detect_voice sync_sound_filename, MIN_SHOT_SIZE, @min_pause_between_shots
+      voice_segments = detect_voice sync_sound_filename, MIN_SHOT_SIZE, @min_pause_between_shots, @aggressiveness
       @logger.debug "voice segments: #{voice_segments.join(',')}"
 
       unless voice_segments.empty?
@@ -369,17 +370,18 @@ def parse_options!(options)
   OptionParser.new do |opts|
     opts.banner = 'Usage: vlog-recorder.rb -p project_dir/ [other options]'
     opts.on('-p', '--project [dir]', 'Project directory') { |p| options[:project_dir] = p }
-    opts.on('-t', '--trim [duration]', 'Trim duration of beginning and ending of each clip (default 0.15)') { |t| options[:trim_duration] = t.to_f }
-    opts.on('-s', '--sound-settings [arecord-args]', 'Additional arecord arguments (default " --device=default --format=dat"') { |s| options[:arecord_args] = s }
-    opts.on('-a', '--android-device [device-id]', 'Android device id') { |a| options[:android_id] = a }
-    opts.on('-o', '--opencamera-dir [dir]', 'Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")') { |o| options[:opencamera_dir] = o }
-    opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default false)') { |b| options[:change_brightness] = b == 'true' }
-    opts.on('-f', '--fps [num]', 'Constant frame rate (default 30)') { |f| options[:fps] = f.to_i }
-    opts.on('-S', '--speed [num]', 'Speed factor (default 1.2)') { |s| options[:speed] = s.to_f }
-    opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default "hflip,atadenoise,vignette")') { |v| options[:video_filters] = v }
-    opts.on('-C', '--video-compression [options]', 'libx264 options (default " -preset ultrafast -crf 18")') { |c| options[:video_compression] = c }
-    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default 2)') { |p| options[:min_pause_between_shots] = p }
-    opts.on('-d', '--debug [true|false]', 'Show debug messages (default false)') { |d| options[:debug] = d == 'true' }
+    opts.on('-t', '--trim [duration]', 'Trim duration of beginning and ending of each clip (default: 0.15)') { |t| options[:trim_duration] = t.to_f }
+    opts.on('-s', '--sound-settings [arecord-args]', 'Additional arecord arguments (default: " --device=default --format=dat"') { |s| options[:arecord_args] = s }
+    opts.on('-A', '--android-device [device-id]', 'Android device id') { |a| options[:android_id] = a }
+    opts.on('-o', '--opencamera-dir [dir]', 'Open Camera directory path on Android device (default: "/mnt/sdcard/DCIM/OpenCamera")') { |o| options[:opencamera_dir] = o }
+    opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default: false)') { |b| options[:change_brightness] = b == 'true' }
+    opts.on('-f', '--fps [num]', 'Constant frame rate (default: 30)') { |f| options[:fps] = f.to_i }
+    opts.on('-S', '--speed [num]', 'Speed factor (default: 1.2)') { |s| options[:speed] = s.to_f }
+    opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default: "hflip,atadenoise,vignette")') { |v| options[:video_filters] = v }
+    opts.on('-C', '--video-compression [options]', 'libx264 options (default: " -preset ultrafast -crf 18")') { |c| options[:video_compression] = c }
+    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default: 2)') { |p| options[:min_pause_between_shots] = p }
+    opts.on('-a', '--aggressiveness [0..3]', 'How aggressively to filter out non-speech (default: 2)') { |a| options[:aggressiveness] = a.to_i }
+    opts.on('-d', '--debug [true|false]', 'Show debug messages (default: false)') { |d| options[:debug] = d == 'true' }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -396,6 +398,7 @@ options = {
   video_filters: 'hflip,atadenoise,vignette',
   video_compression: '-preset ultrafast -crf 18',
   min_pause_between_shots: 2.0,
+  aggressiveness: 2,
   debug: false
 }
 parse_options!(options)

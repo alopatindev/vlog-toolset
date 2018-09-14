@@ -20,21 +20,22 @@ cd vlog-recorder
 RUBYOPT="-Ilib" ./bin/vlog-recorder.rb -h
 Usage: vlog-recorder.rb -p project_dir/ [other options]
     -p, --project [dir]              Project directory
-    -t, --trim [duration]            Trim duration of beginning and ending of each clip (default 0.15)
-    -s [arecord-args],               Additional arecord arguments (default " --device=default --format=dat"
+    -t, --trim [duration]            Trim duration of beginning and ending of each clip (default: 0.15)
+    -s [arecord-args],               Additional arecord arguments (default: " --device=default --format=dat"
         --sound-settings
-    -a, --android-device [device-id] Android device id
-    -o, --opencamera-dir [dir]       Open Camera directory path on Android device (default "/mnt/sdcard/DCIM/OpenCamera")
-    -b [true|false],                 Set lowest brightness to save device power (default false)
+    -A, --android-device [device-id] Android device id
+    -o, --opencamera-dir [dir]       Open Camera directory path on Android device (default: "/mnt/sdcard/DCIM/OpenCamera")
+    -b [true|false],                 Set lowest brightness to save device power (default: false)
         --change-brightness
-    -f, --fps [num]                  Constant frame rate (default 30)
-    -S, --speed [num]                Speed factor (default 1.2)
-    -V, --video-filters [filters]    ffmpeg video filters (default "hflip,atadenoise,vignette")
-    -C [options],                    libx264 options (default " -preset ultrafast -crf 18")
+    -f, --fps [num]                  Constant frame rate (default: 30)
+    -S, --speed [num]                Speed factor (default: 1.2)
+    -V, --video-filters [filters]    ffmpeg video filters (default: "hflip,atadenoise,vignette")
+    -C [options],                    libx264 options (default: " -preset ultrafast -crf 18")
         --video-compression
-    -P [seconds],                    Minimum pause between shots for auto trimming (default 2)
+    -P [seconds],                    Minimum pause between shots for auto trimming (default: 2)
         --pause-between-shots
-    -d, --debug [true|false]         Show debug messages (default false)
+    -a, --aggressiveness [0..3]      How aggressively to filter out non-speech (default: 2)
+    -d, --debug [true|false]         Show debug messages (default: false)
 
 RUBYOPT="-Ilib" ./bin/vlog-recorder.rb -p ~/video/new-cool-video-project
 r - (RE)START recording
@@ -53,9 +54,10 @@ RUBYOPT="-Ilib" ./bin/play-segments.rb -h
 Usage: play-segments.rb [options] -i video.mp4
     -i, --i [filename]               Video to play
     -s, --silence [true|false]       Play silent parts starting from longest segment (default: true)
-    -P [seconds],                    Minimum pause between shots (default 2)
+    -P [seconds],                    Minimum pause between shots (default: 2)
         --pause-between-shots
-    -w, --window [num]               Time window before and after the segment (default 0)
+    -w, --window [num]               Time window before and after the segment (default: 0)
+    -a, --aggressiveness [0..3]      How aggressively to filter out non-speech (default: 3)
 
 RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/rendered_video.mp4
 ```

@@ -21,9 +21,10 @@ def detect_segments(sound_filename, options)
   silence = options[:silence]
   min_pause_between_shots = options[:min_pause_between_shots]
   time_window = options[:window]
+  aggressiveness = options[:aggressiveness]
 
   duration = get_duration(sound_filename)
-  voice_segments = detect_voice sound_filename, MIN_SHOT_SIZE, min_pause_between_shots
+  voice_segments = detect_voice sound_filename, MIN_SHOT_SIZE, min_pause_between_shots, aggressiveness
 
   pauses = voice_segments
            .flatten[1..-2]
@@ -73,8 +74,9 @@ def parse_options!(options)
     opts.banner = 'Usage: play-segments.rb [options] -i video.mp4'
     opts.on('-i', '--i [filename]', 'Video to play') { |i| options[:video] = i }
     opts.on('-s', '--silence [true|false]', 'Play silent parts starting from longest segment (default: true)') { |s| options[:silence] = s == 'true' }
-    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots (default 2)') { |p| options[:min_pause_between_shots] = p }
-    opts.on('-w', '--window [num]', 'Time window before and after the segment (default 0)') { |w| options[:window] = w.to_f }
+    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots (default: 2)') { |p| options[:min_pause_between_shots] = p }
+    opts.on('-w', '--window [num]', 'Time window before and after the segment (default: 0)') { |w| options[:window] = w.to_f }
+    opts.on('-a', '--aggressiveness [0..3]', 'How aggressively to filter out non-speech (default: 3)') { |a| options[:aggressiveness] = a.to_i }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:video].nil?
@@ -83,7 +85,8 @@ end
 options = {
   silence: true,
   min_pause_between_shots: 0.5,
-  window: 0.0
+  window: 0.0,
+  aggressiveness: 3
 }
 
 parse_options!(options)
