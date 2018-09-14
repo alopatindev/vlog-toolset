@@ -8,17 +8,10 @@ require 'optparse'
 
 MIN_SHOT_SIZE = 1.0
 
-def convert_to_wav(video_filename)
-  puts "converting sound...\n"
-  sound_filename = "#{video_filename}.wav"
-  system "#{FFMPEG} -i #{video_filename} -vn #{sound_filename}"
-  sound_filename
-end
-
 def detect_segments(sound_filename, options)
   puts "detecting segments...\n"
 
-  silence = options[:silence]
+  mode = options[:mode]
   min_pause_between_shots = options[:min_pause_between_shots]
   time_window = options[:window]
   aggressiveness = options[:aggressiveness]
@@ -41,11 +34,19 @@ def detect_segments(sound_filename, options)
   puts "pauses take #{pauses_percentage.round(1)}% of video"
 
   segments =
-    if silence
+    case mode
+    when 'silence'
       pauses_with_dt.sort_by { |dt, _start_position, _end_position| -dt }
                     .map { |_dt, start_position, end_position| [start_position, end_position] }
-    else
+    when 'voice'
       voice_segments
+    when 'both'
+      voice_segments.zip(pauses.map { |xs| xs.map { |i| i + 0.001 } })
+                    .flatten
+                    .reject(&:nil?)
+                    .each_slice(2)
+    else
+      raise "Unsupported mode #{mode}"
     end
 
   segments.map do |start_position, end_position|
@@ -57,23 +58,26 @@ end
 
 def play_segments(options)
   video_filename = options[:video]
-  sound_filename = convert_to_wav video_filename
-  segments = detect_segments sound_filename, options
-  FileUtils.rm_f sound_filename
+  mode = options[:mode]
+  speed = options[:speed]
+
+  segments = detect_segments video_filename, options
 
   puts "playing...\n"
-  mpv_args = segments.map do |start_position, end_position|
-    "--{ --start=#{start_position} --end=#{end_position} #{video_filename} --}"
+  mpv_args = segments.map.with_index do |(start_position, end_position), i|
+    clip_speed = i.odd? && mode == 'both' ? (speed * 4.0) : speed
+    "--{ --start=#{start_position} --end=#{end_position} --speed=#{clip_speed} #{video_filename} --}"
   end.join(' ')
 
-  system "mpv --really-quiet #{mpv_args}"
+  system "mpv --really-quiet --hr-seek=yes #{mpv_args}"
 end
 
 def parse_options!(options)
   OptionParser.new do |opts|
     opts.banner = 'Usage: play-segments.rb [options] -i video.mp4'
     opts.on('-i', '--i [filename]', 'Video to play') { |i| options[:video] = i }
-    opts.on('-s', '--silence [true|false]', 'Play silent parts starting from longest segment (default: true)') { |s| options[:silence] = s == 'true' }
+    opts.on('-S', '--speed [num]', 'Speed factor (default: 1.5)') { |s| options[:speed] = s.to_f }
+    opts.on('-m', '--mode [silence|voice|both]', 'Play silent parts starting from longest segment OR voice only OR both, but silences will be spedup (default: silence)') { |m| options[:mode] = m }
     opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots (default: 2)') { |p| options[:min_pause_between_shots] = p }
     opts.on('-w', '--window [num]', 'Time window before and after the segment (default: 0)') { |w| options[:window] = w.to_f }
     opts.on('-a', '--aggressiveness [0..3]', 'How aggressively to filter out non-speech (default: 3)') { |a| options[:aggressiveness] = a.to_i }
@@ -83,7 +87,8 @@ def parse_options!(options)
 end
 
 options = {
-  silence: true,
+  speed: 1.5,
+  mode: 'silence',
   min_pause_between_shots: 0.5,
   window: 0.0,
   aggressiveness: 3

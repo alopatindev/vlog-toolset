@@ -5,7 +5,7 @@ def get_duration(filename)
 end
 
 def prepare_for_vad(filename)
-  output_filename = "#{filename}.1ch.wav"
-  system "#{FFMPEG} -i #{filename} -af 'pan=mono|c0=c0' -ar 48000 #{output_filename}"
+  output_filename = "#{filename}.vad.wav"
+  system "#{FFMPEG} -i #{filename} -af 'pan=mono|c0=c0' -ar 48000 -vn #{output_filename}"
   output_filename
 end
