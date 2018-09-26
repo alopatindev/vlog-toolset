@@ -23,7 +23,7 @@ class DevicesFacade
     @min_pause_between_shots = options[:min_pause_between_shots]
     @aggressiveness = options[:aggressiveness]
     @fps = options[:fps]
-    @speed = options[:speed]
+    @speed = clamp_speed(options[:speed])
     @video_filters = options[:video_filters]
     @video_compression = options[:video_compression]
     @reencode_video = options[:reencode_video]
@@ -384,7 +384,7 @@ def parse_options!(options)
     opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default: false)') { |b| options[:change_brightness] = b == 'true' }
     opts.on('-f', '--fps [num]', 'Constant frame rate (default: 30)') { |f| options[:fps] = f.to_i }
     opts.on('-S', '--speed [num]', 'Speed factor (default: 1.2)') { |s| options[:speed] = s.to_f }
-    opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default: "hflip,atadenoise,vignette")') { |v| options[:video_filters] = v }
+    opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default: "atadenoise,hflip,vignette")') { |v| options[:video_filters] = v }
     opts.on('-C', '--video-compression [options]', 'libx264 options (default: " -preset ultrafast -crf 18")') { |c| options[:video_compression] = c }
     opts.on('-r', '--reencode-video [true|false]', 'Whether we should apply any effects') { |r| options[:reencode_video] = r == 'true' }
     opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default: 2)') { |p| options[:min_pause_between_shots] = p }
@@ -403,7 +403,7 @@ options = {
   change_brightness: false,
   fps: 30,
   speed: 1.2,
-  video_filters: 'hflip,atadenoise,vignette',
+  video_filters: 'atadenoise,hflip,vignette',
   video_compression: '-preset ultrafast -crf 18',
   reencode_video: true,
   min_pause_between_shots: 2.0,

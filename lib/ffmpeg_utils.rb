@@ -9,3 +9,7 @@ def prepare_for_vad(filename)
   system "#{FFMPEG} -i #{filename} -af 'pan=mono|c0=c0' -ar 48000 -vn #{output_filename}"
   output_filename
 end
+
+def clamp_speed(speed)
+  speed.clamp(0.5, 2.0)
+end

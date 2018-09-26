@@ -29,7 +29,7 @@ Usage: vlog-recorder.rb -p project_dir/ [other options]
         --change-brightness
     -f, --fps [num]                  Constant frame rate (default: 30)
     -S, --speed [num]                Speed factor (default: 1.2)
-    -V, --video-filters [filters]    ffmpeg video filters (default: "hflip,atadenoise,vignette")
+    -V, --video-filters [filters]    ffmpeg video filters (default: "atadenoise,hflip,vignette")
     -C [options],                    libx264 options (default: " -preset ultrafast -crf 18")
         --video-compression
     -P [seconds],                    Minimum pause between shots for auto trimming (default: 2)
@@ -48,7 +48,27 @@ h - show HELP
 q / Ctrl+C - QUIT
 ```
 
-## Play Longest Pauses After Montage
+## Generate and Edit Metadata
+```
+lib/autosub/generate_metadata.py ~/video/new-cool-video-project
+vi ~/video/new-cool-video-project/video.meta
+```
+
+The columns in metadata mean
+- clip filename
+- speed multiplier
+- start position (in seconds)
+- end position (in seconds)
+- text (to figure out which clips can be removed / reordered)
+
+Remove lines to remove particular clips from output. Add empty newlines to increase delay after clip. Change speed of individual clips.
+
+## Render a Video
+```
+RUBYOPT="-Ilib" ./bin/render.rb -p ~/video/new-cool-video-project --preview false
+```
+
+## Play Longest Pauses (Optional)
 ```
 RUBYOPT="-Ilib" ./bin/play-segments.rb -h
 Usage: play-segments.rb [options] -i video.mp4
@@ -59,7 +79,7 @@ Usage: play-segments.rb [options] -i video.mp4
     -w, --window [num]               Time window before and after the segment (default: 0)
     -a, --aggressiveness [0..3]      How aggressively to filter out non-speech (default: 3)
 
-RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/rendered_video.mp4
+RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/output.mp4
 ```
 
 ## Installation
@@ -79,3 +99,5 @@ RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/rendere
   - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
 - webrtcvad (tested with 2.0.10)
   - `pip3 install --user webrtcvad`
+- autosub
+  - `git clone git@github.com:agermanidis/autosub.git lib/autosub`
