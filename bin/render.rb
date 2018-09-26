@@ -6,7 +6,6 @@ require 'fileutils'
 require 'io/console'
 require 'optparse'
 require 'thread/pool'
-require 'tmpdir'
 
 PREVIEW_WIDTH = 320
 
@@ -102,14 +101,15 @@ def process_and_split_videos(segments, options, temp_dir)
   thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   temp_videos = segments.map do |seg|
+    segment_speed = clamp_speed(seg[:speed] * speed)
+
     ext = '.mp4'
     basename = File.basename seg[:video_filename]
-    filename = File.join temp_dir, "#{basename}#{ext}_#{seg[:start_position]}_#{seg[:end_position]}"
+    filename = File.join temp_dir, "#{basename}#{ext}_#{segment_speed}_#{preview}_#{seg[:start_position]}_#{seg[:end_position]}"
     temp_video_filename = "#{filename}#{ext}"
     temp_cut_video_filename = "#{filename}.cut#{ext}"
 
     thread_pool.post do
-      segment_speed = clamp_speed(seg[:speed] * speed)
       audio_filters = "atempo=#{segment_speed}"
       video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{segment_speed})*PTS"
       if preview
@@ -118,12 +118,13 @@ def process_and_split_videos(segments, options, temp_dir)
 
       video_codec = 'libx264 -preset ultrafast -crf 18'
 
-      command = "#{FFMPEG} -threads 1 \
+      command = "#{FFMPEG_NO_OVERWRITE} -threads 1 \
                            -ss #{seg[:start_position]} \
                            -i #{seg[:video_filename]} \
                            -to #{seg[:end_position] - seg[:start_position]} \
                            -c copy #{temp_cut_video_filename} && \
-                 #{FFMPEG} -threads 1 -i #{temp_cut_video_filename} \
+                 #{FFMPEG_NO_OVERWRITE} -threads 1 \
+                           -i #{temp_cut_video_filename} \
                            -vcodec #{video_codec} \
                            -vf '#{video_filters}' \
                            -af '#{audio_filters}' \
@@ -237,10 +238,9 @@ segments = merge_small_pauses apply_delays(parse(metadata_filename)), min_pause_
 
 temp_dir = File.join project_dir, 'tmp'
 FileUtils.mkdir_p(temp_dir)
-Dir.mktmpdir(nil, temp_dir) do |dir|
-  temp_videos = process_and_split_videos segments, options, dir
-  concat_videos temp_videos, output_filename
-end
+
+temp_videos = process_and_split_videos segments, options, temp_dir
+concat_videos temp_videos, output_filename
 
 player_position = compute_player_position segments, options
 print "player_position = #{player_position}\n"
