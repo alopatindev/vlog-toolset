@@ -132,7 +132,8 @@ def process_and_split_videos(segments, options, temp_dir)
                            -f ipod #{temp_video_filename}"
 
       system command
-      FileUtils.rm_f temp_cut_video_filename
+
+      FileUtils.rm_f temp_cut_video_filename if options[:cleanup]
     end
 
     temp_video_filename
@@ -201,13 +202,14 @@ end
 
 def parse_options!(options)
   OptionParser.new do |opts|
-    opts.banner = 'Usage: vlog-recorder.rb -p project_dir/ [other options]'
+    opts.banner = 'Usage: render.rb -p project_dir/ [other options]'
     opts.on('-p', '--project [dir]', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-L', '--line [num]', 'Line in video.meta file, to play by given position (default: 1)') { |l| options[:line_in_file] = l }
-    opts.on('-P', '--preview [true|false]', 'Preview mode (default: true)') { |p| options[:preview] = p == 'true' }
+    opts.on('-P', '--preview [true|false]', 'Preview mode. It will also start a video player by a given position (default: true)') { |p| options[:preview] = p == 'true' }
     opts.on('-f', '--fps [num]', 'Constant frame rate (default: 30)') { |f| options[:fps] = f.to_i }
     opts.on('-S', '--speed [num]', 'Speed factor (default: 1.2)') { |s| options[:speed] = s.to_f }
     opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default: "atadenoise,hflip,vignette")') { |v| options[:video_filters] = v }
+    opts.on('-c', '--cleanup [true|false]', 'Remove temporary files, instead of reusing them in future (default: false)') { |c| options[:cleanup] = c == 'true' }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -222,7 +224,8 @@ options = {
   video_filters: 'atadenoise,hflip,vignette',
   min_pause_between_shots: 0.1,
   preview: true,
-  line_in_file: 1
+  line_in_file: 1,
+  cleanup: false
 }
 
 parse_options!(options)
@@ -237,11 +240,15 @@ min_pause_between_shots = 0.1
 segments = merge_small_pauses apply_delays(parse(metadata_filename)), min_pause_between_shots
 
 temp_dir = File.join project_dir, 'tmp'
-FileUtils.mkdir_p(temp_dir)
+FileUtils.mkdir_p temp_dir
 
 temp_videos = process_and_split_videos segments, options, temp_dir
 concat_videos temp_videos, output_filename
 
-player_position = compute_player_position segments, options
-print "player_position = #{player_position}\n"
-system "mpv --really-quiet --start=#{player_position} #{output_filename}"
+FileUtils.rm_r temp_dir if options[:cleanup]
+
+if options[:preview]
+  player_position = compute_player_position segments, options
+  print "player_position = #{player_position}\n"
+  system "mpv --really-quiet --start=#{player_position} #{output_filename}"
+end
