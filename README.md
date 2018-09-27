@@ -2,13 +2,20 @@
 This tool set is designed to record clipping videos for Vlogs
 
 ## vlog-recorder
-- records video (using camera of Android-based device)
-- records audio (using microphone, connected to GNU/Linux machine)
+- records video
+  - using camera of Android-based device
+- records audio
+  - using microphone, connected to GNU/Linux machine
 - detects voice (to trim silence)
-  - if auto trimming is disabled — just removes beginning and ending of each clip (which typically contain the button click sound)
+    - if you save clip without auto trimming — it will just remove beginning and ending of each clip
+        - which typically contain the button click sound
 - synchronizes audio
-- combines stuff together to produce video clips
+- combines stuff together to produce MP4 video clips
+    - which contain
+        - H.264/MPEG-4 AVC video taken from camera
+        - ALAC audio recorded with GNU/Linux machine
 - plays lastly recorded video clips
+    - with optional mirror effect
 
 ```
 cd vlog-recorder
@@ -41,35 +48,38 @@ h - show HELP
 q / Ctrl+C - QUIT
 ```
 
-## generate-metadata
+## generate-conf
+- runs voice recognition in a selected language
+- makes more precise clips segmentation
+- produces a configuration file that will be used later for rendering
+    - the columns in the config are:
+        - clip filename
+        - speed multiplier
+        - start position (in seconds)
+        - end position (in seconds)
+        - recognized text (to figure out which clips can be removed / reordered)
+    - you can edit the config
+        - put `#` in the beginning of line you want to ignore (or just remove the entire line)
+        - add empty newlines to increase delay *after* clip
+        - change speed of individual clips
+
 ```
-bin/generate-metadata.py -h
-Usage: ./bin/generate-metadata.py project_dir/ language
+bin/generate-conf.py -h
+Usage: ./bin/generate-conf.py project_dir/ language
        where language is one of `autosub --list-language`
 
-bin/generate-metadata.py ~/video/new-cool-video-project ru
-vi ~/video/new-cool-video-project/videos.meta
+bin/generate-conf.py ~/video/new-cool-video-project ru
+vi ~/video/new-cool-video-project/render.conf
 ```
-
-The columns in metadata mean:
-- clip filename
-- speed multiplier
-- start position (in seconds)
-- end position (in seconds)
-- text (to figure out which clips can be removed / reordered)
-
-You can edit the metadata:
-- remove lines to remove particular clips from final video
-- add empty newlines to increase delay after clip
-- change speed of individual clips
 
 ## render
 - applies some effects to video clips
-  - speed/tempo change
-  - forced constant frame rate
-  - mirror, video denoiser, vignette and/or whatever you specify
+    - speed/tempo change
+    - forced constant frame rate
+        - which is useful for video editors that don't support variable frame rate (like Blender)
+    - video denoiser, mirror, vignette and/or whatever you specify
 - renders video clips to a final video
-- plays a video by given position
+- plays a video by a given position
 
 ```
 RUBYOPT="-Ilib" ./bin/render.rb -h
@@ -87,10 +97,10 @@ RUBYOPT="-Ilib" ./bin/render.rb -p ~/video/new-cool-video-project --preview fals
 
 ## play-segments
 - plays longest pauses
-  - to check the quality of video montage (useful if you do it manually, with video editors)
+    - to check the quality of video montage (useful if you do it manually, with video editors)
 - plays parts with voice only
-- or plays both voice + silence parts
-  - silent parts will be sped up
+- or plays both voiced + silent parts
+    - silent parts will be sped up
 
 ```
 RUBYOPT="-Ilib" ./bin/play-segments.rb -h
@@ -107,22 +117,23 @@ RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/output.
 ```
 
 ## Installation
-`git clone git@github.com:alopatindev/vlog-recorder.git`
+`git clone git@github.com:alopatindev/vlog-recorder.git && cd vlog-recorder`
 
 ### Dependencies
 - GNU/Linux
-- ruby (tested with 2.5.1)
-- python3 (tested with 3.6.5)
-- pip (tested with 9.0.1)
-- ffmpeg (tested with 3.4.4)
-- [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH variable)
-- alsa-utils (tested with 1.1.2)
-- Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))
-- mpv (tested with 0.27.2)
-- android-tools (tested with 6.0.1)
-  - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
-- webrtcvad (tested with 2.0.10)
-  - `pip3 install --user webrtcvad`
-- autosub
-  - `pip3 install --user autosub # to install dependencies`
-  - `git clone git@github.com:agermanidis/autosub.git lib/autosub`
+    - ruby (tested with 2.5.1)
+    - python3 (tested with 3.6.5)
+    - pip (tested with 9.0.1)
+    - ffmpeg (tested with 3.4.4)
+    - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
+    - alsa-utils (tested with 1.1.2)
+    - mpv (tested with 0.27.2)
+    - android-tools (tested with 6.0.1)
+        - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
+    - webrtcvad (tested with 2.0.10)
+        - `pip3 install --user webrtcvad`
+    - autosub
+        - `pip3 install --user autosub # to install dependencies`
+        - `git clone git@github.com:agermanidis/autosub.git lib/autosub`
+- Android device
+    - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))

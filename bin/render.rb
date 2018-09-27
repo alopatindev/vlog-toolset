@@ -8,10 +8,13 @@ require 'optparse'
 require 'thread/pool'
 
 PREVIEW_WIDTH = 320
+CONFIG_FILENAME = 'render.conf'.freeze
+OUTPUT_FILENAME = 'output.mp4'.freeze
 
 def parse(filename)
   File.open filename do |f|
-    f.map { |line| line.split("\t") }
+    f.reject { |line| line.start_with? '#' }
+     .map { |line| line.split("\t") }
      .map
      .with_index do |cols, index|
       if cols[0] == "\n" then { index: index, empty: true }
@@ -204,7 +207,7 @@ def parse_options!(options)
   OptionParser.new do |opts|
     opts.banner = 'Usage: render.rb -p project_dir/ [other options]'
     opts.on('-p', '--project [dir]', 'Project directory') { |p| options[:project_dir] = p }
-    opts.on('-L', '--line [num]', 'Line in video.meta file, to play by given position (default: 1)') { |l| options[:line_in_file] = l }
+    opts.on('-L', '--line [num]', "Line in #{CONFIG_FILENAME} file, to play by given position (default: 1)") { |l| options[:line_in_file] = l }
     opts.on('-P', '--preview [true|false]', 'Preview mode. It will also start a video player by a given position (default: true)') { |p| options[:preview] = p == 'true' }
     opts.on('-f', '--fps [num]', 'Constant frame rate (default: 30)') { |f| options[:fps] = f.to_i }
     opts.on('-S', '--speed [num]', 'Speed factor (default: 1.2)') { |s| options[:speed] = s.to_f }
@@ -231,13 +234,13 @@ options = {
 parse_options!(options)
 
 project_dir = options[:project_dir]
-metadata_filename = File.join project_dir, 'videos.meta'
-output_filename = File.join project_dir, 'output.mp4'
+config_filename = File.join project_dir, CONFIG_FILENAME
+output_filename = File.join project_dir, OUTPUT_FILENAME
 
 Dir.chdir project_dir
 
 min_pause_between_shots = 0.1
-segments = merge_small_pauses apply_delays(parse(metadata_filename)), min_pause_between_shots
+segments = merge_small_pauses apply_delays(parse(config_filename)), min_pause_between_shots
 
 temp_dir = File.join project_dir, 'tmp'
 FileUtils.mkdir_p temp_dir

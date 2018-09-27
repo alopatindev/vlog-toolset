@@ -44,16 +44,24 @@ if __name__ == '__main__':
         sys.exit(1)
 
     project_dir = sys.argv[1]
-    output = project_dir + '/videos.meta'
+    output = project_dir + '/render.conf'
     language = sys.argv[2]
 
     concurrency = 32
     pool = multiprocessing.Pool(concurrency)
 
     f = open(output, 'w')
+    line = '\t'.join(['#filename', 'speed', 'start', 'end', 'text']) + '\n'
+    f.write(line)
 
-    for filename in sorted(glob.glob(project_dir + '/0*.mp4')):
-        print('processing ' + filename)
+    video_filenames = glob.glob(project_dir + '/0*.mp4')
+    video_filenames.sort()
+    n = len(video_filenames)
+
+    for i, filename in enumerate(video_filenames):
+        num = i + 1
+        progress = (num / len(video_filenames)) * 100.0
+        print('processing (%d/%d) (%.1f%%) %s' % (num, n, progress, filename))
         try:
             for (start, end), t in extract_transcripts(filename, src_language=language):
                 line = '\t'.join([os.path.basename(filename), '1.0', str(start), str(end), t]) + '\n'
