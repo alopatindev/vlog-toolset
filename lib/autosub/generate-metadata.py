@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import glob
@@ -38,33 +38,35 @@ def extract_transcripts(
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print 'Usage: %s dir-with-video-files/' % sys.argv[0]
+    if len(sys.argv) < 3:
+        print('Usage: %s project_dir/ language' % sys.argv[0])
+        print('       where language is one of `autosub --list-language`')
         sys.exit(1)
 
-    dir_with_videos = sys.argv[1]
-    output = dir_with_videos + '/videos.meta'
+    project_dir = sys.argv[1]
+    output = project_dir + '/videos.meta'
+    language = sys.argv[2]
 
     concurrency = 32
     pool = multiprocessing.Pool(concurrency)
 
     f = open(output, 'w')
 
-    for filename in sorted(glob.glob(dir_with_videos + '/0*.mp4')):
-        print 'processing ' + filename
+    for filename in sorted(glob.glob(project_dir + '/0*.mp4')):
+        print('processing ' + filename)
         try:
-            for (start, end), t in extract_transcripts(filename, src_language='ru'):
-                line = '\t'.join([os.path.basename(filename), '1.0', str(start), str(end), t.encode('utf-8')]) + '\n'
+            for (start, end), t in extract_transcripts(filename, src_language=language):
+                line = '\t'.join([os.path.basename(filename), '1.0', str(start), str(end), t]) + '\n'
                 f.write(line)
         except Exception as e:
-            print 'failed to process ' + filename
-            print e
+            print('failed to process ' + filename)
+            print(e)
 
     f.close()
 
-    print 'terminating the pool'
+    print('terminating the pool')
     pool.terminate()
     pool.join()
 
-    print 'done'
-    print output
+    print('done')
+    print(output)

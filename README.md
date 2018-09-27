@@ -43,8 +43,12 @@ q / Ctrl+C - QUIT
 
 ## generate-metadata
 ```
-lib/autosub/generate-metadata.py ~/video/new-cool-video-project
-vi ~/video/new-cool-video-project/video.meta
+bin/generate-metadata.py -h
+Usage: ./bin/generate-metadata.py project_dir/ language
+       where language is one of `autosub --list-language`
+
+bin/generate-metadata.py ~/video/new-cool-video-project ru
+vi ~/video/new-cool-video-project/videos.meta
 ```
 
 The columns in metadata mean:
@@ -108,7 +112,6 @@ RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/output.
 ### Dependencies
 - GNU/Linux
 - ruby (tested with 2.5.1)
-- python2 (tested with 2.7.14)
 - python3 (tested with 3.6.5)
 - pip (tested with 9.0.1)
 - ffmpeg (tested with 3.4.4)
@@ -121,5 +124,5 @@ RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/output.
 - webrtcvad (tested with 2.0.10)
   - `pip3 install --user webrtcvad`
 - autosub
-  - `pip2 install --user autosub # to install dependencies`
+  - `pip3 install --user autosub # to install dependencies`
   - `git clone git@github.com:agermanidis/autosub.git lib/autosub`
