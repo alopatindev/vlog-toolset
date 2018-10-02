@@ -37,6 +37,11 @@ def extract_transcripts(
     return timed_subtitles
 
 
+def filename_to_clip(filename):
+    basename = os.path.basename(filename)
+    return int(basename.split('_')[0])
+
+
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         print('Usage: %s project_dir/ language' % sys.argv[0])
@@ -50,12 +55,23 @@ if __name__ == '__main__':
     concurrency = 32
     pool = multiprocessing.Pool(concurrency)
 
-    f = open(output, 'w')
-    line = '\t'.join(['#filename', 'speed', 'start', 'end', 'text']) + '\n'
-    f.write(line)
-
     video_filenames = glob.glob(project_dir + '/0*.mp4')
     video_filenames.sort()
+
+    new_config = not os.path.isfile(output)
+    if new_config:
+        f = open(output, 'w')
+        line = '\t'.join(['#filename', 'speed', 'start', 'end', 'text']) + '\n'
+        f.write(line)
+    else:
+        f = open(output, 'r+')
+        last_line = f.readlines()[-1]
+        first_column = last_line.split('\t')[0]
+        last_recorded_filename = first_column.split('#')[-1].strip()
+        last_recorded_clip = filename_to_clip(last_recorded_filename)
+        skip_lines = len([i for i in video_filenames if filename_to_clip(i) <= last_recorded_clip])
+        video_filenames = video_filenames[skip_lines:]
+
     n = len(video_filenames)
 
     for i, filename in enumerate(video_filenames):
