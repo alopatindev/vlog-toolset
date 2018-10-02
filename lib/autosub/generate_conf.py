@@ -16,7 +16,9 @@ def extract_transcripts(
     regions = find_speech_regions(audio_filename)
 
     converter = FLACConverter(source_path=audio_filename)
-    recognizer = SpeechRecognizer(language=src_language, rate=audio_rate,
+    recognizer = SpeechRecognizer(language=src_language,
+                                  rate=audio_rate,
+                                  retries=10,
                                   api_key=GOOGLE_SPEECH_API_KEY)
 
     transcripts = []

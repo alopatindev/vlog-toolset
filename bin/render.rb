@@ -203,6 +203,11 @@ def test_merge_small_pauses
   raise unless result == expected
 end
 
+def generate_config(options)
+  script_filename = File.join(__dir__, '..', 'lib', 'autosub', 'generate_conf.py')
+  system script_filename, options[:project_dir], options[:language]
+end
+
 def parse_options!(options)
   OptionParser.new do |opts|
     opts.banner = 'Usage: render.rb -p project_dir/ [other options]'
@@ -213,6 +218,7 @@ def parse_options!(options)
     opts.on('-S', '--speed [num]', 'Speed factor (default: 1.2)') { |s| options[:speed] = s.to_f }
     opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default: "atadenoise,hflip,vignette")') { |v| options[:video_filters] = v }
     opts.on('-c', '--cleanup [true|false]', 'Remove temporary files, instead of reusing them in future (default: false)') { |c| options[:cleanup] = c == 'true' }
+    opts.on('-l', '--language [en|ru|...]', 'Language for voice recognition (default: en)') { |l| options[:language] = l }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -228,10 +234,13 @@ options = {
   min_pause_between_shots: 0.1,
   preview: true,
   line_in_file: 1,
-  cleanup: false
+  cleanup: false,
+  language: 'en'
 }
 
 parse_options!(options)
+
+generate_config(options)
 
 project_dir = options[:project_dir]
 config_filename = File.join project_dir, CONFIG_FILENAME

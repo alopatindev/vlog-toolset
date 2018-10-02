@@ -3,9 +3,9 @@ This tool set is designed to record clipping videos for Vlogs
 
 ## vlog-recorder
 - records video
-  - using camera of Android-based device
+    - using camera of Android-based device
 - records audio
-  - using microphone, connected to GNU/Linux machine
+    - using microphone, connected to GNU/Linux machine
 - detects voice (to trim silence)
     - if you save clip without auto trimming — it will just remove beginning and ending of each clip
         - which typically contain the button click sound
@@ -48,30 +48,6 @@ h - show HELP
 q / Ctrl+C - QUIT
 ```
 
-## generate-conf
-- runs voice recognition in a selected language
-- makes more precise clips segmentation
-- produces a configuration file that will be used later for rendering
-    - the columns in the config are:
-        - clip filename
-        - speed multiplier
-        - start position (in seconds)
-        - end position (in seconds)
-        - recognized text (to figure out which clips can be removed / reordered)
-    - you can edit the config
-        - put `#` in the beginning of line you want to ignore (or just remove the entire line)
-        - add empty newlines to increase delay *after* clip
-        - change speed of individual clips
-
-```
-bin/generate-conf.py -h
-Usage: ./bin/generate-conf.py project_dir/ language
-       where language is one of `autosub --list-language`
-
-bin/generate-conf.py ~/video/new-cool-video-project ru
-vi ~/video/new-cool-video-project/render.conf
-```
-
 ## render
 - applies some effects to video clips
     - speed/tempo change
@@ -91,8 +67,27 @@ Usage: render.rb -p project_dir/ [other options]
     -S, --speed [num]                Speed factor (default: 1.2)
     -V, --video-filters [filters]    ffmpeg video filters (default: "atadenoise,hflip,vignette")
     -c, --cleanup [true|false]       Remove temporary files, instead of reusing them in future (default: false)
+    -l, --language [en|ru|...]       Language for voice recognition (default: en)
 
 RUBYOPT="-Ilib" ./bin/render.rb -p ~/video/new-cool-video-project --preview false
+```
+
+- it also runs voice recognition in a selected language
+- makes more precise clips segmentation
+- produces a configuration file
+    - the columns in the config are:
+        - clip filename
+        - speed multiplier
+        - start position (in seconds)
+        - end position (in seconds)
+        - recognized text (to figure out which clips can be removed / reordered)
+    - you can edit the config
+        - put `#` in the beginning of line you want to ignore (or just remove the entire line)
+        - add empty newlines to increase delay *after* clip
+        - change speed of individual clips
+
+```
+vi ~/video/new-cool-video-project/render.conf
 ```
 
 ## play-segments
