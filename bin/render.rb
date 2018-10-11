@@ -105,10 +105,17 @@ def process_and_split_videos(segments, options, temp_dir)
 
   temp_videos = segments.map do |seg|
     segment_speed = clamp_speed(seg[:speed] * speed)
+    if segment_speed < 1.0
+      print "segment #{seg[:video_filename]} has speed #{segment_speed} < 1\n"
+    end
 
-    ext = '.mp4'
     basename = File.basename seg[:video_filename]
     filename = File.join temp_dir, "#{basename}#{ext}_#{segment_speed}_#{preview}_#{seg[:start_position]}_#{seg[:end_position]}"
+
+    line_in_config = seg[:index] + 1
+    filename += line_in_config.to_s if preview
+
+    ext = '.mp4'
     temp_video_filename = "#{filename}#{ext}"
     temp_cut_video_filename = "#{filename}.cut#{ext}"
 
@@ -116,7 +123,7 @@ def process_and_split_videos(segments, options, temp_dir)
       audio_filters = "atempo=#{segment_speed}"
       video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{segment_speed})*PTS"
       if preview
-        video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{seg[:index] + 1}"
+        video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
       end
 
       video_codec = 'libx264 -preset ultrafast -crf 18'
