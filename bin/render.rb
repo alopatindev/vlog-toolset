@@ -103,47 +103,50 @@ def process_and_split_videos(segments, options, temp_dir)
 
   thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
-  temp_videos = segments.map do |seg|
+  temp_videos = segments.map.with_index do |seg, index|
     segment_speed = clamp_speed(seg[:speed] * speed)
     if segment_speed < 1.0
       print "segment #{seg[:video_filename]} has speed #{segment_speed} < 1\n"
     end
 
-    basename = File.basename seg[:video_filename]
-    filename = File.join temp_dir, "#{basename}#{ext}_#{segment_speed}_#{preview}_#{seg[:start_position]}_#{seg[:end_position]}"
-
-    line_in_config = seg[:index] + 1
-    filename += line_in_config.to_s if preview
-
     ext = '.mp4'
+    basename = File.basename seg[:video_filename]
+    filename = File.join(temp_dir, seg.values.map(&:to_s).join('_'))
+
     temp_video_filename = "#{filename}#{ext}"
     temp_cut_video_filename = "#{filename}.cut#{ext}"
 
     thread_pool.post do
-      audio_filters = "atempo=#{segment_speed}"
-      video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{segment_speed})*PTS"
-      if preview
-        video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
+      begin
+        audio_filters = "atempo=#{segment_speed}"
+        video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{segment_speed})*PTS"
+        if preview
+          line_in_config = seg[:index] + 1
+          video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
+        end
+
+        video_codec = 'libx264 -preset ultrafast -crf 18'
+
+        command = "#{FFMPEG_NO_OVERWRITE} -threads 1 \
+                             -ss #{seg[:start_position]} \
+                             -i #{seg[:video_filename]} \
+                             -to #{seg[:end_position] - seg[:start_position]} \
+                             -c copy #{temp_cut_video_filename} && \
+                   #{FFMPEG_NO_OVERWRITE} -threads 1 \
+                             -i #{temp_cut_video_filename} \
+                             -vcodec #{video_codec} \
+                             -vf '#{video_filters}' \
+                             -af '#{audio_filters}' \
+                             -acodec alac \
+                             -f ipod #{temp_video_filename}"
+
+        system command
+        print "#{basename} (#{index + 1}/#{segments.length})\n"
+
+        FileUtils.rm_f temp_cut_video_filename if options[:cleanup]
+      rescue StandardError => error
+        print "exception for segment #{seg}: #{error} #{error.backtrace}\n"
       end
-
-      video_codec = 'libx264 -preset ultrafast -crf 18'
-
-      command = "#{FFMPEG_NO_OVERWRITE} -threads 1 \
-                           -ss #{seg[:start_position]} \
-                           -i #{seg[:video_filename]} \
-                           -to #{seg[:end_position] - seg[:start_position]} \
-                           -c copy #{temp_cut_video_filename} && \
-                 #{FFMPEG_NO_OVERWRITE} -threads 1 \
-                           -i #{temp_cut_video_filename} \
-                           -vcodec #{video_codec} \
-                           -vf '#{video_filters}' \
-                           -af '#{audio_filters}' \
-                           -acodec alac \
-                           -f ipod #{temp_video_filename}"
-
-      system command
-
-      FileUtils.rm_f temp_cut_video_filename if options[:cleanup]
     end
 
     temp_video_filename
@@ -219,13 +222,13 @@ def parse_options!(options)
   OptionParser.new do |opts|
     opts.banner = 'Usage: render.rb -p project_dir/ [other options]'
     opts.on('-p', '--project [dir]', 'Project directory') { |p| options[:project_dir] = p }
-    opts.on('-L', '--line [num]', "Line in #{CONFIG_FILENAME} file, to play by given position (default: 1)") { |l| options[:line_in_file] = l }
-    opts.on('-P', '--preview [true|false]', 'Preview mode. It will also start a video player by a given position (default: true)') { |p| options[:preview] = p == 'true' }
-    opts.on('-f', '--fps [num]', 'Constant frame rate (default: 30)') { |f| options[:fps] = f.to_i }
-    opts.on('-S', '--speed [num]', 'Speed factor (default: 1.2)') { |s| options[:speed] = s.to_f }
-    opts.on('-V', '--video-filters [filters]', 'ffmpeg video filters (default: "atadenoise,hflip,vignette")') { |v| options[:video_filters] = v }
-    opts.on('-c', '--cleanup [true|false]', 'Remove temporary files, instead of reusing them in future (default: false)') { |c| options[:cleanup] = c == 'true' }
-    opts.on('-l', '--language [en|ru|...]', 'Language for voice recognition (default: en)') { |l| options[:language] = l }
+    opts.on('-L', '--line [num]', "Line in #{CONFIG_FILENAME} file, to play by given position (default: #{options[:line_in_file]})") { |l| options[:line_in_file] = l }
+    opts.on('-P', '--preview [true|false]', "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") { |p| options[:preview] = p == 'true' }
+    opts.on('-f', '--fps [num]', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f.to_i }
+    opts.on('-S', '--speed [num]', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
+    opts.on('-V', '--video-filters [filters]', "ffmpeg video filters (default: '#{options[:video_filters]}')") { |v| options[:video_filters] = v }
+    opts.on('-c', '--cleanup [true|false]', "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") { |c| options[:cleanup] = c == 'true' }
+    opts.on('-l', '--language [en|ru|...]', "Language for voice recognition (default: '#{options[:language]}')") { |l| options[:language] = l }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -237,7 +240,7 @@ test_segments_overlap
 options = {
   fps: 30,
   speed: 1.2,
-  video_filters: 'atadenoise,hflip,vignette',
+  video_filters: 'hqdn3d,hflip,vignette',
   min_pause_between_shots: 0.1,
   preview: true,
   line_in_file: 1,

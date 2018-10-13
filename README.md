@@ -61,13 +61,13 @@ q / Ctrl+C - QUIT
 RUBYOPT="-Ilib" ./bin/render.rb -h
 Usage: render.rb -p project_dir/ [other options]
     -p, --project [dir]              Project directory
-    -L, --line [num]                 Line in video.meta file, to play by given position (default: 1)
+    -L, --line [num]                 Line in render.conf file, to play by given position (default: 1)
     -P, --preview [true|false]       Preview mode. It will also start a video player by a given position (default: true)
     -f, --fps [num]                  Constant frame rate (default: 30)
     -S, --speed [num]                Speed factor (default: 1.2)
-    -V, --video-filters [filters]    ffmpeg video filters (default: "atadenoise,hflip,vignette")
+    -V, --video-filters [filters]    ffmpeg video filters (default: 'hqdn3d,hflip,vignette')
     -c, --cleanup [true|false]       Remove temporary files, instead of reusing them in future (default: false)
-    -l, --language [en|ru|...]       Language for voice recognition (default: en)
+    -l, --language [en|ru|...]       Language for voice recognition (default: 'en')
 
 RUBYOPT="-Ilib" ./bin/render.rb -p ~/video/new-cool-video-project --preview false
 ```
