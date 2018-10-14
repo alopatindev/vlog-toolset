@@ -42,7 +42,9 @@ class Phone
     local_filename = File.join @temp_dir, clip_num.with_leading_zeros + '.mp4'
     @logger.debug "move_to_host #{phone_filename} => #{local_filename}"
 
-    system "#{@adb} pull -a '#{phone_filename}' '#{local_filename}' 2>> /dev/null && \
+    script_filename = File.join(__dir__, 'adb_pull_with_retries.py')
+
+    system "#{script_filename} '#{phone_filename}' '#{local_filename}' && \
             #{@adb_shell} rm -f '#{phone_filename}'", out: File::NULL
 
     raise "Failed to move #{phone_filename} => #{local_filename}" unless File.file?(local_filename)
