@@ -19,7 +19,9 @@ def parse(filename, options)
      .with_index do |cols, index|
       if cols[0] == "\n" then { index: index, empty: true }
       else
-        video_filename, speed, start_position, end_position = cols
+        video_filename, speed, start_position, end_position, text = cols
+        text = text.sub /#.*$/, ''
+        words = text.split(' ').length
 
         final_speed = clamp_speed(speed.to_f * options[:speed])
         if final_speed < 1.0
@@ -32,6 +34,7 @@ def parse(filename, options)
           speed: final_speed,
           start_position: start_position.to_f,
           end_position: end_position.to_f,
+          words: words,
           empty: false
         }
       end
@@ -268,6 +271,14 @@ temp_videos = process_and_split_videos segments, options, temp_dir
 concat_videos temp_videos, output_filename
 
 FileUtils.rm_r temp_dir if options[:cleanup]
+
+words_per_second = segments.map do |seg|
+  dt = seg[:end_position] - seg[:start_position]
+  duration = seg[:speed] * dt
+  seg[:words] / duration
+end.sum / segments.length
+
+print "average words per second = #{words_per_second}\n"
 
 if options[:preview]
   player_position = compute_player_position segments, options
