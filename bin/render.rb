@@ -11,7 +11,7 @@ PREVIEW_WIDTH = 320
 CONFIG_FILENAME = 'render.conf'.freeze
 OUTPUT_FILENAME = 'output.mp4'.freeze
 
-def parse(filename)
+def parse(filename, options)
   File.open filename do |f|
     f.reject { |line| line.start_with? '#' }
      .map { |line| line.split("\t") }
@@ -20,10 +20,16 @@ def parse(filename)
       if cols[0] == "\n" then { index: index, empty: true }
       else
         video_filename, speed, start_position, end_position = cols
+
+        final_speed = clamp_speed(speed.to_f * options[:speed])
+        if final_speed < 1.0
+          print "segment #{video_filename} has speed #{final_speed} < 1\n"
+        end
+
         {
           index: index,
           video_filename: video_filename,
-          speed: speed.to_f,
+          speed: final_speed,
           start_position: start_position.to_f,
           end_position: end_position.to_f,
           empty: false
@@ -99,16 +105,10 @@ def process_and_split_videos(segments, options, temp_dir)
 
   fps = options[:fps]
   preview = options[:preview]
-  speed = options[:speed]
 
   thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   temp_videos = segments.map.with_index do |seg, index|
-    segment_speed = clamp_speed(seg[:speed] * speed)
-    if segment_speed < 1.0
-      print "segment #{seg[:video_filename]} has speed #{segment_speed} < 1\n"
-    end
-
     ext = '.mp4'
     basename = File.basename seg[:video_filename]
     filename = File.join(temp_dir, seg.values.map(&:to_s).join('_'))
@@ -118,8 +118,8 @@ def process_and_split_videos(segments, options, temp_dir)
 
     thread_pool.post do
       begin
-        audio_filters = "atempo=#{segment_speed}"
-        video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{segment_speed})*PTS"
+        audio_filters = "atempo=#{options[:speed]}"
+        video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{options[:speed]})*PTS"
         if preview
           line_in_config = seg[:index] + 1
           video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
@@ -259,7 +259,7 @@ output_filename = File.join project_dir, OUTPUT_FILENAME
 Dir.chdir project_dir
 
 min_pause_between_shots = 0.1
-segments = merge_small_pauses apply_delays(parse(config_filename)), min_pause_between_shots
+segments = merge_small_pauses apply_delays(parse(config_filename, options)), min_pause_between_shots
 
 temp_dir = File.join project_dir, 'tmp'
 FileUtils.mkdir_p temp_dir
