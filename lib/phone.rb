@@ -42,7 +42,7 @@ class Phone
     local_filename = File.join @temp_dir, clip_num.with_leading_zeros + '.mp4'
     @logger.debug "move_to_host #{phone_filename} => #{local_filename}"
 
-    script_filename = File.join(__dir__, 'adb_pull_with_retries.py')
+    script_filename = File.join(__dir__, 'adb_repull.py')
 
     system "#{script_filename} '#{phone_filename}' '#{local_filename}' && \
             #{@adb_shell} rm -f '#{phone_filename}'", out: File::NULL

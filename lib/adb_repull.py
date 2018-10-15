@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# ADB pull emulation for machines with problematic USB ports/cables.
+# Continuously retries and resumes download when disconnection happens.
+#
 # Copyright (c) 2018 Alexander Lopatin
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
