@@ -14,11 +14,11 @@ class Phone
     @change_brightness = options[:change_brightness]
 
     @logger = logger
-    android_id = options[:android_id]
-    adb_args = android_id.empty? ? '' : "-s #{android_id}"
     @opencamera_dir = options[:opencamera_dir]
 
-    @adb = "adb #{adb_args}"
+    android_id = options[:android_id]
+    @adb_env = android_id.empty? ? '' : "ANDROID_SERIAL='#{android_id}'"
+    @adb = "#{@adb_env} adb"
     @adb_shell = "#{@adb} shell"
 
     @clip_num_to_filename = {}
@@ -44,7 +44,7 @@ class Phone
 
     script_filename = File.join(__dir__, 'adb_repull.py')
 
-    system "#{script_filename} '#{phone_filename}' '#{local_filename}' && \
+    system "#{@adb_env} #{script_filename} '#{phone_filename}' '#{local_filename}' >> /dev/null && \
             #{@adb_shell} rm -f '#{phone_filename}'", out: File::NULL
 
     raise "Failed to move #{phone_filename} => #{local_filename}" unless File.file?(local_filename)

@@ -123,7 +123,7 @@ RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/output.
     - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
     - alsa-utils (tested with 1.1.2)
     - mpv (tested with 0.27.2)
-    - android-tools (tested with 6.0.1)
+    - android-tools (tested with 8.1.0_p1, adb version is 1.0.39)
         - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
     - webrtcvad (tested with 2.0.10)
         - `pip3 install --user webrtcvad`
