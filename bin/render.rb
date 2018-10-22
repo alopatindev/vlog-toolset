@@ -167,7 +167,7 @@ def concat_videos(temp_videos, output_filename)
   parts = temp_videos.map { |f| "file '#{f}'" }
                      .join "\n"
 
-  command = "#{FFMPEG} -f concat -safe 0 -protocol_whitelist file,pipe -i - -vcodec copy -acodec alac -f ipod #{output_filename}"
+  command = "#{FFMPEG} -f concat -safe 0 -protocol_whitelist file,pipe -i - -vcodec copy -acodec copy -f ipod #{output_filename}"
 
   IO.popen(command, 'w') do |f|
     f.puts parts
