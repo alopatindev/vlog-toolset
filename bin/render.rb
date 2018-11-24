@@ -4,6 +4,7 @@ require 'ffmpeg_utils.rb'
 require 'concurrent'
 require 'fileutils'
 require 'io/console'
+require 'numeric.rb'
 require 'optparse'
 require 'thread/pool'
 
@@ -113,8 +114,9 @@ def process_and_split_videos(segments, options, temp_dir)
 
   temp_videos = segments.map.with_index do |seg, index|
     ext = '.mp4'
+    line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
-    filename = File.join(temp_dir, seg.values.map(&:to_s).join('_'))
+    filename = File.join(temp_dir, ([line_in_config.with_leading_zeros] + seg.values.map(&:to_s)).join('_'))
 
     temp_video_filename = "#{filename}#{ext}"
     temp_cut_video_filename = "#{filename}.cut#{ext}"
@@ -124,7 +126,6 @@ def process_and_split_videos(segments, options, temp_dir)
         audio_filters = "atempo=#{options[:speed]}"
         video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{options[:speed]})*PTS"
         if preview
-          line_in_config = seg[:index] + 1
           video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
         end
 
