@@ -116,7 +116,7 @@ def process_and_split_videos(segments, options, temp_dir)
     ext = '.mp4'
     line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
-    filename = File.join(temp_dir, ([line_in_config.with_leading_zeros] + seg.values.map(&:to_s)).join('_'))
+    filename = File.join(temp_dir, ([seg[:index].with_leading_zeros] + seg.reject { |key| key == :index }.values.map(&:to_s)).join('_'))
 
     temp_video_filename = "#{filename}#{ext}"
     temp_cut_video_filename = "#{filename}.cut#{ext}"
@@ -168,7 +168,14 @@ def concat_videos(temp_videos, output_filename)
   parts = temp_videos.map { |f| "file '#{f}'" }
                      .join "\n"
 
-  command = "#{FFMPEG} -f concat -safe 0 -protocol_whitelist file,pipe -i - -vcodec copy -acodec copy -f ipod #{output_filename}"
+  command = "#{FFMPEG} -async 1 \
+                       -f concat \
+                       -safe 0 \
+                       -protocol_whitelist file,pipe \
+                       -i - \
+                       -vcodec copy \
+                       -acodec alac \
+                       -f ipod #{output_filename}"
 
   IO.popen(command, 'w') do |f|
     f.puts parts
