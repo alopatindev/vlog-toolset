@@ -105,7 +105,7 @@ def merge_small_pauses(segments, min_pause_between_shots)
   end
 end
 
-def process_and_split_videos(segments, options, temp_dir)
+def process_and_split_videos(segments, options, output_dir)
   print "processing video clips\n"
 
   fps = options[:fps]
@@ -117,7 +117,7 @@ def process_and_split_videos(segments, options, temp_dir)
     ext = '.mp4'
     line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
-    filename = File.join(temp_dir, ([seg[:index].with_leading_zeros] + seg.reject { |key| key == :index }.values.map(&:to_s)).join('_'))
+    filename = File.join(output_dir, ([seg[:index].with_leading_zeros] + seg.reject { |key| key == :index }.values.map(&:to_s)).join('_'))
 
     temp_video_filename = "#{filename}#{ext}"
     temp_cut_video_filename = "#{filename}.cut#{ext}"
@@ -273,13 +273,11 @@ Dir.chdir project_dir
 min_pause_between_shots = 0.1
 segments = merge_small_pauses apply_delays(parse(config_filename, options)), min_pause_between_shots
 
-temp_dir = File.join project_dir, 'tmp'
-FileUtils.mkdir_p temp_dir
+output_dir = File.join project_dir, 'output'
+FileUtils.mkdir_p output_dir
 
-temp_videos = process_and_split_videos segments, options, temp_dir
+temp_videos = process_and_split_videos segments, options, output_dir
 concat_videos temp_videos, output_filename
-
-FileUtils.rm_r temp_dir if options[:cleanup]
 
 words_per_second = segments.map do |seg|
   dt = seg[:end_position] - seg[:start_position]
