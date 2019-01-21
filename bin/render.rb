@@ -26,7 +26,8 @@ def parse(filename, options)
 
         final_speed = clamp_speed(speed.to_f * options[:speed])
         if final_speed < 1.0
-          print "segment #{video_filename} has speed #{final_speed} < 1\n"
+          print "segment #{video_filename} has speed #{final_speed} < 1; forcing speed 1\n"
+          final_speed = 1.0
         end
 
         {
