@@ -260,9 +260,7 @@ class DevicesFacade
       system command, out: File::NULL
       remove_files temp_filename
 
-      unless File.file?(output_filename)
-        raise "Failed to process #{output_filename}"
-      end
+      raise "Failed to process #{output_filename}" unless File.file?(output_filename)
 
       output_filename
     end
@@ -366,7 +364,7 @@ end
 
 def parse_options!(options)
   OptionParser.new do |opts|
-    opts.banner = 'Usage: vlog-recorder.rb -p project_dir/ [other options]'
+    opts.banner = 'Usage: vlog-recorder -p project_dir/ [other options]'
     opts.on('-p', '--project [dir]', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-t', '--trim [duration]', 'Trim duration of beginning and ending of each clip (default: 0.15)') { |t| options[:trim_duration] = t.to_f }
     opts.on('-s', '--sound-settings [arecord-args]', 'Additional arecord arguments (default: " --device=default --format=dat"') { |s| options[:arecord_args] = s }

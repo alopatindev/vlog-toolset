@@ -74,7 +74,7 @@ end
 
 def parse_options!(options)
   OptionParser.new do |opts|
-    opts.banner = 'Usage: play-segments.rb [options] -i video.mp4'
+    opts.banner = 'Usage: vlog-play-segments [options] -i video.mp4'
     opts.on('-i', '--i [filename]', 'Video to play') { |i| options[:video] = i }
     opts.on('-S', '--speed [num]', 'Speed factor (default: 1.5)') { |s| options[:speed] = s.to_f }
     opts.on('-m', '--mode [silence|voice|both]', 'Play silent parts starting from longest segment OR voice only OR both, but silences will be sped up (default: silence)') { |m| options[:mode] = m }

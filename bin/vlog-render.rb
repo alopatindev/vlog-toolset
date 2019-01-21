@@ -232,7 +232,7 @@ end
 
 def parse_options!(options)
   OptionParser.new do |opts|
-    opts.banner = 'Usage: render.rb -p project_dir/ [other options]'
+    opts.banner = 'Usage: vlog-render -p project_dir/ [other options]'
     opts.on('-p', '--project [dir]', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-L', '--line [num]', "Line in #{CONFIG_FILENAME} file, to play by given position (default: #{options[:line_in_file]})") { |l| options[:line_in_file] = l }
     opts.on('-P', '--preview [true|false]', "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") { |p| options[:preview] = p == 'true' }

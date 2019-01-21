@@ -1,5 +1,5 @@
-# vlog-recorder
-This tool set is designed to record clipping videos for Vlogs
+# vlog-toolset
+Designed to record vlogs with classical [jump cuts](https://www.youtube.com/watch?v=QHhVnIyO_NQ&t=20s)
 
 ## vlog-recorder
 - records video
@@ -18,10 +18,10 @@ This tool set is designed to record clipping videos for Vlogs
     - with optional mirror effect
 
 ```
-cd vlog-recorder
+cd vlog-toolset
 
-RUBYOPT="-Ilib" ./bin/vlog-recorder.rb -h
-Usage: vlog-recorder.rb -p project_dir/ [other options]
+./bin/vlog-recorder -h
+Usage: vlog-recorder -p project_dir/ [other options]
     -p, --project [dir]              Project directory
     -t, --trim [duration]            Trim duration of beginning and ending of each clip (default: 0.15)
     -s [arecord-args],               Additional arecord arguments (default: " --device=default --format=dat"
@@ -37,7 +37,7 @@ Usage: vlog-recorder.rb -p project_dir/ [other options]
     -a, --aggressiveness [0..3]      How aggressively to filter out non-speech (default: 1)
     -d, --debug [true|false]         Show debug messages (default: false)
 
-RUBYOPT="-Ilib" ./bin/vlog-recorder.rb -p ~/video/new-cool-video-project
+./bin/vlog-recorder -p ~/video/new-cool-video-project
 r - (RE)START recording
 s - STOP and SAVE current clip
 S - STOP and SAVE current clip, don't use auto trimming
@@ -48,18 +48,18 @@ h - show HELP
 q / Ctrl+C - QUIT
 ```
 
-## render
+## vlog-render
 - applies some effects to video clips
     - speed/tempo change
     - forced constant frame rate
         - which is useful for video editors that don't support variable frame rate (like Blender)
-    - video denoiser, mirror, vignette and/or whatever you specify
+    - video denoiser, mirror, vignette and/or whatever you [specify](https://ffmpeg.org/ffmpeg-filters.html#Video-Filters)
 - renders video clips to a final video
 - plays a video by a given position
 
 ```
-RUBYOPT="-Ilib" ./bin/render.rb -h
-Usage: render.rb -p project_dir/ [other options]
+./bin/vlog-render -h
+Usage: vlog-render -p project_dir/ [other options]
     -p, --project [dir]              Project directory
     -L, --line [num]                 Line in render.conf file, to play by given position (default: 1)
     -P, --preview [true|false]       Preview mode. It will also start a video player by a given position (default: true)
@@ -69,7 +69,7 @@ Usage: render.rb -p project_dir/ [other options]
     -c, --cleanup [true|false]       Remove temporary files, instead of reusing them in future (default: false)
     -l, --language [en|ru|...]       Language for voice recognition (default: 'en')
 
-RUBYOPT="-Ilib" ./bin/render.rb -p ~/video/new-cool-video-project --preview false
+./bin/vlog-render -p ~/video/new-cool-video-project --preview false
 ```
 
 - it also runs voice recognition in a selected language
@@ -90,7 +90,7 @@ RUBYOPT="-Ilib" ./bin/render.rb -p ~/video/new-cool-video-project --preview fals
 vi ~/video/new-cool-video-project/render.conf
 ```
 
-## play-segments
+## vlog-play-segments
 - plays longest pauses
     - to check the quality of video montage (useful if you do it manually, with video editors)
 - plays parts with voice only
@@ -98,8 +98,8 @@ vi ~/video/new-cool-video-project/render.conf
     - silent parts will be sped up
 
 ```
-RUBYOPT="-Ilib" ./bin/play-segments.rb -h
-Usage: play-segments.rb [options] -i video.mp4
+./bin/vlog-play-segments -h
+Usage: vlog-play-segments [options] -i video.mp4
     -i, --i [filename]               Video to play
     -S, --speed [num]                Speed factor (default: 1.5)
     -m, --mode [silence|voice|both]  Play silent parts starting from longest segment OR voice only OR both, but silences will be sped up (default: silence)
@@ -108,11 +108,11 @@ Usage: play-segments.rb [options] -i video.mp4
     -w, --window [num]               Time window before and after the segment (default: 0)
     -a, --aggressiveness [0..3]      How aggressively to filter out non-speech (default: 3)
 
-RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/output.mp4
+./bin/vlog-play-segments -i ~/video/new-cool-video-project/output.mp4
 ```
 
 ## Installation
-`git clone git@github.com:alopatindev/vlog-recorder.git && cd vlog-recorder`
+`git clone git@github.com:alopatindev/vlog-toolset.git && cd vlog-toolset`
 
 ### Dependencies
 - GNU/Linux
@@ -129,6 +129,11 @@ RUBYOPT="-Ilib" ./bin/play-segments.rb -i ~/video/new-cool-video-project/output.
         - `pip3 install --user webrtcvad`
     - autosub
         - `pip3 install --user autosub # to install dependencies`
-        - `git clone git@github.com:agermanidis/autosub.git lib/autosub`
+        - `git clone git@github.com:agermanidis/autosub.git lib/autosub && cd lib/autosub && git checkout 477d5a9 && cd ../..`
 - Android device
     - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))
+
+## Known issues
+- paths with spaces and weird characters are unsupported
+- cuts precision accuracy is pretty poor
+    - better approach would be something like [roughcut](https://graphics.stanford.edu/papers/roughcut/)

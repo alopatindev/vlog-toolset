@@ -1,0 +1,6 @@
+#!/bin/sh
+
+BINDIR="$(dirname $0)"
+export RUBYOPT="-I${BINDIR}/../lib"
+
+ruby bin/vlog-render.rb $@
