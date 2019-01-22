@@ -33,6 +33,7 @@ class Phone
       opencamera_was_active = opencamera_active?
       run_opencamera unless opencamera_was_active
       @width, @height = get_size
+      @logger.debug "device width=#{@width}, height=#{@height}"
       @initial_brightness = get_brightness
       set_front_camera unless opencamera_was_active
     end
@@ -108,6 +109,7 @@ class Phone
   def tap(x, y)
     screen_x = (x * @height).to_i
     screen_y = (y * @width).to_i
+    @logger.debug "#{@adb_shell} input tap #{screen_x} #{screen_y}\n"
     system "#{@adb_shell} input tap #{screen_x} #{screen_y}"
   end
 
@@ -142,10 +144,14 @@ class Phone
 
   def get_size
     dumpsys = `#{@adb_shell} dumpsys display`
-    if dumpsys =~ /mDisplayWidth=([0-9]*?)#{NEWLINE_SPLITTER}\s*mDisplayHeight=([0-9]*?)#{NEWLINE_SPLITTER}/
+    if dumpsys =~ /mDisplayWidth=([0-9]{2,}?)#{NEWLINE_SPLITTER}\s*mDisplayHeight=([0-9]{2,}?)#{NEWLINE_SPLITTER}/
       width = Regexp.last_match(1).to_i
       height = Regexp.last_match(2).to_i
       [width, height]
+    elsif dumpsys =~ /deviceWidth=([0-9]{2,}?),\sdeviceHeight=([0-9]{2,}?)\}/
+      width = Regexp.last_match(1).to_i
+      height = Regexp.last_match(2).to_i
+      [width, height].reverse
     else
       raise 'Failed to fetch display size'
     end
