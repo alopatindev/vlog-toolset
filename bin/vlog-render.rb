@@ -10,7 +10,6 @@ require 'thread/pool'
 
 PREVIEW_WIDTH = 320
 CONFIG_FILENAME = 'render.conf'.freeze
-OUTPUT_FILENAME = 'output.mp4'.freeze
 
 def parse(filename, options)
   File.open filename do |f|
@@ -105,7 +104,7 @@ def merge_small_pauses(segments, min_pause_between_shots)
   end
 end
 
-def process_and_split_videos(segments, options, output_dir)
+def process_and_split_videos(segments, options, output_dir, temp_dir)
   print "processing video clips\n"
 
   fps = options[:fps]
@@ -114,13 +113,13 @@ def process_and_split_videos(segments, options, output_dir)
   thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   temp_videos = segments.map.with_index do |seg, index|
+    # FIXME: make less confusing paths
     ext = '.mp4'
     line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
-    filename = File.join(output_dir, ([seg[:index].with_leading_zeros] + seg.reject { |key| key == :index }.values.map(&:to_s)).join('_'))
-
-    temp_video_filename = "#{filename}#{ext}"
-    temp_cut_video_filename = "#{filename}.cut#{ext}"
+    base_output_filename = ([seg[:index].with_leading_zeros] + seg.reject { |key| key == :index }.values.map(&:to_s) + [preview.to_s]).join('_')
+    output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
+    temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
 
     thread_pool.post do
       begin
@@ -136,25 +135,25 @@ def process_and_split_videos(segments, options, output_dir)
                              -ss #{seg[:start_position]} \
                              -i #{seg[:video_filename]} \
                              -to #{seg[:end_position] - seg[:start_position]} \
-                             -c copy #{temp_cut_video_filename} && \
+                             -c copy #{temp_cut_output_filename} && \
                    #{FFMPEG_NO_OVERWRITE} -threads 1 \
-                             -i #{temp_cut_video_filename} \
+                             -i #{temp_cut_output_filename} \
                              -vcodec #{video_codec} \
                              -vf '#{video_filters}' \
                              -af '#{audio_filters}' \
                              -acodec alac \
-                             -f ipod #{temp_video_filename}"
+                             -f ipod #{output_filename}"
 
         system command
         print "#{basename} (#{index + 1}/#{segments.length})\n"
 
-        FileUtils.rm_f temp_cut_video_filename if options[:cleanup]
+        FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
       rescue StandardError => error
         print "exception for segment #{seg}: #{error} #{error.backtrace}\n"
       end
     end
 
-    temp_video_filename
+    output_filename
   end
 
   thread_pool.shutdown
@@ -169,6 +168,7 @@ def concat_videos(temp_videos, output_filename)
   parts = temp_videos.map { |f| "file '#{f}'" }
                      .join "\n"
 
+  # TODO: migrate async to aresample
   command = "#{FFMPEG} -async 1 \
                        -f concat \
                        -safe 0 \
@@ -192,6 +192,7 @@ def compute_player_position(segments, options)
           .sum / clamp_speed(options[:speed])
 end
 
+# FIXME: move tests to some proper place
 def test_segments_overlap
   raise unless segments_overlap?({ start_position: 0.0, end_position: 5.0 }, start_position: 4.0, end_position: 6.0)
   raise unless segments_overlap?({ start_position: 0.0, end_position: 5.0 }, start_position: 5.0, end_position: 6.0)
@@ -266,7 +267,9 @@ generate_config(options)
 
 project_dir = options[:project_dir]
 config_filename = File.join project_dir, CONFIG_FILENAME
-output_filename = File.join project_dir, OUTPUT_FILENAME
+
+output_postfix = options[:preview] ? '_preview' : ''
+output_filename = File.join project_dir, "output#{output_postfix}.mp4"
 
 Dir.chdir project_dir
 
@@ -274,9 +277,10 @@ min_pause_between_shots = 0.1
 segments = merge_small_pauses apply_delays(parse(config_filename, options)), min_pause_between_shots
 
 output_dir = File.join project_dir, 'output'
-FileUtils.mkdir_p output_dir
+temp_dir = File.join project_dir, 'tmp'
+FileUtils.mkdir_p [output_dir, temp_dir]
 
-temp_videos = process_and_split_videos segments, options, output_dir
+temp_videos = process_and_split_videos segments, options, output_dir, temp_dir
 concat_videos temp_videos, output_filename
 
 words_per_second = segments.map do |seg|
