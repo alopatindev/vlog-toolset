@@ -74,6 +74,9 @@ Usage: vlog-render -p project_dir/ [other options]
 
 - it also runs voice recognition in a selected language
 - makes more precise clips segmentation
+- produces media output
+    - clips are located in `project_dir/output/`
+    - concatenation of all clips is located at `project_dir/output.mp4`
 - produces a configuration file
     - the columns in the config are:
         - clip filename
@@ -133,7 +136,23 @@ Usage: vlog-play-segments [options] -i video.mp4
 - Android device
     - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))
 
-## Known issues
+## Known issues/limitations
+- it's just a dumb dirty PoC, it's not necessarily gonna work on your hardware
+    - I'm using Meizu MX4
+        - front camera faces at me
+        - autorotation is enabled, the device is rotated counterclockwise to landscape position
 - paths with spaces and weird characters are unsupported
 - cuts precision accuracy is pretty poor
     - better approach would be something like [roughcut](https://graphics.stanford.edu/papers/roughcut/)
+
+## License
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version.
+
+This program comes with ABSOLUTELY NO WARRANTY.
+This is free software, and you are welcome to redistribute it
+under certain conditions; read LICENSE.txt for details.
+
+Copyright (C) 2018  Alexander Lopatin <alopatindev ät gmail dot com>
