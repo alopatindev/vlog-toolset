@@ -1,5 +1,23 @@
 # vlog-toolset
 Designed to record vlogs with classical [jump cuts](https://www.youtube.com/watch?v=QHhVnIyO_NQ&t=20s)
+using camera of Android-based device and microphone of GNU/Linux machine
+
+## Installation
+`git clone git@github.com:alopatindev/vlog-toolset.git && cd vlog-toolset && ./configure`
+
+### Dependencies
+- GNU/Linux
+    - ruby (tested with 2.5.1)
+    - python3 (tested with 3.6.5)
+    - pip (tested with 9.0.1)
+    - ffmpeg (tested with 3.4.4)
+    - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
+    - alsa-utils (tested with 1.1.2)
+    - mpv (tested with 0.27.2)
+    - android-tools (tested with 8.1.0_p1, adb version is 1.0.39)
+        - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
+- Android device
+    - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))
 
 ## vlog-recorder
 - records video
@@ -114,33 +132,12 @@ Usage: vlog-play-segments [options] -i video.mp4
 ./bin/vlog-play-segments -i ~/video/new-cool-video-project/output.mp4
 ```
 
-## Installation
-`git clone git@github.com:alopatindev/vlog-toolset.git && cd vlog-toolset`
-
-### Dependencies
-- GNU/Linux
-    - ruby (tested with 2.5.1)
-    - python3 (tested with 3.6.5)
-    - pip (tested with 9.0.1)
-    - ffmpeg (tested with 3.4.4)
-    - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
-    - alsa-utils (tested with 1.1.2)
-    - mpv (tested with 0.27.2)
-    - android-tools (tested with 8.1.0_p1, adb version is 1.0.39)
-        - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
-    - webrtcvad (tested with 2.0.10)
-        - `pip3 install --user webrtcvad`
-    - autosub
-        - `pip3 install --user autosub # to install dependencies`
-        - `git clone git@github.com:agermanidis/autosub.git lib/autosub && cd lib/autosub && git checkout 477d5a9 && cd ../..`
-- Android device
-    - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))
-
 ## Known issues/limitations
 - it's just a dumb dirty PoC, it's not necessarily gonna work on your hardware
     - I'm using Meizu MX4
         - front camera faces at me
-        - autorotation is enabled, the device is rotated counterclockwise to landscape position
+        - autorotation is enabled
+        - the device is at landscape position (counterclockwise from normal position)
 - paths with spaces and weird characters are unsupported
 - cuts precision accuracy is pretty poor
     - better approach would be something like [roughcut](https://graphics.stanford.edu/papers/roughcut/)
@@ -155,4 +152,4 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions; read LICENSE.txt for details.
 
-Copyright (C) 2018  Alexander Lopatin <alopatindev ät gmail dot com>
+Copyright (C) 2018—2019  Alexander Lopatin <alopatindev ät gmail dot com>
