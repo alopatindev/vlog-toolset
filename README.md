@@ -1,6 +1,7 @@
 # vlog-toolset
-Designed to record vlogs with classical [jump cuts](https://www.youtube.com/watch?v=QHhVnIyO_NQ&t=20s)
-using camera of Android-based device and microphone of GNU/Linux machine
+Designed to record vlogs with classical jump cuts
+using camera of Android-based device and microphone of GNU/Linux machine.
+I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automatic-jump-cuts-using-open-source-and-coding/) with Pitivi for my Russian [YouTube channel](https://www.youtube.com/channel/UCjNAnQpPQydNLTHcVz0s44A).
 
 ## Installation
 `git clone git@github.com:alopatindev/vlog-toolset.git && cd vlog-toolset && ./configure`

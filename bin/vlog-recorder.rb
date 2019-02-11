@@ -297,7 +297,7 @@ class DevicesFacade
   def show_status(text)
     size = 80
     if text.nil?
-      recording = @recording ? 'LIVE' : 'stopped'
+      recording = @recording ? 'REC' : 'stopped'
       battery_level, battery_temperature = @phone.get_battery_info
       text = "[ #{recording} ] [ battery: #{battery_level}% / #{battery_temperature}°C ]"
     end
