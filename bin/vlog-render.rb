@@ -15,13 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
-require 'ffmpeg_utils.rb'
+require 'ffmpeg_utils'
+require 'numeric'
+
 require 'concurrent'
 require 'fileutils'
 require 'io/console'
-require 'numeric.rb'
 require 'optparse'
-require 'thread/pool'
+# require 'thread/pool' # FIXME: gem install thread? or no longer used?
 
 PREVIEW_WIDTH = 320
 CONFIG_FILENAME = 'render.conf'.freeze
@@ -35,13 +36,14 @@ def parse(filename, options)
       if cols[0] == "\n" then { index: index, empty: true }
       else
         video_filename, speed, start_position, end_position, text = cols
-        text = text.sub /#.*$/, ''
+        text = text.sub(/#.*$/, '')
         words = text.split(' ').length
 
         final_speed = clamp_speed(speed.to_f * options[:speed])
-        if final_speed < 1.0
-          print "segment #{video_filename} has speed #{final_speed} < 1; forcing speed 1\n"
-          final_speed = 1.0
+        min_speed = 1.0 # FIXME: set min speed to 44.1/48?
+        if final_speed < min_speed
+          print "segment #{video_filename} has speed #{final_speed} < 1; forcing speed #{min_speed}\n"
+          final_speed = min_speed
         end
 
         {
@@ -72,7 +74,8 @@ def apply_delays(segments)
     .reverse
     .inject([0, []]) do |(delays, acc), seg|
       if seg[:empty] then [delays + 1, acc]
-      else [0, acc + [[seg, delays]]] end
+      else
+        [0, acc + [[seg, delays]]] end
     end[1]
     .reverse
     .reject { |(seg, _delays)| seg[:empty] }
@@ -128,25 +131,27 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
   thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   temp_videos = segments.map.with_index do |seg, index|
-    # FIXME: make less confusing paths
+    # FIXME: make less confusing paths, perhaps with hashing
     ext = '.mp4'
     line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
-    base_output_filename = ([seg[:index].with_leading_zeros] + seg.reject { |key| key == :index }.values.map(&:to_s) + [preview.to_s]).join('_')
+    base_output_filename = ([seg[:index].with_leading_zeros] + seg.reject { |key|
+                                                                 key == :index
+                                                               }.values.map(&:to_s) + [preview.to_s]).join('_')
     output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
     temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
 
     thread_pool.post do
-      begin
-        audio_filters = "atempo=#{options[:speed]}"
-        video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{options[:speed]})*PTS"
-        if preview
-          video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
-        end
+      audio_filters = "atempo=#{options[:speed]}"
+      video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{options[:speed]})*PTS"
+      if preview
+        video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
+      end
 
-        video_codec = 'libx264 -preset ultrafast -crf 18'
+      # TODO: nvidia based encoding, autodetect whether it's available?
+      video_codec = 'libx264 -preset ultrafast -crf 18'
 
-        command = "#{FFMPEG_NO_OVERWRITE} -threads 1 \
+      command = "#{FFMPEG_NO_OVERWRITE} -threads 1 \
                              -ss #{seg[:start_position]} \
                              -i #{seg[:video_filename]} \
                              -to #{seg[:end_position] - seg[:start_position]} \
@@ -159,13 +164,12 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
                              -acodec alac \
                              -f ipod #{output_filename}"
 
-        system command
-        print "#{basename} (#{index + 1}/#{segments.length})\n"
+      system command
+      print "#{basename} (#{index + 1}/#{segments.length})\n"
 
-        FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
-      rescue StandardError => error
-        print "exception for segment #{seg}: #{error} #{error.backtrace}\n"
-      end
+      FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
+    rescue StandardError => e
+      print "exception for segment #{seg}: #{e} #{e.backtrace}\n"
     end
 
     output_filename
@@ -249,14 +253,27 @@ end
 def parse_options!(options)
   OptionParser.new do |opts|
     opts.banner = 'Usage: vlog-render -p project_dir/ [other options]'
-    opts.on('-p', '--project [dir]', 'Project directory') { |p| options[:project_dir] = p }
-    opts.on('-L', '--line [num]', "Line in #{CONFIG_FILENAME} file, to play by given position (default: #{options[:line_in_file]})") { |l| options[:line_in_file] = l }
-    opts.on('-P', '--preview [true|false]', "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") { |p| options[:preview] = p == 'true' }
-    opts.on('-f', '--fps [num]', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f.to_i }
-    opts.on('-S', '--speed [num]', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
-    opts.on('-V', '--video-filters [filters]', "ffmpeg video filters (default: '#{options[:video_filters]}')") { |v| options[:video_filters] = v }
-    opts.on('-c', '--cleanup [true|false]', "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") { |c| options[:cleanup] = c == 'true' }
-    opts.on('-l', '--language [en|ru|...]', "Language for voice recognition (default: '#{options[:language]}')") { |l| options[:language] = l }
+    opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
+    opts.on('-L', '--line <num>',
+            "Line in #{CONFIG_FILENAME} file, to play by given position (default: #{options[:line_in_file]})") do |l|
+      options[:line_in_file] = l
+    end
+    opts.on('-P', '--preview <true|false>',
+            "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
+      options[:preview] = p == 'true'
+    end
+    opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f.to_i }
+    opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
+    opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: '#{options[:video_filters]}')") do |v|
+      options[:video_filters] = v
+    end
+    opts.on('-c', '--cleanup <true|false>',
+            "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
+      options[:cleanup] = c == 'true'
+    end
+    opts.on('-l', '--language <en|ru|...>', "Language for voice recognition (default: '#{options[:language]}')") do |l|
+      options[:language] = l
+    end
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?

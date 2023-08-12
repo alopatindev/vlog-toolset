@@ -15,17 +15,22 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
-require 'phone.rb'
-require 'microphone.rb'
-require 'numeric.rb'
-require 'ffmpeg_utils.rb'
-require 'voice/detect_voice.rb'
+require 'ffmpeg_utils'
+require 'microphone'
+require 'numeric'
+require 'phone'
+require 'voice/detect_voice'
 
 require 'concurrent'
 require 'fileutils'
 require 'io/console'
 require 'logger'
 require 'optparse'
+
+# TODO: `mpv -v av://v4l2:/dev/video0` says "[ffmpeg/demuxer] video4linux2,v4l2: The V4L2 driver changed the video from 1920x1080 to 640x480"
+# possible solution "driver=v4l2:width=720:height=576:norm=PAL:outfmt=uyvy"
+
+# TODO: nvidia based encoding, autodetect whether it's available?
 
 class DevicesFacade
   MPV = 'mpv --no-terminal --fs --volume=130'.freeze
@@ -78,17 +83,17 @@ class DevicesFacade
   end
 
   def start_recording
-    unless @recording
-      @logger.debug 'start recording'
-      toggle_recording
-    end
+    return if @recording
+
+    @logger.debug 'start recording'
+    toggle_recording
   end
 
   def stop_recording
-    if @recording
-      @logger.debug 'stop recording'
-      toggle_recording
-    end
+    return unless @recording
+
+    @logger.debug 'stop recording'
+    toggle_recording
   end
 
   def toggle_recording
@@ -129,10 +134,10 @@ class DevicesFacade
   def delete_last_subclip
     @logger.debug 'delete_last_subclip'
     filename = get_clips([@project_dir]).last
-    if !filename.nil? && (File.file? filename)
-      show_status "Delete #{filename}? y/n"
-      remove_files filename if STDIN.getch == 'y'
-    end
+    return unless !filename.nil? && (File.file? filename)
+
+    show_status "Delete #{filename}? y/n"
+    remove_files filename if STDIN.getch == 'y'
   end
 
   def save_clip(trim_noise)
@@ -148,25 +153,24 @@ class DevicesFacade
       @saving_clips.add(clip_num)
 
       @thread_pool.post do
-        begin
-          camera_filename = @phone.move_to_host(phone_filename, clip_num)
-          @logger.debug "save_clip: camera_filename=#{camera_filename} sound_filename=#{sound_filename}"
+        camera_filename = @phone.move_to_host(phone_filename, clip_num)
+        @logger.debug "save_clip: camera_filename=#{camera_filename} sound_filename=#{sound_filename}"
 
-          sync_offset, sync_sound_filename = synchronize_sound(camera_filename, sound_filename)
-          @logger.debug "save_clip: sync_offset=#{sync_offset}"
+        sync_offset, sync_sound_filename = synchronize_sound(camera_filename, sound_filename)
+        @logger.debug "save_clip: sync_offset=#{sync_offset}"
 
-          segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, trim_noise)
-          processed_sound_filenames = process_sound(sync_sound_filename, segments)
-          @logger.debug "save_clip: processed_sound_filenames=#{processed_sound_filenames}"
+        segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, trim_noise)
+        processed_sound_filenames = process_sound(sync_sound_filename, segments)
+        @logger.debug "save_clip: processed_sound_filenames=#{processed_sound_filenames}"
 
-          processed_video_filenames = process_video(camera_filename, segments)
-          output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num)
-          remove_files [camera_filename, sound_filename, sync_sound_filename] + processed_sound_filenames + processed_video_filenames
-          @logger.info "save_clip: #{clip_num} as #{output_filenames} ok"
-        rescue StandardError => error
-          @logger.info "ignoring saving of #{clip_num} as #{output_filename}"
-          @logger.debug error
-        end
+        processed_video_filenames = process_video(camera_filename, segments)
+        output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num)
+        remove_files [camera_filename, sound_filename,
+                      sync_sound_filename] + processed_sound_filenames + processed_video_filenames
+        @logger.info "save_clip: #{clip_num} as #{output_filenames} ok"
+      rescue StandardError => e
+        @logger.info "ignoring saving of #{clip_num} as #{output_filename}"
+        @logger.debug e
       end
     end
   end
@@ -242,10 +246,6 @@ class DevicesFacade
     File.join @project_dir, "#{clip_num.with_leading_zeros}_#{subclip_num.with_leading_zeros}.mp4"
   end
 
-  def get_duration(filename)
-    `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 #{filename}`.to_f
-  end
-
   def synchronize_sound(camera_filename, sound_filename)
     output_filename = "#{sound_filename}.sync.wav"
 
@@ -308,22 +308,23 @@ class DevicesFacade
 
   def play
     clips = get_clips [@project_dir]
-    unless clips.empty?
-      last_clip_num = parse_clip_num clips.last
-      @logger.debug "play clip: #{last_clip_num}"
+    return if clips.empty?
 
-      last_clip_filename = File.basename(get_output_filename(last_clip_num, subclip_num = 0))
-      position_in_playlist = clips
-                             .map { |f| File.basename(f) }
-                             .index(last_clip_filename) || clips.length - 1
+    last_clip_num = parse_clip_num clips.last
+    @logger.debug "play clip: #{last_clip_num}"
 
-      mpv_args = "--speed=#{@speed}"
-      mpv_args += ' -vf=mirror' if @mirror
+    last_clip_filename = File.basename(get_output_filename(last_clip_num, subclip_num = 0))
+    position_in_playlist = clips
+                           .map { |f| File.basename(f) }
+                           .index(last_clip_filename) || clips.length - 1
 
-      command = "#{MPV} #{mpv_args} --playlist-start=#{position_in_playlist} #{clips.join(' ')}"
-      @logger.debug command
-      system command
-    end
+    mpv_args = "--speed=#{@speed}"
+    mpv_args += ' -vf=mirror' if @mirror
+    # mpv_args += ' --audio-device=alsa/intel_card' # TODO: additional argument
+
+    command = "#{MPV} #{mpv_args} --playlist-start=#{position_in_playlist} #{clips.join(' ')}"
+    @logger.debug command
+    system command
   end
 end
 
@@ -380,17 +381,35 @@ end
 def parse_options!(options)
   OptionParser.new do |opts|
     opts.banner = 'Usage: vlog-recorder -p project_dir/ [other options]'
-    opts.on('-p', '--project [dir]', 'Project directory') { |p| options[:project_dir] = p }
-    opts.on('-t', '--trim [duration]', 'Trim duration of beginning and ending of each clip (default: 0.15)') { |t| options[:trim_duration] = t.to_f }
-    opts.on('-s', '--sound-settings [arecord-args]', 'Additional arecord arguments (default: " --device=default --format=dat"') { |s| options[:arecord_args] = s }
-    opts.on('-A', '--android-device [device-id]', 'Android device id') { |a| options[:android_id] = a }
-    opts.on('-o', '--opencamera-dir [dir]', 'Open Camera directory path on Android device (default: "/mnt/sdcard/DCIM/OpenCamera")') { |o| options[:opencamera_dir] = o }
-    opts.on('-b', '--change-brightness [true|false]', 'Set lowest brightness to save device power (default: false)') { |b| options[:change_brightness] = b == 'true' }
-    opts.on('-S', '--speed [num]', 'Speed factor for player (default: 1.2)') { |s| options[:speed] = s.to_f }
-    opts.on('-m', '--mirror [true|false]', 'Enable mirror effect for player (default: true)') { |m| options[:mirror] = m == 'true' }
-    opts.on('-P', '--pause-between-shots [seconds]', 'Minimum pause between shots for auto trimming (default: 2)') { |p| options[:min_pause_between_shots] = p }
-    opts.on('-a', '--aggressiveness [0..3]', 'How aggressively to filter out non-speech (default: 1)') { |a| options[:aggressiveness] = a.to_i }
-    opts.on('-d', '--debug [true|false]', 'Show debug messages (default: false)') { |d| options[:debug] = d == 'true' }
+    opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
+    opts.on('-t', '--trim <duration>', 'Trim duration of beginning and ending of each clip (default: 0.15)') do |t|
+      options[:trim_duration] = t.to_f
+    end
+    opts.on('-s', '--sound-settings <arecord-args>',
+            'Additional arecord arguments (default: " --device=default --format=dat"') do |s|
+      options[:arecord_args] = s
+    end
+    opts.on('-A', '--android-device <device-id>', 'Android device id') { |a| options[:android_id] = a }
+    opts.on('-o', '--opencamera-dir <dir>',
+            'Open Camera directory path on Android device (default: "/mnt/sdcard/DCIM/OpenCamera")') do |o|
+      options[:opencamera_dir] = o
+    end
+    opts.on('-b', '--change-brightness <true|false>',
+            'Set lowest brightness to save device power (default: false)') do |b|
+      options[:change_brightness] = b == 'true'
+    end
+    opts.on('-S', '--speed <num>', 'Speed factor for player (default: 1.2)') { |s| options[:speed] = s.to_f }
+    opts.on('-m', '--mirror <true|false>', 'Enable mirror effect for player (default: true)') do |m|
+      options[:mirror] = m == 'true'
+    end
+    opts.on('-P', '--pause-between-shots <seconds>',
+            'Minimum pause between shots for auto trimming (default: 2)') do |p|
+      options[:min_pause_between_shots] = p
+    end
+    opts.on('-a', '--aggressiveness <0..3>', 'How aggressively to filter out non-speech (default: 1)') do |a|
+      options[:aggressiveness] = a.to_i
+    end
+    opts.on('-d', '--debug <true|false>', 'Show debug messages (default: false)') { |d| options[:debug] = d == 'true' }
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -424,9 +443,9 @@ begin
   show_help
   run_main_loop(devices)
 rescue SystemExit, Interrupt
-rescue StandardError => error
-  logger.fatal(error) unless logger.nil?
-  puts error
+rescue StandardError => e
+  logger.fatal(e) unless logger.nil?
+  puts e
 ensure
   puts 'Exiting...'
   logger.info('exit') unless logger.nil?
