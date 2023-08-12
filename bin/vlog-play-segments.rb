@@ -91,18 +91,23 @@ def parse_options!(options)
   OptionParser.new do |opts|
     opts.banner = 'Usage: vlog-play-segments [options] -i video.mp4'
     opts.on('-i', '--i <filename>', 'Video to play') { |i| options[:video] = i }
-    opts.on('-S', '--speed <num>', 'Speed factor (default: 1.5)') { |s| options[:speed] = s.to_f }
+    opts.on('-S', '--speed <num>', "Speed factor (default: #{'%.1f' % options[:speed]})") do |s|
+      options[:speed] = s.to_f
+    end
     opts.on('-m', '--mode <silence|voice|both>',
-            'Play silent parts starting from longest segment OR voice only OR both, but silences will be sped up (default: silence)') do |m|
+            "Play silent parts starting from longest segment OR voice only OR both, but silences will be sped up (default: #{options[:mode]})") do |m|
       options[:mode] = m
     end
-    opts.on('-P', '--pause-between-shots <seconds>', 'Minimum pause between shots (default: 2)') do |p|
+    opts.on('-P', '--pause-between-shots <seconds>',
+            "Minimum pause between shots (default: #{'%.1f' % options[:min_pause_between_shots]})") do |p|
       options[:min_pause_between_shots] = p
     end
-    opts.on('-w', '--window <num>', 'Time window before and after the segment (default: 0)') do |w|
+    opts.on('-w', '--window <num>',
+            "Time window before and after the segment (default: #{'%.1f' % options[:window]})") do |w|
       options[:window] = w.to_f
     end
-    opts.on('-a', '--aggressiveness <0..3>', 'How aggressively to filter out non-speech (default: 3)') do |a|
+    opts.on('-a', '--aggressiveness <0..3>',
+            "How aggressively to filter out non-speech (default: #{options[:aggressiveness]})") do |a|
       options[:aggressiveness] = a.to_i
     end
   end.parse!
