@@ -19,7 +19,6 @@ require 'set'
 class Phone
   APP_ID = 'net.sourceforge.opencamera'.freeze
   MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
-  NEWLINE_SPLITTER = "\r\n".freeze
   POLL_WAIT_TIME = 0.3
 
   def initialize(temp_dir, options, logger)
@@ -72,7 +71,7 @@ class Phone
     return if filename.nil?
 
     @logger.debug "phone.delete_clip #{clip_num} #{filename}"
-    system("#{@adb_shell} rm -f '#{filename}'")
+    adb_shell("rm -f '#{filename}'")
     @clip_num_to_filename.delete(clip_num)
   end
 
@@ -89,8 +88,8 @@ class Phone
   end
 
   def get_new_filenames
-    `#{@adb_shell} 'ls #{@opencamera_dir}/*.mp4 2>> /dev/null'`
-      .split(NEWLINE_SPLITTER)
+    adb_shell("'ls #{@opencamera_dir}/*.mp4 2>> /dev/null'")
+      .split("\n")
       .map(&:strip)
       .reject { |f| @filenames.include?(f) }
   end
@@ -103,6 +102,7 @@ class Phone
     begin
       sleep POLL_WAIT_TIME
       new_filenames = get_new_filenames
+      @logger.debug "new_filenames=#{new_filenames.inspect}"
       @logger.warn "#{new_filenames.length} new files were detected, using the first one" if new_filenames.length > 1
       new_filenames.take(1).map { |f| assign_new_filename(new_clip_num, f) }
     end while new_filenames.empty?
@@ -121,12 +121,11 @@ class Phone
   def tap(x, y)
     screen_x = (x * @height).to_i
     screen_y = (y * @width).to_i
-    @logger.debug "#{@adb_shell} input tap #{screen_x} #{screen_y}\n"
-    system "#{@adb_shell} input tap #{screen_x} #{screen_y}"
+    adb_shell("input tap #{screen_x} #{screen_y}")
   end
 
   def locked?
-    dumpsys = `#{@adb_shell} dumpsys window`
+    dumpsys = adb_shell('dumpsys window')
     unless dumpsys =~ /mDreamingLockscreen=(.*?)\s/ || dumpsys =~ /mShowingLockscreen=(.*?)\s/
       raise 'Failed to check if device is locked'
     end
@@ -135,11 +134,11 @@ class Phone
   end
 
   def wakeup
-    system "#{@adb_shell} input keyevent KEYCODE_WAKEUP"
+    adb_shell('input keyevent KEYCODE_WAKEUP')
   end
 
   def opencamera_active?
-    `#{@adb_shell} dumpsys window windows`.match?(/mCurrentFocus=Window\{[0-9a-f]* u0 #{MAIN_ACTIVITY}/)
+    adb_shell('dumpsys window windows').match?(/mCurrentFocus=Window\{[0-9a-f]* u0 #{MAIN_ACTIVITY}/)
   end
 
   def run_opencamera
@@ -147,7 +146,7 @@ class Phone
   end
 
   def close_opencamera
-    system "#{@adb_shell} input keyevent KEYCODE_BACK"
+    adb_shell('input keyevent KEYCODE_BACK')
   end
 
   def set_front_camera
@@ -156,28 +155,38 @@ class Phone
   end
 
   def get_size
-    dumpsys = `#{@adb_shell} dumpsys display`
-    if dumpsys =~ /mDisplayWidth=([0-9]{2,}?)#{NEWLINE_SPLITTER}\s*mDisplayHeight=([0-9]{2,}?)#{NEWLINE_SPLITTER}/
-      width = Regexp.last_match(1).to_i
-      height = Regexp.last_match(2).to_i
-      [width, height]
-    elsif dumpsys =~ /deviceWidth=([0-9]{2,}?),\sdeviceHeight=([0-9]{2,}?)\}/
-      width = Regexp.last_match(1).to_i
-      height = Regexp.last_match(2).to_i
-      [width, height].reverse
-    else
-      raise 'Failed to fetch display size'
+    dumpsys = adb_shell('dumpsys display')
+    width, height =
+      if dumpsys =~ /mDisplayWidth=([0-9]{2,}?)\n\s*mDisplayHeight=([0-9]{2,}?)\n/
+        width = Regexp.last_match(1).to_i
+        height = Regexp.last_match(2).to_i
+        [width, height]
+      elsif dumpsys =~ /deviceWidth=([0-9]{2,}?),\sdeviceHeight=([0-9]{2,}?)\}/
+        width = Regexp.last_match(1).to_i
+        height = Regexp.last_match(2).to_i
+        [width, height].reverse
+      else
+        raise 'Failed to fetch display size'
+      end
+
+    # TODO: detect task bar
+    if adb_shell('dumpsys window') =~ /ITYPE_NAVIGATION_BAR frame=\[([0-9]{2,}?),/
+      new_height = Regexp.last_match(1).to_i
+      @logger.debug "height #{height} => #{new_height}"
+      height = new_height
     end
+
+    [width, height]
   end
 
   def get_brightness
-    `#{@adb_shell} settings get system screen_brightness`.to_i
+    adb_shell('settings get system screen_brightness').to_i
   end
 
   def set_brightness(brightness)
     return unless @change_brightness
 
-    `#{@adb_shell} settings put system screen_brightness #{brightness}`.to_i
+    adb_shell("settings put system screen_brightness #{brightness}").to_i
   end
 
   def restore_brightness
@@ -185,7 +194,7 @@ class Phone
   end
 
   def get_battery_info
-    dumpsys = `#{@adb_shell} dumpsys battery`.split(NEWLINE_SPLITTER)
+    dumpsys = adb_shell('dumpsys battery').split("\n")
     level = dumpsys.select { |line| line.include? 'level: ' }
                    .map { |line| line.gsub(/.*: /, '') }
                    .first
@@ -193,5 +202,12 @@ class Phone
                          .map { |line| line.gsub(/.*: /, '').to_i / 10 }
                          .first
     [level, temperature]
+  end
+
+  def adb_shell(args)
+    command = "#{@adb_shell} #{args}"
+    @logger.debug command
+    `#{command}`.gsub("\r\n", "\n")
+    # @logger.debug "#{command} => #{output}"
   end
 end

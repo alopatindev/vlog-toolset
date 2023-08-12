@@ -382,34 +382,40 @@ def parse_options!(options)
   OptionParser.new do |opts|
     opts.banner = 'Usage: vlog-recorder -p project_dir/ [other options]'
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
-    opts.on('-t', '--trim <duration>', 'Trim duration of beginning and ending of each clip (default: 0.15)') do |t|
+    opts.on('-t', '--trim <duration>',
+            "Trim duration of beginning and ending of each clip (default: #{'%.1f' % options[:trim_duration]})") do |t|
       options[:trim_duration] = t.to_f
     end
     opts.on('-s', '--sound-settings <arecord-args>',
-            'Additional arecord arguments (default: " --device=default --format=dat"') do |s|
+            "Additional arecord arguments (default: \"#{options[:arecord_args]}\"") do |s|
       options[:arecord_args] = s
     end
     opts.on('-A', '--android-device <device-id>', 'Android device id') { |a| options[:android_id] = a }
     opts.on('-o', '--opencamera-dir <dir>',
-            'Open Camera directory path on Android device (default: "/mnt/sdcard/DCIM/OpenCamera")') do |o|
+            "Open Camera directory path on Android device (default: \"#{options[:opencamera_dir]}\")") do |o|
       options[:opencamera_dir] = o
     end
     opts.on('-b', '--change-brightness <true|false>',
-            'Set lowest brightness to save device power (default: false)') do |b|
+            "Set lowest brightness to save device power (default: #{options[:change_brightness]})") do |b|
       options[:change_brightness] = b == 'true'
     end
-    opts.on('-S', '--speed <num>', 'Speed factor for player (default: 1.2)') { |s| options[:speed] = s.to_f }
-    opts.on('-m', '--mirror <true|false>', 'Enable mirror effect for player (default: true)') do |m|
+    opts.on('-S', '--speed <num>', "Speed factor for player (default: #{'%.1f' % options[:speed]})") do |s|
+      options[:speed] = s.to_f
+    end
+    opts.on('-m', '--mirror <true|false>', "Enable mirror effect for player (default: #{options[:mirror]})") do |m|
       options[:mirror] = m == 'true'
     end
     opts.on('-P', '--pause-between-shots <seconds>',
-            'Minimum pause between shots for auto trimming (default: 2)') do |p|
+            "Minimum pause between shots for auto trimming (default: #{'%.1f' % options[:min_pause_between_shots]})") do |p|
       options[:min_pause_between_shots] = p
     end
-    opts.on('-a', '--aggressiveness <0..3>', 'How aggressively to filter out non-speech (default: 1)') do |a|
+    opts.on('-a',
+            '--aggressiveness <0..3>', "How aggressively to filter out non-speech (default: #{options[:aggressiveness]})") do |a|
       options[:aggressiveness] = a.to_i
     end
-    opts.on('-d', '--debug <true|false>', 'Show debug messages (default: false)') { |d| options[:debug] = d == 'true' }
+    opts.on('-d', '--debug <true|false>', "Show debug messages (default: #{options[:debug]})") do |d|
+      options[:debug] = d == 'true'
+    end
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -419,7 +425,7 @@ options = {
   trim_duration: 0.15,
   arecord_args: '--device=default --format=dat',
   android_id: '',
-  opencamera_dir: '/mnt/sdcard/DCIM/OpenCamera',
+  opencamera_dir: '/storage/emulated/0/DCIM/OpenCamera',
   change_brightness: false,
   speed: 1.2,
   mirror: true,
