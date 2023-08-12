@@ -169,8 +169,7 @@ class Phone
         raise 'Failed to fetch display size'
       end
 
-    # TODO: detect task bar
-    if adb_shell('dumpsys window') =~ /ITYPE_NAVIGATION_BAR frame=\[([0-9]{2,}?),/
+    if adb_shell('dumpsys window') =~ /mAppBounds=Rect\([0-9\s-]*,\s[0-9\s-]*,([0-9\s-]*)\)/
       new_height = Regexp.last_match(1).to_i
       @logger.debug "height #{height} => #{new_height}"
       height = new_height
