@@ -1,6 +1,7 @@
 #!/bin/sh
 
 AUTOSUB_COMMIT="477d5a99b50338c4ad7ef7dce484e739323164d5"
+ADB_REPULL_COMMIT="f253e1a27be58a457ed02bb116788c43f9e37798"
 
 echo "Checking installed dependencies..."
 for i in ruby python3 pip3 ffmpeg sync-audio-tracks.sh arecord mpv adb; do
@@ -21,7 +22,7 @@ pip3 install --user webrtcvad autosub
 wget "https://github.com/agermanidis/autosub/archive/${AUTOSUB_COMMIT}.tar.gz"
 tar -C lib/autosub --strip-components=1 -xzf "${AUTOSUB_COMMIT}.tar.gz"
 
-wget https://gist.githubusercontent.com/alopatindev/e94ff95ea834500abe2da81ac2a7764f/raw/81495bed585d7e0c90213e9e51cad47317969b4f/adb_repull.py -O lib/adb_repull.py
+wget "https://gist.githubusercontent.com/alopatindev/e94ff95ea834500abe2da81ac2a7764f/raw/${ADB_REPULL_COMMIT}/adb_repull.py" -O lib/adb_repull.py
 chmod +x lib/adb_repull.py
 
 gem install concurrent-ruby
