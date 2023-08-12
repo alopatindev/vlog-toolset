@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
-require 'numeric.rb'
+require 'numeric'
 
 require 'fileutils'
 require 'io/console'
