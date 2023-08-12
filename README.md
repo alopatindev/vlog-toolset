@@ -18,10 +18,6 @@ I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automat
     - android-tools (tested with 8.1.0_p1, adb version is 1.0.39)
         - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
 
-```
-VIRTUAL_ENV=$(python3 -c 'import sys; print(sys.base_prefix)') maturin develop --release -m pyDF/Cargo.toml
-```
-
 - Android device
     - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))
 
