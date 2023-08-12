@@ -55,20 +55,20 @@ cd vlog-toolset
 
 ./bin/vlog-recorder -h
 Usage: vlog-recorder -p project_dir/ [other options]
-    -p, --project [dir]              Project directory
-    -t, --trim [duration]            Trim duration of beginning and ending of each clip (default: 0.15)
-    -s [arecord-args],               Additional arecord arguments (default: " --device=default --format=dat"
+    -p, --project <dir>              Project directory
+    -t, --trim <duration>            Trim duration of beginning and ending of each clip (default: 0.15)
+    -s <arecord-args>,               Additional arecord arguments (default: " --device=default --format=dat"
         --sound-settings
-    -A, --android-device [device-id] Android device id
-    -o, --opencamera-dir [dir]       Open Camera directory path on Android device (default: "/mnt/sdcard/DCIM/OpenCamera")
-    -b [true|false],                 Set lowest brightness to save device power (default: false)
+    -A, --android-device <device-id> Android device id
+    -o, --opencamera-dir <dir>       Open Camera directory path on Android device (default: "/mnt/sdcard/DCIM/OpenCamera")
+    -b <true|false>,                 Set lowest brightness to save device power (default: false)
         --change-brightness
-    -S, --speed [num]                Speed factor for player (default: 1.2)
-    -m, --mirror [true|false]        Enable mirror effect for player (default: true)
-    -P [seconds],                    Minimum pause between shots for auto trimming (default: 2)
+    -S, --speed <num>                Speed factor for player (default: 1.2)
+    -m, --mirror <true|false>        Enable mirror effect for player (default: true)
+    -P <seconds>,                    Minimum pause between shots for auto trimming (default: 2)
         --pause-between-shots
-    -a, --aggressiveness [0..3]      How aggressively to filter out non-speech (default: 1)
-    -d, --debug [true|false]         Show debug messages (default: false)
+    -a, --aggressiveness <0..3>      How aggressively to filter out non-speech (default: 1)
+    -d, --debug <true|false>         Show debug messages (default: false)
 
 ./bin/vlog-recorder -p ~/video/new-cool-video-project
 r - (RE)START recording
@@ -93,14 +93,14 @@ q / Ctrl+C - QUIT
 ```
 ./bin/vlog-render -h
 Usage: vlog-render -p project_dir/ [other options]
-    -p, --project [dir]              Project directory
-    -L, --line [num]                 Line in render.conf file, to play by given position (default: 1)
-    -P, --preview [true|false]       Preview mode. It will also start a video player by a given position (default: true)
-    -f, --fps [num]                  Constant frame rate (default: 30)
-    -S, --speed [num]                Speed factor (default: 1.2)
-    -V, --video-filters [filters]    ffmpeg video filters (default: 'hqdn3d,hflip,vignette')
-    -c, --cleanup [true|false]       Remove temporary files, instead of reusing them in future (default: false)
-    -l, --language [en|ru|...]       Language for voice recognition (default: 'en')
+    -p, --project <dir>              Project directory
+    -L, --line <num>                 Line in render.conf file, to play by given position (default: 1)
+    -P, --preview <true|false>       Preview mode. It will also start a video player by a given position (default: true)
+    -f, --fps <num>                  Constant frame rate (default: 30)
+    -S, --speed <num>                Speed factor (default: 1.2)
+    -V, --video-filters <filters>    ffmpeg video filters (default: 'hqdn3d,hflip,vignette')
+    -c, --cleanup <true|false>       Remove temporary files, instead of reusing them in future (default: false)
+    -l, --language <en|ru|...>       Language for voice recognition (default: 'en')
 
 ./bin/vlog-render -p ~/video/new-cool-video-project --preview false
 ```
@@ -136,13 +136,13 @@ vi ~/video/new-cool-video-project/render.conf
 ```
 ./bin/vlog-play-segments -h
 Usage: vlog-play-segments [options] -i video.mp4
-    -i, --i [filename]               Video to play
-    -S, --speed [num]                Speed factor (default: 1.5)
-    -m, --mode [silence|voice|both]  Play silent parts starting from longest segment OR voice only OR both, but silences will be sped up (default: silence)
-    -P [seconds],                    Minimum pause between shots (default: 2)
+    -i, --i <filename>               Video to play
+    -S, --speed <num>                Speed factor (default: 1.5)
+    -m, --mode <silence|voice|both>  Play silent parts starting from longest segment OR voice only OR both, but silences will be sped up (default: silence)
+    -P <seconds>,                    Minimum pause between shots (default: 2)
         --pause-between-shots
-    -w, --window [num]               Time window before and after the segment (default: 0)
-    -a, --aggressiveness [0..3]      How aggressively to filter out non-speech (default: 3)
+    -w, --window <num>               Time window before and after the segment (default: 0)
+    -a, --aggressiveness <0..3>      How aggressively to filter out non-speech (default: 3)
 
 ./bin/vlog-play-segments -i ~/video/new-cool-video-project/output.mp4
 ```
@@ -171,4 +171,4 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions; read LICENSE.txt for details.
 
-Copyright (C) 2018—2019  Alexander Lopatin <alopatindev ät gmail dot com>
+Copyright (C) 2018—2023  Alexander Lopatin <alopatindev ät gmail dot com>
