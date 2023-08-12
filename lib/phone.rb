@@ -44,6 +44,7 @@ class Phone
 
     opencamera_was_active = opencamera_active?
     run_opencamera unless opencamera_was_active
+    unlock_auto_rotate
     @width, @height = get_size
     @logger.debug "device width=#{@width}, height=#{@height}"
     @initial_brightness = get_brightness
@@ -104,14 +105,14 @@ class Phone
       new_filenames = get_new_filenames
       @logger.debug "new_filenames=#{new_filenames.inspect}"
       @logger.warn "#{new_filenames.length} new files were detected, using the first one" if new_filenames.length > 1
-      new_filenames.take(1).map { |f| assign_new_filename(new_clip_num, f) }
+      new_filenames.take(1).each { |f| assign_new_filename(new_clip_num, f) }
     end while new_filenames.empty?
   end
 
   def toggle_recording(clip_num, recording)
     tap 0.92, 0.5
 
-    wait_for_new_filename clip_num if recording
+    wait_for_new_filename clip_num unless recording
   end
 
   def focus
@@ -135,6 +136,10 @@ class Phone
 
   def wakeup
     adb_shell('input keyevent KEYCODE_WAKEUP')
+  end
+
+  def unlock_auto_rotate
+    adb_shell('adb shell settings put system accelerometer_rotation 1')
   end
 
   def opencamera_active?
@@ -169,7 +174,7 @@ class Phone
         raise 'Failed to fetch display size'
       end
 
-    if adb_shell('dumpsys window') =~ /mAppBounds=Rect\([0-9\s-]*,\s[0-9\s-]*,([0-9\s-]*)\)/
+    if adb_shell('dumpsys window') =~ /mAppBounds=Rect\([0-9\s-]*,\s0\s-\s([0-9]*),\s[0-9\s-]*\)/
       new_height = Regexp.last_match(1).to_i
       @logger.debug "height #{height} => #{new_height}"
       height = new_height

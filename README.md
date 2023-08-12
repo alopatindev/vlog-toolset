@@ -149,10 +149,11 @@ Usage: vlog-play-segments [options] -i video.mp4
 
 ## Known issues/limitations
 - it's just a dumb dirty PoC, it's not necessarily gonna work on your hardware
-    - I'm using Meizu MX4
+    - I'm using ~~Meizu MX4~~ Xiaomi Mi 8
         - front camera faces at me
         - autorotation is enabled
         - the device is at landscape position (counterclockwise from normal position)
+            - if auto-rotate is broken — try to reboot your phone
 - paths with spaces and weird characters are unsupported
 - cuts precision accuracy is pretty poor
     - better approach would be something like [roughcut](https://graphics.stanford.edu/papers/roughcut/)
