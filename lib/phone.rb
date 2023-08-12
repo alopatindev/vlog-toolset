@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
-require 'numeric.rb'
+require 'numeric'
 require 'set'
 
 class Phone
@@ -41,16 +41,14 @@ class Phone
 
     wakeup
 
-    if locked?
-      raise 'You need to unlock the screen'
-    else
-      opencamera_was_active = opencamera_active?
-      run_opencamera unless opencamera_was_active
-      @width, @height = get_size
-      @logger.debug "device width=#{@width}, height=#{@height}"
-      @initial_brightness = get_brightness
-      set_front_camera unless opencamera_was_active
-    end
+    raise 'You need to unlock the screen' if locked?
+
+    opencamera_was_active = opencamera_active?
+    run_opencamera unless opencamera_was_active
+    @width, @height = get_size
+    @logger.debug "device width=#{@width}, height=#{@height}"
+    @initial_brightness = get_brightness
+    set_front_camera unless opencamera_was_active
   end
 
   def move_to_host(phone_filename, clip_num)
@@ -63,6 +61,7 @@ class Phone
             #{@adb_shell} rm -f '#{phone_filename}'", out: File::NULL
 
     raise "Failed to move #{phone_filename} => #{local_filename}" unless File.file?(local_filename)
+
     @logger.debug "move_to_host #{phone_filename} => #{local_filename} ok"
 
     local_filename
@@ -70,11 +69,11 @@ class Phone
 
   def delete_clip(clip_num)
     filename = filename(clip_num)
-    unless filename.nil?
-      @logger.debug "phone.delete_clip #{clip_num} #{filename}"
-      system("#{@adb_shell} rm -f '#{filename}'")
-      @clip_num_to_filename.delete(clip_num)
-    end
+    return if filename.nil?
+
+    @logger.debug "phone.delete_clip #{clip_num} #{filename}"
+    system("#{@adb_shell} rm -f '#{filename}'")
+    @clip_num_to_filename.delete(clip_num)
   end
 
   def filename(clip_num)
@@ -83,6 +82,7 @@ class Phone
 
   def assign_new_filename(clip_num, filename)
     raise "#{filename} is a known file" if @filenames.include?(filename)
+
     @logger.debug "phone.assign_new_filename #{clip_num} => #{filename}"
     @clip_num_to_filename[clip_num] = filename
     @filenames.add filename
@@ -98,16 +98,14 @@ class Phone
   def wait_for_new_filename(new_clip_num)
     @logger.debug "waiting for #{new_clip_num}"
     # TODO: limit number of iterations?
-    unless @clip_num_to_filename.include?(new_clip_num)
-      begin
-        sleep POLL_WAIT_TIME
-        new_filenames = get_new_filenames
-        if new_filenames.length > 1
-          @logger.warn "#{new_filenames.length} new files were detected, using the first one"
-        end
-        new_filenames.take(1).map { |f| assign_new_filename(new_clip_num, f) }
-      end while new_filenames.empty?
-    end
+    return if @clip_num_to_filename.include?(new_clip_num)
+
+    begin
+      sleep POLL_WAIT_TIME
+      new_filenames = get_new_filenames
+      @logger.warn "#{new_filenames.length} new files were detected, using the first one" if new_filenames.length > 1
+      new_filenames.take(1).map { |f| assign_new_filename(new_clip_num, f) }
+    end while new_filenames.empty?
   end
 
   def toggle_recording(clip_num, recording)
@@ -128,11 +126,12 @@ class Phone
   end
 
   def locked?
-    if `#{@adb_shell} dumpsys window` =~ /mShowingLockscreen=(.*?)\s/
-      Regexp.last_match(1) == 'true'
-    else
+    dumpsys = `#{@adb_shell} dumpsys window`
+    unless dumpsys =~ /mDreamingLockscreen=(.*?)\s/ || dumpsys =~ /mShowingLockscreen=(.*?)\s/
       raise 'Failed to check if device is locked'
     end
+
+    Regexp.last_match(1) == 'true'
   end
 
   def wakeup
@@ -177,6 +176,7 @@ class Phone
 
   def set_brightness(brightness)
     return unless @change_brightness
+
     `#{@adb_shell} settings put system screen_brightness #{brightness}`.to_i
   end
 
