@@ -21,8 +21,8 @@ require 'numeric'
 require 'concurrent'
 require 'fileutils'
 require 'io/console'
+require 'mkmf'
 require 'optparse'
-# require 'thread/pool' # FIXME: gem install thread? or no longer used?
 
 PREVIEW_WIDTH = 320
 CONFIG_FILENAME = 'render.conf'.freeze
@@ -123,6 +123,12 @@ def merge_small_pauses(segments, min_pause_between_shots)
 end
 
 def process_and_split_videos(segments, options, output_dir, temp_dir)
+  video_codec = if is_nvenc_supported
+                  'hevc_nvenc'
+                else
+                  'libx265 -preset ultrafast -crf 18'
+                end
+
   print "processing video clips\n"
 
   fps = options[:fps]
@@ -147,13 +153,6 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
       if preview
         video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
       end
-
-      # TODO: detect when nvidia is available, both in ffmpeg and in a loaded nvidia module of supported version?
-      # ffmpeg -h encoder=hevc_nvenc -hide_banner
-      # https://unix.stackexchange.com/a/677315/172519
-      video_codec = 'hevc_nvenc'
-
-      # FIXME: second (or none?) command supposed to be with #{FFMPEG_NO_OVERWRITE} -hwaccel cuda -hwaccel_output_format cuda -threads 1
 
       command = "#{FFMPEG_NO_OVERWRITE} -threads 1 \
                              -ss #{seg[:start_position]} \
@@ -216,6 +215,21 @@ def compute_player_position(segments, options)
   segments.select { |seg| seg[:index] < options[:line_in_file] - 1 }
           .map { |seg| seg[:end_position] - seg[:start_position] }
           .sum / clamp_speed(options[:speed])
+end
+
+def is_nvenc_supported
+  if `#{FFMPEG} --help encoder=hevc_nvenc`.include? 'is not recognized'
+    print "ffmpeg doesn't support hevc_nvenc\n"
+    false
+  elsif (find_executable 'nvcc').nil?
+    print "nvidia-cuda-toolkit is not installed\n"
+    false
+  elsif !File.exist?('/dev/nvidia0')
+    print "nvidia module is not loaded\n"
+    false
+  else
+    true
+  end
 end
 
 # FIXME: move tests to some proper place
