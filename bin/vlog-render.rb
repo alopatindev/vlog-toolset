@@ -154,14 +154,14 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
       end
 
-      command = "#{FFMPEG_NO_OVERWRITE} -threads 1 \
+      command = "#{FFMPEG_NO_OVERWRITE} -threads #{Concurrent.processor_count} \
                              -ss #{seg[:start_position]} \
                              -i #{seg[:video_filename]} \
                              -to #{seg[:end_position] - seg[:start_position]} \
                              -strict -2 \
                              -codec copy #{temp_cut_output_filename} \
                              && \
-                 #{FFMPEG_NO_OVERWRITE} -threads 1 \
+                 #{FFMPEG_NO_OVERWRITE} -threads #{Concurrent.processor_count} \
                              -i #{temp_cut_output_filename} \
                              -vcodec #{video_codec} \
                              -vf '#{video_filters}' \
