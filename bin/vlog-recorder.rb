@@ -64,7 +64,7 @@ class DevicesFacade
 
   def get_clips(dirs)
     dirs_joined = dirs.join ','
-    Dir.glob("{#{dirs_joined}}#{File::SEPARATOR}0*.{wav,mp4,mkv,m4a}")
+    Dir.glob("{#{dirs_joined}}#{File::SEPARATOR}0*.{wav,mp4,mkv,m4a,webm}")
        .sort
   end
 
@@ -185,7 +185,7 @@ class DevicesFacade
       processed_sound_filename, processed_video_filename = f
       output_filename = get_output_filename clip_num, subclip_num
       @logger.debug "save_clip: output_filename=#{output_filename}"
-      command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -codec copy -f ipod #{output_filename}"
+      command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -codec copy #{output_filename}"
       @logger.debug command
       system command
 
@@ -263,10 +263,10 @@ class DevicesFacade
 
     segments.each_with_index.map do |seg, subclip_num|
       start_position, end_position = seg
-      output_filename = "#{sync_sound_filename}_#{subclip_num}.m4a"
+      output_filename = "#{sync_sound_filename}_#{subclip_num}.flac"
 
       ffmpeg_cut_args = "-ss #{start_position} -i #{sync_sound_filename} -to #{end_position - start_position} -c copy"
-      ffmpeg_output_args = "-af '#{audio_filters.join(',')}' -acodec alac"
+      ffmpeg_output_args = "-af '#{audio_filters.join(',')}' -acodec flac"
 
       temp_filename = "#{sync_sound_filename}_#{subclip_num}.cut.wav"
       command = "#{FFMPEG} #{ffmpeg_cut_args} #{temp_filename} && \
@@ -318,9 +318,8 @@ class DevicesFacade
                            .map { |f| File.basename(f) }
                            .index(last_clip_filename) || clips.length - 1
 
-    mpv_args = "--speed=#{@speed}"
-    mpv_args += ' -vf=mirror' if @mirror
-    # mpv_args += ' --audio-device=alsa/intel_card' # TODO: additional argument
+    mpv_args = "--speed=#{@speed} --no-resume-playback"
+    mpv_args += ' -vf=hflip' if @mirror
 
     command = "#{MPV} #{mpv_args} --playlist-start=#{position_in_playlist} #{clips.join(' ')}"
     @logger.debug command

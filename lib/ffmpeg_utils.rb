@@ -13,8 +13,9 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
-FFMPEG = 'ffmpeg -y -hide_banner -loglevel error'.freeze
-FFMPEG_NO_OVERWRITE = 'ffmpeg -n -hide_banner -loglevel panic'.freeze
+FFMPEG = 'ffmpeg -y -hide_banner -loglevel error '.freeze
+# FFMPEG_NO_OVERWRITE = 'ffmpeg -n -hide_banner -loglevel panic'.freeze
+FFMPEG_NO_OVERWRITE = 'ffmpeg -n -hide_banner -loglevel error'.freeze
 
 def get_duration(filename)
   `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 #{filename}`.to_f

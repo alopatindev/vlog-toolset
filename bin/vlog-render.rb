@@ -130,7 +130,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
 
   thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
-  temp_videos = segments.map.with_index do |seg, index|
+  temp_videos = segments.map.with_index do |seg, _index|
     # FIXME: make less confusing paths, perhaps with hashing
     ext = '.mp4'
     line_in_config = seg[:index] + 1
@@ -148,24 +148,30 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
       end
 
-      # TODO: nvidia based encoding, autodetect whether it's available?
-      video_codec = 'libx264 -preset ultrafast -crf 18'
+      # TODO: detect when nvidia is available, both in ffmpeg and in a loaded nvidia module of supported version?
+      # ffmpeg -h encoder=hevc_nvenc -hide_banner
+      # https://unix.stackexchange.com/a/677315/172519
+      video_codec = 'hevc_nvenc'
+
+      # FIXME: second (or none?) command supposed to be with #{FFMPEG_NO_OVERWRITE} -hwaccel cuda -hwaccel_output_format cuda -threads 1
 
       command = "#{FFMPEG_NO_OVERWRITE} -threads 1 \
                              -ss #{seg[:start_position]} \
                              -i #{seg[:video_filename]} \
                              -to #{seg[:end_position] - seg[:start_position]} \
-                             -c copy #{temp_cut_output_filename} && \
-                   #{FFMPEG_NO_OVERWRITE} -threads 1 \
+                             -strict -2 \
+                             -c copy #{temp_cut_output_filename} \
+                             && \
+                 #{FFMPEG_NO_OVERWRITE} -threads 1 \
                              -i #{temp_cut_output_filename} \
                              -vcodec #{video_codec} \
                              -vf '#{video_filters}' \
                              -af '#{audio_filters}' \
-                             -acodec alac \
-                             -f ipod #{output_filename}"
+                             -strict -2 \
+                             -acodec flac \
+                             #{output_filename}"
 
       system command
-      print "#{basename} (#{index + 1}/#{segments.length})\n"
 
       FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
     rescue StandardError => e
@@ -194,8 +200,9 @@ def concat_videos(temp_videos, output_filename)
                        -protocol_whitelist file,pipe \
                        -i - \
                        -vcodec copy \
-                       -acodec alac \
-                       -f ipod #{output_filename}"
+                       -strict -2 \
+                       -acodec flac \
+                       #{output_filename}"
 
   IO.popen(command, 'w') do |f|
     f.puts parts
@@ -247,7 +254,7 @@ end
 
 def generate_config(options)
   script_filename = File.join(__dir__, '..', 'lib', 'autosub', 'generate_conf.py')
-  system script_filename, options[:project_dir], options[:language]
+  system script_filename, options[:project_dir]
 end
 
 def parse_options!(options)
@@ -271,9 +278,6 @@ def parse_options!(options)
             "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
       options[:cleanup] = c == 'true'
     end
-    opts.on('-l', '--language <en|ru|...>', "Language for voice recognition (default: '#{options[:language]}')") do |l|
-      options[:language] = l
-    end
   end.parse!
 
   raise OptionParser::MissingArgument if options[:project_dir].nil?
@@ -289,8 +293,7 @@ options = {
   min_pause_between_shots: 0.1,
   preview: true,
   line_in_file: 1,
-  cleanup: false,
-  language: 'en'
+  cleanup: false
 }
 
 parse_options!(options)
