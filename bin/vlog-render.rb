@@ -267,7 +267,7 @@ def test_merge_small_pauses
 end
 
 def generate_config(options)
-  script_filename = File.join(__dir__, '..', 'lib', 'autosub', 'generate_conf.py')
+  script_filename = File.join(__dir__, '..', 'lib', 'generate_conf.py')
   system script_filename, options[:project_dir]
 end
 

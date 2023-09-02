@@ -2,7 +2,6 @@
 
 # TODO: rename to install-dependencies.sh ?
 
-AUTOSUB_COMMIT="477d5a99b50338c4ad7ef7dce484e739323164d5"
 ADB_REPULL_COMMIT="f253e1a27be58a457ed02bb116788c43f9e37798"
 
 # TODO: if gentoo - --break-system-packages
@@ -21,10 +20,8 @@ echo "Installing dependencies..."
 set -euo pipefail
 cd "$(dirname $0)"
 
-#pip3 install --user webrtcvad autosub
+#pip3 install --user webrtcvad
 
-#wget "https://github.com/agermanidis/autosub/archive/${AUTOSUB_COMMIT}.tar.gz"
-#tar -C lib/autosub --strip-components=1 -xzf "${AUTOSUB_COMMIT}.tar.gz"
 pip3 install --user openai-whisper
 
 # TODO: if nvidia-cuda-toolkit is installed, etc.; AND if torch cuda version is not installed
