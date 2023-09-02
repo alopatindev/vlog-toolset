@@ -185,7 +185,7 @@ class DevicesFacade
       processed_sound_filename, processed_video_filename = f
       output_filename = get_output_filename clip_num, subclip_num
       @logger.debug "save_clip: output_filename=#{output_filename}"
-      command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -codec copy #{output_filename}"
+      command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -strict -2 -codec copy #{output_filename}"
       @logger.debug command
       system command
 
