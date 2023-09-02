@@ -30,8 +30,6 @@ require 'optparse'
 # TODO: `mpv -v av://v4l2:/dev/video0` says "[ffmpeg/demuxer] video4linux2,v4l2: The V4L2 driver changed the video from 1920x1080 to 640x480"
 # possible solution "driver=v4l2:width=720:height=576:norm=PAL:outfmt=uyvy"
 
-# TODO: nvidia based encoding, autodetect whether it's available?
-
 class DevicesFacade
   MPV = 'mpv --no-terminal --fs --volume=130'.freeze
   MIN_SHOT_SIZE = 1.0
