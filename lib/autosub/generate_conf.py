@@ -5,39 +5,6 @@ import glob
 import os
 import sys
 import whisper
-#from autosub import *
-
-
-#def extract_transcripts(
-#    source_path,
-#    src_language=DEFAULT_SRC_LANGUAGE,
-#    api_key=None,
-#):
-#    audio_filename, audio_rate = extract_audio(source_path, rate=48000)
-#    regions = find_speech_regions(audio_filename)
-#
-#    converter = FLACConverter(source_path=audio_filename)
-#    recognizer = SpeechRecognizer(language=src_language,
-#                                  rate=audio_rate,
-#                                  retries=10,
-#                                  api_key=GOOGLE_SPEECH_API_KEY)
-#
-#    transcripts = []
-#    timed_subtitles = []
-#
-#    try:
-#        if regions:
-#            extracted_regions = []
-#            for i, extracted_region in enumerate(pool.imap(converter, regions)):
-#                extracted_regions.append(extracted_region)
-#
-#            for i, transcript in enumerate(pool.imap(recognizer, extracted_regions)):
-#                transcripts.append(transcript)
-#
-#        timed_subtitles = [(r, t) for r, t in zip(regions, transcripts) if t]
-#    finally:
-#        os.remove(audio_filename)
-#    return timed_subtitles
 
 
 def extract_transcripts(filename, model):
