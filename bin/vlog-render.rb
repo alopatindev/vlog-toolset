@@ -190,7 +190,7 @@ end
 def concat_videos(temp_videos, output_filename)
   print "rendering to #{output_filename}\n"
 
-  parts = temp_videos.map { |f| "file '#{f}'" }
+  parts = temp_videos.map { |f| "file 'file:#{f}'" }
                      .join "\n"
 
   # TODO: migrate async to aresample
@@ -199,7 +199,8 @@ def concat_videos(temp_videos, output_filename)
                        -safe 0 \
                        -protocol_whitelist file,pipe \
                        -i - \
-                       -vcodec copy \
+                       -c copy \
+                       -movflags '+faststart' -default_mode infer_no_subs -ignore_unknown \
                        -strict -2 \
                        -acodec flac \
                        #{output_filename}"
