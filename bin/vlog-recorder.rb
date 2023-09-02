@@ -235,7 +235,7 @@ class DevicesFacade
       output_filename = "#{camera_filename}_#{subclip_num}.processed.mp4"
       temp_filename = "#{camera_filename}_#{subclip_num}.cut.mp4"
 
-      system "#{FFMPEG} -ss #{start_position} -i #{camera_filename} -to #{end_position - start_position} -an -c copy #{temp_filename}"
+      system "#{FFMPEG} -ss #{start_position} -i #{camera_filename} -to #{end_position - start_position} -an -codec copy #{temp_filename}"
       FileUtils.mv temp_filename, output_filename, force: true
 
       output_filename
@@ -265,7 +265,7 @@ class DevicesFacade
       start_position, end_position = seg
       output_filename = "#{sync_sound_filename}_#{subclip_num}.flac"
 
-      ffmpeg_cut_args = "-ss #{start_position} -i #{sync_sound_filename} -to #{end_position - start_position} -c copy"
+      ffmpeg_cut_args = "-ss #{start_position} -i #{sync_sound_filename} -to #{end_position - start_position} -codec copy"
       ffmpeg_output_args = "-af '#{audio_filters.join(',')}' -acodec flac"
 
       temp_filename = "#{sync_sound_filename}_#{subclip_num}.cut.wav"

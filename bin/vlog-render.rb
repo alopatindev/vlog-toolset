@@ -160,7 +160,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
                              -i #{seg[:video_filename]} \
                              -to #{seg[:end_position] - seg[:start_position]} \
                              -strict -2 \
-                             -c copy #{temp_cut_output_filename} \
+                             -codec copy #{temp_cut_output_filename} \
                              && \
                  #{FFMPEG_NO_OVERWRITE} -threads 1 \
                              -i #{temp_cut_output_filename} \
@@ -199,10 +199,9 @@ def concat_videos(temp_videos, output_filename)
                        -safe 0 \
                        -protocol_whitelist file,pipe \
                        -i - \
-                       -c copy \
-                       -movflags '+faststart' -default_mode infer_no_subs -ignore_unknown \
+                       -codec copy \
+                       -movflags faststart \
                        -strict -2 \
-                       -acodec flac \
                        #{output_filename}"
 
   IO.popen(command, 'w') do |f|
