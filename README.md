@@ -8,18 +8,18 @@ I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automat
 
 ### Dependencies
 - GNU/Linux
-    - ruby (tested with 2.5.1)
-    - python3 (tested with 3.6.5)
-    - pip (tested with 9.0.1)
-    - ffmpeg (tested with 3.4.4)
+    - ruby (tested with 3.1.4)
+    - python3 (tested with 3.11.5)
+    - pip (tested with 23.2.1)
+    - ffmpeg (tested with 4.4.4)
     - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
-    - alsa-utils (tested with 1.1.2)
-    - mpv (tested with 0.27.2)
-    - android-tools (tested with 8.1.0_p1, adb version is 1.0.39)
+    - alsa-utils (tested with 1.2.9)
+    - mpv (tested with 0.36.0)
+    - android-tools (tested with 34.0.0, adb version is 1.0.41)
         - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
 
 - Android device
-    - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera))
+    - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera)) (tested with 1.51.1)
 
 ## vlog-recorder
 - records video
