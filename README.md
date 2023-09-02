@@ -47,7 +47,7 @@ Usage: vlog-recorder -p project_dir/ [other options]
     -s <arecord-args>,               Additional arecord arguments (default: " --device=default --format=dat"
         --sound-settings
     -A, --android-device <device-id> Android device id
-    -o, --opencamera-dir <dir>       Open Camera directory path on Android device (default: "/mnt/sdcard/DCIM/OpenCamera")
+    -o, --opencamera-dir <dir>       Open Camera directory path on Android device (default: "/storage/emulated/0/DCIM/OpenCamera")
     -b <true|false>,                 Set lowest brightness to save device power (default: false)
         --change-brightness
     -S, --speed <num>                Speed factor for player (default: 1.2)
@@ -87,7 +87,6 @@ Usage: vlog-render -p project_dir/ [other options]
     -S, --speed <num>                Speed factor (default: 1.2)
     -V, --video-filters <filters>    ffmpeg video filters (default: 'hqdn3d,hflip,vignette')
     -c, --cleanup <true|false>       Remove temporary files, instead of reusing them in future (default: false)
-    -l, --language <en|ru|...>       Language for voice recognition (default: 'en')
 
 ./bin/vlog-render -p ~/video/new-cool-video-project --preview false
 ```
@@ -144,6 +143,20 @@ Usage: vlog-play-segments [options] -i video.mp4
 - paths with spaces and weird characters are unsupported
 - cuts precision accuracy is pretty poor
     - better approach would be something like [roughcut](https://graphics.stanford.edu/papers/roughcut/)
+
+## Recommended OpenCamera Settings
+- ⋮
+    - Grid - Phi 3x3
+- ⚙️
+    - Camera preview
+        - Ghost image - Last photo taken
+    - Video settings…
+        - Video resolution - FullHD 1920x1080 (16:9 2.07 MP)
+        - Video format - **MPEG4 HEVC**
+        - Video picture profiles - TODO
+        - Video frame rate (approx) - 30
+    - Processing settings - Anti-banding - TODO
+    - Camera API - Camera2 API
 
 ## RIIR?
 - [adb](https://github.com/kpcyrd/forensic-adb/blob/736f7c43d116b6334af3c1d8c4a41f9ae06ff812/src/lib.rs#L754)
