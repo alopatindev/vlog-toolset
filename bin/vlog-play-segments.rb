@@ -85,8 +85,7 @@ def play_segments(options)
     ['--{', "--start=#{start_position}", "--end=#{end_position}", "--speed=#{clip_speed}", video_filename, '--}']
   end.flatten
 
-  # TODO: use MPV?
-  command = ['mpv', '--really-quiet', '--no-resume-playback', '--hr-seek=yes'] + mpv_args
+  command = MPV + ['--hr-seek=yes'] + mpv_args
   system command.shelljoin_wrapped
 end
 

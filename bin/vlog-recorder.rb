@@ -32,7 +32,6 @@ require 'optparse'
 # possible solution "driver=v4l2:width=720:height=576:norm=PAL:outfmt=uyvy"
 
 class DevicesFacade
-  MPV = ['mpv', '--no-terminal', '--fs', '--volume=130']
   MIN_SHOT_SIZE = 1.0
 
   def initialize(options, temp_dir, logger)
@@ -327,7 +326,7 @@ class DevicesFacade
                            .map { |f| File.basename(f) }
                            .index(last_clip_filename) || clips.length - 1
 
-    mpv_args = ["--speed=#{@speed}", '--no-resume-playback']
+    mpv_args = ['--fs', '--volume=130', "--speed=#{@speed}"]
     mpv_args += ['-vf=hflip'] if @mirror
     mpv_args += ["--playlist-start=#{position_in_playlist}", clips.join(' ')]
 

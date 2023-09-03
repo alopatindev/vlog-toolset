@@ -18,6 +18,8 @@ require 'shellwords_utils'
 FFMPEG = ['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error']
 FFMPEG_NO_OVERWRITE = ['ffmpeg', '-n', '-hide_banner', '-loglevel', 'panic']
 
+MPV = ['mpv', '--really-quiet', '--no-resume-playback']
+
 def get_duration(filename)
   command = ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1',
              filename]
