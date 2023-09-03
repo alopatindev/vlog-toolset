@@ -123,7 +123,7 @@ def merge_small_pauses(segments, min_pause_between_shots)
 end
 
 def process_and_split_videos(segments, options, output_dir, temp_dir)
-  video_codec = if is_nvenc_supported
+  video_codec = if is_hevc_nvenc_supported
                   'hevc_nvenc'
                 else
                   'libx265 -preset ultrafast -crf 18'
@@ -217,9 +217,9 @@ def compute_player_position(segments, options)
           .sum / clamp_speed(options[:speed])
 end
 
-def is_nvenc_supported
+def is_hevc_nvenc_supported
   if `#{FFMPEG} --help encoder=hevc_nvenc`.include? 'is not recognized'
-    print "ffmpeg doesn't support hevc_nvenc\n"
+    print "ffmpeg was built without hevc_nvenc support\n"
     false
   elsif (find_executable 'nvcc').nil?
     print "nvidia-cuda-toolkit is not installed\n"
