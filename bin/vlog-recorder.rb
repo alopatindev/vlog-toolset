@@ -184,7 +184,7 @@ class DevicesFacade
       output_filename = get_output_filename clip_num, subclip_num
       @logger.debug "save_clip: output_filename=#{output_filename}"
       command = FFMPEG + ['-i', processed_sound_filename, '-an', '-i', processed_video_filename, '-shortest',
-                          '-strict', '-2', '-codec', 'copy', output_filename]
+                          '-strict', '-2', '-codec', 'copy', '-movflags', 'faststart', output_filename]
       @logger.debug command
       system command.shelljoin_wrapped
 

@@ -170,6 +170,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         '-to', seg[:end_position] - seg[:start_position],
         '-strict', '-2',
         '-codec', 'copy',
+        '-movflags', 'faststart',
         temp_cut_output_filename
       ]
       system command.shelljoin_wrapped
@@ -182,6 +183,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         '-af', audio_filters,
         '-strict', '-2',
         '-acodec', 'flac',
+        '-movflags', 'faststart',
         output_filename
       ]
       system command.shelljoin_wrapped
