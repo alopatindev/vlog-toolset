@@ -86,7 +86,7 @@ def play_segments(options)
   end.flatten
 
   # TODO: use MPV?
-  command = ['mpv', '--really-quiet', '--hr-seek=yes'] + mpv_args
+  command = ['mpv', '--really-quiet', '--no-resume-playback', '--hr-seek=yes'] + mpv_args
   system command.shelljoin_wrapped
 end
 

@@ -366,6 +366,7 @@ print "average words per second = #{words_per_second}\n"
 if options[:preview]
   player_position = compute_player_position segments, options
   print "player_position = #{player_position}\n"
-  system ['mpv', '--really-quiet', "--start=#{player_position}", output_filename].shelljoin_wrapped
+  system ['mpv', '--really-quiet', '--no-resume-playback', "--start=#{player_position}",
+          output_filename].shelljoin_wrapped
   # TODO: use MPV?
 end
