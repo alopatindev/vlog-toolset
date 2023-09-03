@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
-require 'ffmpeg_utils'
+require 'media_utils'
 require 'numeric'
 require 'shellwords_utils'
 
@@ -366,5 +366,6 @@ print "average words per second = #{words_per_second}\n"
 if options[:preview]
   player_position = compute_player_position segments, options
   print "player_position = #{player_position}\n"
-  system MPV + ["--start=#{player_position}", output_filename].shelljoin_wrapped
+  command = MPV + ["--start=#{player_position}", output_filename]
+  system command.shelljoin_wrapped
 end
