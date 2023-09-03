@@ -397,7 +397,7 @@ def parse_options!(options, args)
     end
     opts.on('-s', '--sound-settings <arecord-args>',
             "Additional arecord arguments (default: \"#{options[:arecord_args]}\"") do |s|
-      options[:arecord_args] = s
+      options[:arecord_args] += " #{s}"
     end
     opts.on('-A', '--android-device <device-id>', 'Android device id') { |a| options[:android_id] = a }
     opts.on('-o', '--opencamera-dir <dir>',
