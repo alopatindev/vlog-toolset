@@ -87,9 +87,10 @@ def play_segments(options)
   system "mpv --really-quiet --hr-seek=yes #{mpv_args}"
 end
 
-def parse_options!(options)
-  OptionParser.new do |opts|
-    opts.banner = 'Usage: vlog-play-segments [options] -i video.mp4'
+def parse_options!(options, args)
+  parser = OptionParser.new do |opts|
+    opts.set_banner('Usage: vlog-play-segments [options] -i video.mp4')
+    opts.set_summary_indent('  ')
     opts.on('-i', '--i <filename>', 'Video to play') { |i| options[:video] = i }
     opts.on('-S', '--speed <num>', "Speed factor (default: #{'%.1f' % options[:speed]})") do |s|
       options[:speed] = s.to_f
@@ -110,9 +111,14 @@ def parse_options!(options)
             "How aggressively to filter out non-speech (default: #{options[:aggressiveness]})") do |a|
       options[:aggressiveness] = a.to_i
     end
-  end.parse!
+  end
 
-  raise OptionParser::MissingArgument if options[:video].nil?
+  parser.parse!(args)
+
+  return unless args.empty? || options[:video].nil?
+
+  print parser.help
+  exit 1
 end
 
 options = {
@@ -123,5 +129,5 @@ options = {
   aggressiveness: 3
 }
 
-parse_options!(options)
+parse_options!(options, ARGV)
 play_segments(options)

@@ -271,9 +271,9 @@ def generate_config(options)
   system script_filename, options[:project_dir]
 end
 
-def parse_options!(options)
-  OptionParser.new do |opts|
-    opts.banner = 'Usage: vlog-render -p project_dir/ [other options]'
+def parse_options!(options, args)
+  parser = OptionParser.new do |opts|
+    opts.set_banner('Usage: vlog-render -p project_dir/ [other options]')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-L', '--line <num>',
             "Line in #{CONFIG_FILENAME} file, to play by given position (default: #{options[:line_in_file]})") do |l|
@@ -292,9 +292,14 @@ def parse_options!(options)
             "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
       options[:cleanup] = c == 'true'
     end
-  end.parse!
+  end
 
-  raise OptionParser::MissingArgument if options[:project_dir].nil?
+  parser.parse!(args)
+
+  return unless args.empty? || options[:project_dir].nil?
+
+  print parser.help
+  exit 1
 end
 
 test_merge_small_pauses
@@ -310,7 +315,7 @@ options = {
   cleanup: false
 }
 
-parse_options!(options)
+parse_options!(options, ARGV)
 
 generate_config(options)
 

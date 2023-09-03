@@ -375,9 +375,9 @@ def run_main_loop(devices)
   end
 end
 
-def parse_options!(options)
-  OptionParser.new do |opts|
-    opts.banner = 'Usage: vlog-recorder -p project_dir/ [other options]'
+def parse_options!(options, args)
+  parser = OptionParser.new do |opts|
+    opts.set_banner('Usage: vlog-recorder -p project_dir/ [other options]')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-t', '--trim <duration>',
             "Trim duration of beginning and ending of each clip (default: #{'%.1f' % options[:trim_duration]})") do |t|
@@ -413,9 +413,14 @@ def parse_options!(options)
     opts.on('-d', '--debug <true|false>', "Show debug messages (default: #{options[:debug]})") do |d|
       options[:debug] = d == 'true'
     end
-  end.parse!
+  end
 
-  raise OptionParser::MissingArgument if options[:project_dir].nil?
+  parser.parse!(args)
+
+  return unless args.empty? || options[:project_dir].nil?
+
+  print parser.help
+  exit 1
 end
 
 options = {
@@ -430,7 +435,7 @@ options = {
   aggressiveness: 1,
   debug: false
 }
-parse_options!(options)
+parse_options!(options, ARGV)
 
 begin
   project_dir = options[:project_dir]
