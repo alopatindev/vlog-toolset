@@ -29,6 +29,7 @@ class Phone
     @logger = logger
     @opencamera_dir = options[:opencamera_dir]
 
+    # TODO: shellwords?
     android_id = options[:android_id]
     @adb_env = android_id.empty? ? '' : "ANDROID_SERIAL='#{android_id}'"
     @adb = "#{@adb_env} adb"

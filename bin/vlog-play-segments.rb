@@ -16,6 +16,7 @@
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
 require 'ffmpeg_utils'
+require 'shellwords_utils'
 require 'voice/detect_voice'
 
 require 'fileutils'
@@ -81,10 +82,12 @@ def play_segments(options)
   puts "playing...\n"
   mpv_args = segments.map.with_index do |(start_position, end_position), i|
     clip_speed = i.odd? && mode == 'both' ? (speed * 4.0) : speed
-    "--{ --start=#{start_position} --end=#{end_position} --speed=#{clip_speed} #{video_filename} --}"
-  end.join(' ')
+    ['--{', "--start=#{start_position}", "--end=#{end_position}", "--speed=#{clip_speed}", video_filename, '--}']
+  end.flatten
 
-  system "mpv --really-quiet --hr-seek=yes #{mpv_args}"
+  # TODO: use MPV?
+  command = ['mpv', '--really-quiet', '--hr-seek=yes'] + mpv_args
+  system command.shelljoin_wrapped
 end
 
 def parse_options!(options, args)
@@ -115,7 +118,7 @@ def parse_options!(options, args)
 
   parser.parse!(args)
 
-  return unless args.empty? || options[:video].nil?
+  return unless options[:video].nil?
 
   print parser.help
   exit 1

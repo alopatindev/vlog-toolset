@@ -17,6 +17,7 @@
 
 require 'ffmpeg_utils'
 require 'numeric'
+require 'shellwords_utils'
 
 require 'concurrent'
 require 'fileutils'
@@ -149,28 +150,41 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
 
     thread_pool.post do
       audio_filters = "atempo=#{options[:speed]}"
-      video_filters = "#{options[:video_filters]}, fps=#{fps}, setpts=(1/#{options[:speed]})*PTS"
+      video_filters = [
+        options[:video_filters],
+        "fps=#{fps}",
+        "setpts=(1/#{options[:speed]})*PTS"
+      ].join(',')
       if preview
-        video_filters = "scale=#{PREVIEW_WIDTH}:-1, #{video_filters}, drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename} #{line_in_config}"
+        video_filters = [
+          "scale=#{PREVIEW_WIDTH}:-1",
+          "#{video_filters}",
+          "drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename}/L#{line_in_config}"
+        ].join(',')
       end
 
-      command = "#{FFMPEG_NO_OVERWRITE} -threads #{Concurrent.processor_count} \
-                             -ss #{seg[:start_position]} \
-                             -i #{seg[:video_filename]} \
-                             -to #{seg[:end_position] - seg[:start_position]} \
-                             -strict -2 \
-                             -codec copy #{temp_cut_output_filename} \
-                             && \
-                 #{FFMPEG_NO_OVERWRITE} -threads #{Concurrent.processor_count} \
-                             -i #{temp_cut_output_filename} \
-                             -vcodec #{video_codec} \
-                             -vf '#{video_filters}' \
-                             -af '#{audio_filters}' \
-                             -strict -2 \
-                             -acodec flac \
-                             #{output_filename}"
+      command = FFMPEG_NO_OVERWRITE + [
+        '-threads', Concurrent.processor_count,
+        '-ss', seg[:start_position],
+        '-i', seg[:video_filename],
+        '-to', seg[:end_position] - seg[:start_position],
+        '-strict', '-2',
+        '-codec', 'copy',
+        temp_cut_output_filename
+      ]
+      system command.shelljoin_wrapped
 
-      system command
+      command = FFMPEG_NO_OVERWRITE + [
+        '-threads', Concurrent.processor_count,
+        '-i', temp_cut_output_filename,
+        '-vcodec', video_codec,
+        '-vf', video_filters,
+        '-af', audio_filters,
+        '-strict', '-2',
+        '-acodec', 'flac',
+        output_filename
+      ]
+      system command.shelljoin_wrapped
 
       FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
     rescue StandardError => e
@@ -193,17 +207,19 @@ def concat_videos(temp_videos, output_filename)
                      .join "\n"
 
   # TODO: migrate async to aresample
-  command = "#{FFMPEG} -async 1 \
-                       -f concat \
-                       -safe 0 \
-                       -protocol_whitelist file,pipe \
-                       -i - \
-                       -codec copy \
-                       -movflags faststart \
-                       -strict -2 \
-                       #{output_filename}"
+  command = FFMPEG + [
+    '-async', 1,
+    '-f', 'concat',
+    '-safe', 0,
+    '-protocol_whitelist', 'file,pipe',
+    '-i', '-',
+    '-codec', 'copy',
+    '-movflags', 'faststart',
+    '-strict', '-2',
+    output_filename
+  ]
 
-  IO.popen(command, 'w') do |f|
+  IO.popen(command.shelljoin_wrapped, 'w') do |f|
     f.puts parts
     f.close_write
   end
@@ -218,7 +234,8 @@ def compute_player_position(segments, options)
 end
 
 def is_hevc_nvenc_supported
-  if `#{FFMPEG} --help encoder=hevc_nvenc`.include? 'is not recognized'
+  command = FFMPEG + ['--help', 'encoder=hevc_nvenc']
+  if `#{command.shelljoin_wrapped}`.include? 'is not recognized'
     print "ffmpeg was built without hevc_nvenc support\n"
     false
   elsif (find_executable 'nvcc').nil?
@@ -274,6 +291,7 @@ end
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
     opts.set_banner('Usage: vlog-render -p project_dir/ [other options]')
+    opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-L', '--line <num>',
             "Line in #{CONFIG_FILENAME} file, to play by given position (default: #{options[:line_in_file]})") do |l|
@@ -296,7 +314,7 @@ def parse_options!(options, args)
 
   parser.parse!(args)
 
-  return unless args.empty? || options[:project_dir].nil?
+  return unless options[:project_dir].nil?
 
   print parser.help
   exit 1
@@ -348,5 +366,6 @@ print "average words per second = #{words_per_second}\n"
 if options[:preview]
   player_position = compute_player_position segments, options
   print "player_position = #{player_position}\n"
-  system "mpv --really-quiet --start=#{player_position} #{output_filename}"
+  system ['mpv', '--really-quiet', "--start=#{player_position}", output_filename].shelljoin_wrapped
+  # TODO: use MPV?
 end

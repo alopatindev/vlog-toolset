@@ -13,16 +13,21 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
-FFMPEG = 'ffmpeg -y -hide_banner -loglevel error '.freeze
-FFMPEG_NO_OVERWRITE = 'ffmpeg -n -hide_banner -loglevel panic'.freeze
+require 'shellwords_utils'
+
+FFMPEG = ['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error']
+FFMPEG_NO_OVERWRITE = ['ffmpeg', '-n', '-hide_banner', '-loglevel', 'panic']
 
 def get_duration(filename)
-  `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 #{filename}`.to_f
+  command = ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1',
+             filename]
+  `#{command.shelljoin_wrapped}`.to_f
 end
 
 def prepare_for_vad(filename)
   output_filename = "#{filename}.vad.wav"
-  system "#{FFMPEG} -i #{filename} -af 'pan=mono|c0=c0' -ar 48000 -vn #{output_filename}"
+  command = FFMPEG + ['-i', filename, '-af', 'pan=mono|c0=c0', '-ar', 48_000, '-vn', output_filename]
+  system "#{command.shelljoin_wrapped}"
   output_filename
 end
 

@@ -14,6 +14,7 @@
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
 require 'numeric'
+require 'shellwords_utils'
 
 require 'fileutils'
 require 'io/console'
@@ -23,16 +24,16 @@ class Microphone
     @logger = logger
     @temp_dir = temp_dir
 
-    @arecord_command = "exec arecord --quiet --nonblock #{arecord_args}"
+    @arecord_command = ['exec', 'arecord', '--quiet', '--nonblock'] + arecord_args.shellsplit
     @arecord_pipe = nil
   end
 
   def toggle_recording(clip_num)
     sound_filename = unchecked_filename(clip_num)
     if @arecord_pipe.nil?
-      command = "#{@arecord_command} #{sound_filename} >/dev/null 2>&1"
+      command = @arecord_command + [sound_filename]
       @logger.debug command
-      @arecord_pipe = IO.popen command
+      @arecord_pipe = IO.popen "#{command.shelljoin_wrapped} >/dev/null 2>&1"
     else
       @logger.debug "kill #{@arecord_pipe.pid} clip_num=#{clip_num}"
       Process.kill 'SIGTERM', @arecord_pipe.pid

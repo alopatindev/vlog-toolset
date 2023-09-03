@@ -19,6 +19,7 @@ require 'ffmpeg_utils'
 require 'microphone'
 require 'numeric'
 require 'phone'
+require 'shellwords_utils'
 require 'voice/detect_voice'
 
 require 'concurrent'
@@ -31,7 +32,7 @@ require 'optparse'
 # possible solution "driver=v4l2:width=720:height=576:norm=PAL:outfmt=uyvy"
 
 class DevicesFacade
-  MPV = 'mpv --no-terminal --fs --volume=130'.freeze
+  MPV = ['mpv', '--no-terminal', '--fs', '--volume=130']
   MIN_SHOT_SIZE = 1.0
 
   def initialize(options, temp_dir, logger)
@@ -183,9 +184,10 @@ class DevicesFacade
       processed_sound_filename, processed_video_filename = f
       output_filename = get_output_filename clip_num, subclip_num
       @logger.debug "save_clip: output_filename=#{output_filename}"
-      command = "#{FFMPEG} -i #{processed_sound_filename} -an -i #{processed_video_filename} -shortest -strict -2 -codec copy #{output_filename}"
+      command = FFMPEG + ['-i', processed_sound_filename, '-an', '-i', processed_video_filename, '-shortest',
+                          '-strict', '-2', '-codec', 'copy', output_filename]
       @logger.debug command
-      system command
+      system command.shelljoin_wrapped
 
       output_filename
     end
@@ -233,7 +235,9 @@ class DevicesFacade
       output_filename = "#{camera_filename}_#{subclip_num}.processed.mp4"
       temp_filename = "#{camera_filename}_#{subclip_num}.cut.mp4"
 
-      system "#{FFMPEG} -ss #{start_position} -i #{camera_filename} -to #{end_position - start_position} -an -codec copy #{temp_filename}"
+      command = FFMPEG + ['-ss', start_position, '-i', camera_filename, '-to', end_position - start_position, '-an',
+                          '-codec', 'copy', temp_filename]
+      system command.shelljoin_wrapped
       FileUtils.mv temp_filename, output_filename, force: true
 
       output_filename
@@ -247,7 +251,8 @@ class DevicesFacade
   def synchronize_sound(camera_filename, sound_filename)
     output_filename = "#{sound_filename}.sync.wav"
 
-    sync_offset = `sync-audio-tracks.sh #{sound_filename} #{camera_filename} #{output_filename}`
+    command = ['sync-audio-tracks.sh', sound_filename, camera_filename, output_filename]
+    sync_offset = `#{command.shelljoin_wrapped}`
                   .split("\n")
                   .select { |line| line.start_with? 'offset is' }
                   .map { |line| line.sub(/^offset is /, '').sub(/ seconds$/, '').to_f }
@@ -263,14 +268,20 @@ class DevicesFacade
       start_position, end_position = seg
       output_filename = "#{sync_sound_filename}_#{subclip_num}.flac"
 
-      ffmpeg_cut_args = "-ss #{start_position} -i #{sync_sound_filename} -to #{end_position - start_position} -codec copy"
-      ffmpeg_output_args = "-af '#{audio_filters.join(',')}' -acodec flac"
+      ffmpeg_cut_args = ['-ss', start_position, '-i', sync_sound_filename, '-to', end_position - start_position,
+                         '-codec', 'copy']
+      ffmpeg_output_args = ['-af', "#{audio_filters.join(',')}", '-acodec', 'flac']
 
       temp_filename = "#{sync_sound_filename}_#{subclip_num}.cut.wav"
-      command = "#{FFMPEG} #{ffmpeg_cut_args} #{temp_filename} && \
-        #{FFMPEG} -i #{temp_filename} #{ffmpeg_output_args} #{output_filename}"
+
+      command = FFMPEG + ffmpeg_cut_args + [temp_filename]
       @logger.debug command
-      system command, out: File::NULL
+      system command.shelljoin_wrapped, out: File::NULL
+
+      command = FFMPEG + ['-i', temp_filename] + ffmpeg_output_args + [output_filename]
+      @logger.debug command
+      system command.shelljoin_wrapped, out: File::NULL
+
       remove_files temp_filename
 
       raise "Failed to process #{output_filename}" unless File.file?(output_filename)
@@ -316,12 +327,13 @@ class DevicesFacade
                            .map { |f| File.basename(f) }
                            .index(last_clip_filename) || clips.length - 1
 
-    mpv_args = "--speed=#{@speed} --no-resume-playback"
-    mpv_args += ' -vf=hflip' if @mirror
+    mpv_args = ["--speed=#{@speed}", '--no-resume-playback']
+    mpv_args += ['-vf=hflip'] if @mirror
+    mpv_args += ["--playlist-start=#{position_in_playlist}", clips.join(' ')]
 
-    command = "#{MPV} #{mpv_args} --playlist-start=#{position_in_playlist} #{clips.join(' ')}"
+    command = MPV + mpv_args
     @logger.debug command
-    system command
+    system command.shelljoin_wrapped
   end
 end
 
@@ -378,6 +390,7 @@ end
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
     opts.set_banner('Usage: vlog-recorder -p project_dir/ [other options]')
+    opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-t', '--trim <duration>',
             "Trim duration of beginning and ending of each clip (default: #{'%.1f' % options[:trim_duration]})") do |t|
@@ -417,7 +430,7 @@ def parse_options!(options, args)
 
   parser.parse!(args)
 
-  return unless args.empty? || options[:project_dir].nil?
+  return unless options[:project_dir].nil?
 
   print parser.help
   exit 1

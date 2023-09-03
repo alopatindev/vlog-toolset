@@ -13,7 +13,9 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
-require 'ffmpeg_utils.rb'
+require 'ffmpeg_utils'
+require 'shellwords_utils'
+
 require 'fileutils'
 
 def detect_voice(sound_filename, min_shot_size, min_pause_between_shots, agressiveness)
@@ -24,16 +26,15 @@ def detect_voice(sound_filename, min_shot_size, min_pause_between_shots, agressi
   script_filename = File.join(__dir__, 'detect_voice.py')
 
   sound_with_single_channel_filename = prepare_for_vad(sound_filename)
-  output = `#{script_filename} #{sound_with_single_channel_filename} #{agressiveness} #{min_shot_size} #{min_pause_between_shots}`
+  command = [script_filename, sound_with_single_channel_filename, agressiveness, min_shot_size, min_pause_between_shots]
+  output = `#{command.shelljoin_wrapped}`
 
   FileUtils.rm_f sound_with_single_channel_filename
 
-  segments = output
-             .split("\n")
-             .map { |line| line.split(' ') }
-             .map { |r| r.map(&:to_f) }
-             .select { |r| r.length == 2 }
-             .map { |start_position, end_position| [start_position - start_correction, end_position + end_correction] }
-
-  segments
+  output
+    .split("\n")
+    .map { |line| line.split(' ') }
+    .map { |r| r.map(&:to_f) }
+    .select { |r| r.length == 2 }
+    .map { |start_position, end_position| [start_position - start_correction, end_position + end_correction] }
 end
