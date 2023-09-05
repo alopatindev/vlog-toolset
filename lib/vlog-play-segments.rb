@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
+# TODO: deprecated, might be removed in future
+
 require 'media_utils'
 require 'shellwords_utils'
 require 'voice/detect_voice'
