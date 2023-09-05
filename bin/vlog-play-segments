@@ -3,4 +3,4 @@
 BINDIR="$(dirname $0)"
 export RUBYOPT="-I${BINDIR}/../lib"
 
-ruby bin/vlog-play-segments.rb "$@"
+ruby lib/vlog-play-segments.rb "$@"
