@@ -163,6 +163,8 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         ].join(',')
       end
 
+      # might be uneeded step anymore,
+      # but still might be useful for NLE video editors
       command = FFMPEG_NO_OVERWRITE + [
         '-threads', Concurrent.processor_count,
         '-ss', seg[:start_position],
