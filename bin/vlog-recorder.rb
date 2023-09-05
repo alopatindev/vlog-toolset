@@ -396,7 +396,7 @@ def parse_options!(options, args)
       options[:trim_duration] = t.to_f
     end
     opts.on('-s', '--sound-settings <arecord-args>',
-            "Additional arecord arguments (default: \"#{options[:arecord_args]}\"") do |s|
+            "Additional arecord arguments (default: \"#{options[:arecord_args]}\")") do |s|
       options[:arecord_args] += " #{s}"
     end
     opts.on('-A', '--android-device <device-id>', 'Android device id') { |a| options[:android_id] = a }
