@@ -147,8 +147,6 @@ Usage: vlog-play-segments [options] -i video.mp4
 - ⋮
     - Grid - Phi 3x3
 - ⚙️
-    - Camera preview
-        - Ghost image - Last photo taken
     - Video settings…
         - Video resolution - FullHD 1920x1080 (16:9 2.07 MP)
         - Video format - **MPEG4 HEVC**
