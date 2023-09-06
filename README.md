@@ -1,7 +1,7 @@
 # vlog-toolset
 Designed to record vlogs with classical jump cuts
 using camera of Android-based device and microphone of GNU/Linux machine.
-I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automatic-jump-cuts-using-open-source-and-coding/) with Pitivi for my [YouTube channel](https://www.youtube.com/channel/UCjNAnQpPQydNLTHcVz0s44A).
+I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automatic-jump-cuts-using-open-source-and-coding/) with Pitivi for my [YouTube channel](https://www.youtube.com/@codonaft).
 
 ## Installation
 `git clone git@github.com:alopatindev/vlog-toolset.git && cd vlog-toolset && ./configure`
@@ -136,7 +136,7 @@ Usage: vlog-play-segments [options] -i video.mp4
 
 ## Known issues/limitations
 - it's just a dumb dirty PoC, it's not necessarily gonna work on your hardware
-    - I'm using ~~Meizu MX4~~ Xiaomi Mi 8
+    - I use ~~Meizu MX4~~ Xiaomi Mi 8
         - front camera faces at me
         - autorotation is enabled
         - the device is at landscape position (counterclockwise from normal position)
@@ -157,7 +157,7 @@ Usage: vlog-play-segments [options] -i video.mp4
     - Processing settings - Anti-banding - TODO
     - Camera API - Camera2 API
 
-## RIIR?
+## TODO: RIIR?
 - [adb](https://github.com/kpcyrd/forensic-adb/blob/736f7c43d116b6334af3c1d8c4a41f9ae06ff812/src/lib.rs#L754)
     - `pull` performance comparing `android-tools`? for USB 2 and 3
 
