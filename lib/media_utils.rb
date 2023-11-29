@@ -20,7 +20,7 @@ FFMPEG_NO_OVERWRITE = ['ffmpeg', '-n', '-hide_banner', '-loglevel', 'panic']
 
 EXTRACT_LEFT_CHANNEL_FILTER = 'pan=mono|c0=c0' # TODO: https://trac.ffmpeg.org/wiki/AudioChannelManipulation#Chooseaspecificchannel
 
-MPV = ['mpv', '--really-quiet', '--no-resume-playback']
+MPV = ['mpv', '--no-config', '--really-quiet', '--no-resume-playback']
 
 def get_duration(filename)
   command = ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1',
