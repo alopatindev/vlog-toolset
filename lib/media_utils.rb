@@ -30,7 +30,7 @@ end
 
 def prepare_for_vad(filename)
   output_filename = "#{filename}.vad.wav"
-  command = FFMPEG + ['-i', filename, '-af', EXTRACT_LEFT_CHANNEL_FILTER, '-ar', 48_000, '-vn', output_filename] # TODO: why 48 kHz?
+  command = FFMPEG + ['-i', filename, '-af', EXTRACT_LEFT_CHANNEL_FILTER, '-ar', 16_000, '-vn', output_filename]
   system "#{command.shelljoin_wrapped}"
   output_filename
 end
