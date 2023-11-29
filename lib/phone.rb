@@ -205,7 +205,7 @@ class Phone
                          .first
                          .to_i
     level_sign = level_value <= 20 ? '🪫' : '🔋'
-    level = "#{level_sign} #{level_value}"
+    level = "#{level_sign}#{level_value}"
 
     temperature = dumpsys.select { |line| line.include? 'temperature: ' }
                          .map { |line| line.gsub(/.*: /, '').to_i / 10 }
