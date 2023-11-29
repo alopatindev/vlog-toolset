@@ -41,7 +41,6 @@ class DevicesFacade
     @min_pause_between_shots = options[:min_pause_between_shots]
     @aggressiveness = options[:aggressiveness]
     @speed = clamp_speed(options[:speed])
-    @mirror = options[:mirror] # TODO: remove, leave mpv args?
     @mpv_args = options[:mpv_args]
     @logger = logger
 
@@ -327,10 +326,7 @@ class DevicesFacade
                            .map { |f| File.basename(f) }
                            .index(last_clip_filename) || clips.length - 1
 
-    mpv_args = @mpv_args.split(' ')
-    mpv_args += ['--fs', '--volume=130', "--speed=#{@speed}"]
-    mpv_args += ['-vf=hflip'] if @mirror
-    mpv_args += ["--playlist-start=#{position_in_playlist}", clips.join(' ')]
+    mpv_args = @mpv_args.split(' ') + ["--speed=#{@speed}", "--playlist-start=#{position_in_playlist}", clips.join(' ')]
 
     command = MPV + mpv_args
     @logger.debug command
@@ -413,11 +409,8 @@ def parse_options!(options, args)
     opts.on('-S', '--speed <num>', "Speed factor for player (default: #{'%.1f' % options[:speed]})") do |s|
       options[:speed] = s.to_f
     end
-    opts.on('-m', '--mirror <true|false>', "Enable mirror effect for player (default: #{options[:mirror]})") do |m|
-      options[:mirror] = m == 'true'
-    end
     opts.on('-m', '--mpv-args <mpv-args>', "Additional mpv arguments (default: #{options[:mpv_args]})") do |s|
-      options[:mpv_args] = s # TODO: += just as in arecord args?
+      options[:mpv_args] = s
     end
     opts.on('-P', '--pause-between-shots <seconds>',
             "Minimum pause between shots for auto trimming (default: #{'%.1f' % options[:min_pause_between_shots]})") do |p|
@@ -447,8 +440,7 @@ options = {
   opencamera_dir: '/storage/emulated/0/DCIM/OpenCamera',
   change_brightness: false,
   speed: 1.2,
-  mirror: true,
-  mpv_args: '--no-config --volume-max=300',
+  mpv_args: '--no-config --volume-max=300 --vf=hflip --fs --volume=130',
   min_pause_between_shots: 2.0,
   aggressiveness: 0.4,
   debug: false

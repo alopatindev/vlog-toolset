@@ -51,10 +51,10 @@ Usage: vlog-recorder -p project_dir/ [other options]
   -b <true|false>,                 Set lowest brightness to save device power (default: false)
       --change-brightness
   -S, --speed <num>                Speed factor for player (default: 1.2)
-  -m, --mirror <true|false>        Enable mirror effect for player (default: true)
+  -m, --mpv-args <mpv-args>        Additional mpv arguments (default: --no-config --volume-max=300 --vf=hflip --fs --volume=130)
   -P <seconds>,                    Minimum pause between shots for auto trimming (default: 2.0)
       --pause-between-shots
-  -a, --aggressiveness <0..3>      How aggressively to filter out non-speech (default: 1)
+  -a, --aggressiveness <0..1>      How aggressively to filter out non-speech (default: 0.4)
   -d, --debug <true|false>         Show debug messages (default: false)
 
 ./bin/vlog-recorder -p ~/video/new-cool-video-project
