@@ -305,8 +305,8 @@ class DevicesFacade
     size = 80
     if text.nil?
       recording = @recording ? 'REC' : 'stopped'
-      battery_level, battery_temperature = @phone.get_battery_info
-      text = "[ #{recording} ] [ battery: #{battery_level}% / #{battery_temperature}°C ]"
+      battery_level, battery_temperature, free_storage = @phone.get_system_info
+      text = "[ #{recording} ] [ battery: #{battery_level}% / #{battery_temperature}°C ] [ free storage: #{free_storage} ]"
     end
     postfix = ' ' * (size - text.length)
     print "#{text}#{postfix}\r"

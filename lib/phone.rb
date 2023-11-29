@@ -32,7 +32,7 @@ class Phone
     android_id = options[:android_id]
     @adb_env = android_id.empty? ? '' : "ANDROID_SERIAL='#{android_id}'"
     @adb = "#{@adb_env} adb"
-    @adb_shell = "#{@adb} shell"
+    @adb_shell = "#{@adb} shell --"
 
     @clip_num_to_filename = {}
     @filenames = Set.new
@@ -197,15 +197,18 @@ class Phone
     set_brightness @initial_brightness
   end
 
-  def get_battery_info
+  def get_system_info
     dumpsys = adb_shell('dumpsys battery').split("\n")
+
     level = dumpsys.select { |line| line.include? 'level: ' }
                    .map { |line| line.gsub(/.*: /, '') }
                    .first
     temperature = dumpsys.select { |line| line.include? 'temperature: ' }
                          .map { |line| line.gsub(/.*: /, '').to_i / 10 }
                          .first
-    [level, temperature]
+
+    free_storage = adb_shell("df -h #{@opencamera_dir} | tail -n1 | awk '{print $3}'").strip
+    [level, temperature, free_storage]
   end
 
   def adb_shell(args)
