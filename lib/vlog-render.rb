@@ -293,6 +293,7 @@ def generate_config(options)
 end
 
 def parse_options!(options, args)
+  # TODO: add -l --language <en|ru|...|auto> option?
   parser = OptionParser.new do |opts|
     opts.set_banner('Usage: vlog-render -p project_dir/ [other options]')
     opts.set_summary_indent('  ')

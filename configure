@@ -20,7 +20,10 @@ echo "Installing dependencies..."
 set -euo pipefail
 cd "$(dirname $0)"
 
+# TODO: add versions
+
 pip3 install --user openai-whisper
+#pip3 install --user faster-whisper==0.10.0
 
 pip3 install --user --break-system-packages onnxruntime torchaudio
 
@@ -29,7 +32,7 @@ pip3 install --user --break-system-packages onnxruntime torchaudio
 #pip3 uninstall --break-system-packages torch
 #pip3 install --user --break-system-packages torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
 
-# TODO: pip3 install --user --break-system-packages numpy==1.24
+# TODO: pip3 install --user --break-system-packages numpy==1.24 # TODO: whisper requires old numpy
 
 # TODO: load base module once, to download it
 

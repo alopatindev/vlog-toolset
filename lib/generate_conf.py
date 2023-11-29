@@ -40,9 +40,6 @@ if __name__ == '__main__':
     project_dir = sys.argv[1]
     output = project_dir + '/render.conf'
 
-    #concurrency = 32
-    #pool = multiprocessing.Pool(concurrency)
-
     video_filenames = glob.glob(project_dir + '/0*.mp4')
     video_filenames.sort()
 
@@ -63,6 +60,7 @@ if __name__ == '__main__':
         video_filenames = video_filenames[skip_lines:]
 
     n = len(video_filenames)
+    speed = '1.00'
 
     for i, filename in enumerate(video_filenames):
         num = i + 1
@@ -70,17 +68,13 @@ if __name__ == '__main__':
         print('processing (%d/%d) (%.1f%%) %s' % (num, n, progress, filename))
         try:
             for (start, end), text in extract_transcripts(filename, model):
-                line = '\t'.join([os.path.basename(filename), '1.0', str(start), str(end), text]) + '\n'
+                line = '\t'.join([os.path.basename(filename), speed, str(start), str(end), text]) + '\n'
                 f.write(line)
         except Exception as e:
             print('failed to process ' + filename)
             print(e)
 
     f.close()
-
-    #print('terminating the pool')
-    #pool.terminate()
-    #pool.join()
 
     print('done')
     print(output)
