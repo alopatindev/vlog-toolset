@@ -325,7 +325,7 @@ class DevicesFacade
                            .map { |f| File.basename(f) }
                            .index(last_clip_filename) || clips.length - 1
 
-    mpv_args = @mpv_args.split(' ') + ["--playlist-start=#{position_in_playlist}", clips.join(' ')]
+    mpv_args = @mpv_args.shellsplit + ["--playlist-start=#{position_in_playlist}", clips.join(' ')]
 
     command = MPV + mpv_args
     @logger.debug command
@@ -435,7 +435,7 @@ options = {
   android_id: '',
   opencamera_dir: '/storage/emulated/0/DCIM/OpenCamera',
   change_brightness: false,
-  mpv_args: '--no-config --fs --vf=hflip --volume-max=300 --volume=130 --af=scaletempo2 --speed=1.2',
+  mpv_args: '--fs --vf=hflip --volume-max=300 --volume=130 --speed=1.2',
   min_pause_between_shots: 2.0,
   aggressiveness: 0.4,
   debug: false
