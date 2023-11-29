@@ -40,7 +40,6 @@ class DevicesFacade
     @trim_duration = options[:trim_duration]
     @min_pause_between_shots = options[:min_pause_between_shots]
     @aggressiveness = options[:aggressiveness]
-    @speed = clamp_speed(options[:speed])
     @mpv_args = options[:mpv_args]
     @logger = logger
 
@@ -326,7 +325,7 @@ class DevicesFacade
                            .map { |f| File.basename(f) }
                            .index(last_clip_filename) || clips.length - 1
 
-    mpv_args = @mpv_args.split(' ') + ["--speed=#{@speed}", "--playlist-start=#{position_in_playlist}", clips.join(' ')]
+    mpv_args = @mpv_args.split(' ') + ["--playlist-start=#{position_in_playlist}", clips.join(' ')]
 
     command = MPV + mpv_args
     @logger.debug command
@@ -406,9 +405,6 @@ def parse_options!(options, args)
             "Set lowest brightness to save device power (default: #{options[:change_brightness]})") do |b|
       options[:change_brightness] = b == 'true'
     end
-    opts.on('-S', '--speed <num>', "Speed factor for player (default: #{'%.1f' % options[:speed]})") do |s|
-      options[:speed] = s.to_f
-    end
     opts.on('-m', '--mpv-args <mpv-args>', "Additional mpv arguments (default: #{options[:mpv_args]})") do |s|
       options[:mpv_args] = s
     end
@@ -439,8 +435,7 @@ options = {
   android_id: '',
   opencamera_dir: '/storage/emulated/0/DCIM/OpenCamera',
   change_brightness: false,
-  speed: 1.2,
-  mpv_args: '--no-config --volume-max=300 --vf=hflip --fs --volume=130',
+  mpv_args: '--no-config --fs --vf=hflip --volume-max=300 --volume=130 --af=scaletempo2 --speed=1.2',
   min_pause_between_shots: 2.0,
   aggressiveness: 0.4,
   debug: false
