@@ -304,9 +304,9 @@ class DevicesFacade
   def show_status(text)
     size = 80
     if text.nil?
-      recording = @recording ? 'REC' : 'stopped'
+      recording = @recording ? '🔴' : '⏹️'
       battery_level, battery_temperature, free_storage = @phone.get_system_info
-      text = "[ #{recording} ] [ battery: #{battery_level}% / #{battery_temperature}°C ] [ free storage: #{free_storage} ]"
+      text = "[ #{recording} ] [ phone | battery: #{battery_level}% / #{battery_temperature}°C | storage: #{free_storage} ]"
     end
     postfix = ' ' * (size - text.length)
     print "#{text}#{postfix}\r"

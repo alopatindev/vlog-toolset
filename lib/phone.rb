@@ -200,9 +200,13 @@ class Phone
   def get_system_info
     dumpsys = adb_shell('dumpsys battery').split("\n")
 
-    level = dumpsys.select { |line| line.include? 'level: ' }
-                   .map { |line| line.gsub(/.*: /, '') }
-                   .first
+    level_value = dumpsys.select { |line| line.include? 'level: ' }
+                         .map { |line| line.gsub(/.*: /, '') }
+                         .first
+                         .to_i
+    level_sign = level_value <= 20 ? '🪫' : '🔋'
+    level = "#{level_sign} #{level_value}"
+
     temperature = dumpsys.select { |line| line.include? 'temperature: ' }
                          .map { |line| line.gsub(/.*: /, '').to_i / 10 }
                          .first
