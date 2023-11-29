@@ -36,6 +36,6 @@ pip3 install --user --break-system-packages onnxruntime torchaudio
 wget "https://gist.githubusercontent.com/alopatindev/e94ff95ea834500abe2da81ac2a7764f/raw/${ADB_REPULL_COMMIT}/adb_repull.py" -O lib/adb_repull.py
 chmod +x lib/adb_repull.py
 
-gem install concurrent-ruby
+gem install concurrent-ruby colorize
 
 echo "Done"

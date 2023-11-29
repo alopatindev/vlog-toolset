@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
+require 'colorize'
 require 'numeric'
 require 'set'
 
@@ -199,20 +200,29 @@ class Phone
 
   def get_system_info
     dumpsys = adb_shell('dumpsys battery').split("\n")
+    battery_level = dumpsys.select { |line| line.include? 'level: ' }
+                           .map { |line| line.gsub(/.*: /, '') }
+                           .map do |value|
+                             text = "#{value}%"
+                             value.to_i <= 20 ? "🪫#{text}".red : "🔋#{text}"
+                           end
+                           .first
+    battery_temperature = dumpsys.select { |line| line.include? 'temperature: ' }
+                                 .map { |line| line.gsub(/.*: /, '').to_i / 10 }
+                                 .map do |value|
+                                   text = "#{value}°C"
+                                   value >= 60 ? text.red : text
+                                 end
+                                 .first
 
-    level_value = dumpsys.select { |line| line.include? 'level: ' }
-                         .map { |line| line.gsub(/.*: /, '') }
-                         .first
-                         .to_i
-    level_sign = level_value <= 20 ? '🪫' : '🔋'
-    level = "#{level_sign}#{level_value}"
+    free_storage = adb_shell("df -h #{@opencamera_dir}")
+                   .split("\n")
+                   .reverse
+                   .map { |line| line.gsub(/\s+/, ' ').split(' ')[3] }
+                   .map { |value| value.to_i <= 2 ? value.red : value }
+                   .first
 
-    temperature = dumpsys.select { |line| line.include? 'temperature: ' }
-                         .map { |line| line.gsub(/.*: /, '').to_i / 10 }
-                         .first
-
-    free_storage = adb_shell("df -h #{@opencamera_dir} | tail -n1 | awk '{print $3}'").strip
-    [level, temperature, free_storage]
+    [battery_level, battery_temperature, free_storage]
   end
 
   def adb_shell(args)
