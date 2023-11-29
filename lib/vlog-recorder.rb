@@ -261,7 +261,7 @@ class DevicesFacade
   end
 
   def process_sound(sync_sound_filename, segments)
-    audio_filters = ['pan=mono|c0=c0']
+    audio_filters = [EXTRACT_LEFT_CHANNEL_FILTER]
 
     segments.each_with_index.map do |seg, subclip_num|
       start_position, end_position = seg
@@ -419,7 +419,7 @@ def parse_options!(options, args)
       options[:min_pause_between_shots] = p
     end
     opts.on('-a',
-            '--aggressiveness <0..3>', "How aggressively to filter out non-speech (default: #{options[:aggressiveness]})") do |a|
+            '--aggressiveness <0..1>', "How aggressively to filter out non-speech (default: #{options[:aggressiveness]})") do |a|
       options[:aggressiveness] = a.to_i
     end
     opts.on('-d', '--debug <true|false>', "Show debug messages (default: #{options[:debug]})") do |d|
@@ -444,7 +444,7 @@ options = {
   speed: 1.2,
   mirror: true,
   min_pause_between_shots: 2.0,
-  aggressiveness: 1,
+  aggressiveness: 0.6,
   debug: false
 }
 parse_options!(options, ARGV)

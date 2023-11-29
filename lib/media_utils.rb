@@ -18,6 +18,8 @@ require 'shellwords_utils'
 FFMPEG = ['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error']
 FFMPEG_NO_OVERWRITE = ['ffmpeg', '-n', '-hide_banner', '-loglevel', 'panic']
 
+EXTRACT_LEFT_CHANNEL_FILTER = 'pan=mono|c0=c0' # TODO: https://trac.ffmpeg.org/wiki/AudioChannelManipulation#Chooseaspecificchannel
+
 MPV = ['mpv', '--really-quiet', '--no-resume-playback']
 
 def get_duration(filename)
@@ -28,7 +30,7 @@ end
 
 def prepare_for_vad(filename)
   output_filename = "#{filename}.vad.wav"
-  command = FFMPEG + ['-i', filename, '-af', 'pan=mono|c0=c0', '-ar', 48_000, '-vn', output_filename]
+  command = FFMPEG + ['-i', filename, '-af', EXTRACT_LEFT_CHANNEL_FILTER, '-ar', 48_000, '-vn', output_filename]
   system "#{command.shelljoin_wrapped}"
   output_filename
 end

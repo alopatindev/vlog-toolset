@@ -20,9 +20,9 @@ echo "Installing dependencies..."
 set -euo pipefail
 cd "$(dirname $0)"
 
-#pip3 install --user webrtcvad
-
 pip3 install --user openai-whisper
+
+pip3 install --user --break-system-packages onnxruntime torchaudio
 
 # TODO: if nvidia-cuda-toolkit is installed, etc.; AND if torch cuda version is not installed
 # https://github.com/openai/whisper/discussions/47
