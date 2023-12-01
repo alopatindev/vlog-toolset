@@ -291,6 +291,7 @@ def test_merge_small_pauses
 end
 
 def generate_config(options)
+  # TODO: if file exists - open with r+ and skip to last recorded clip
   File.open("#{options[:project_dir]}#{File::SEPARATOR}render.conf", 'w') do |render_conf_file|
     write_columns(render_conf_file, ['#filename', 'speed', 'start', 'end', 'text'])
     video_filenames = Dir.glob("#{options[:project_dir]}#{File::SEPARATOR}0*.mp4").sort
@@ -306,16 +307,18 @@ def generate_config(options)
       system command.shelljoin
     end
 
+    # TODO: jsons and vad.wavs are supposed to be in tmp
     for i, sound_with_single_channel_filename in video_filenames.zip(sound_with_single_channel_filenames)
       FileUtils.rm_f sound_with_single_channel_filename
 
       transcribed_json = "#{sound_with_single_channel_filename}.json"
       for transcription in JSON.parse(File.read(transcribed_json))['transcription']
+        offsets = transcription['offsets']
         line = [
           File.basename(i),
           RENDER_DEFAULT_SPEED,
-          ms_to_sec(transcription['offsets']['from']),
-          ms_to_sec(transcription['offsets']['to']),
+          ms_to_sec(offsets['from']),
+          ms_to_sec(offsets['to']),
           transcription['text']
         ]
         write_columns(render_conf_file, line)
