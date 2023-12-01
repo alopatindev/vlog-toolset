@@ -391,7 +391,7 @@ def parse_options!(options, args)
     end
     opts.on('-W', '--whisper-cpp-args <dir>',
             "Additional whisper.cpp arguments (default: \"#{options[:whisper_cpp_args]}\")") do |w|
-      options[:whisper_cpp_args] += w
+      options[:whisper_cpp_args] += " #{w}"
     end
   end
 
@@ -441,7 +441,7 @@ concat_videos temp_videos, output_filename
 
 words_per_second = segments.map do |seg|
   dt = seg[:end_position] - seg[:start_position]
-  duration = seg[:speed] * dt
+  duration = dt / seg[:speed]
   seg[:words] / duration
 end.sum / segments.length
 
@@ -451,12 +451,12 @@ mpv_args =
   if options[:preview]
     player_position = compute_player_position segments, options
     print "player_position = #{player_position}\n"
-    ["--start=#{player_position}", '--no-fs', output_filename]
+    MPV + ["--start=#{player_position}", '--no-fs', output_filename]
   else
-    ['--pause', output_filename]
+    ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs', '--pause', output_filename]
   end
 
-command_escaped = (MPV + mpv_args).shelljoin_wrapped
+command_escaped = mpv_args.shelljoin_wrapped
 if options[:preview]
   system command_escaped
 else

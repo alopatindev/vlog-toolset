@@ -413,7 +413,7 @@ def parse_options!(options, args)
       options[:change_brightness] = b == 'true'
     end
     opts.on('-m', '--mpv-args <mpv-args>', "Additional mpv arguments (default: \"#{options[:mpv_args]})\"") do |s|
-      options[:mpv_args] = s
+      options[:mpv_args] += " #{s}"
     end
     opts.on('-P', '--pause-between-shots <seconds>',
             "Minimum pause between shots for auto trimming (default: #{'%.1f' % options[:min_pause_between_shots]})") do |p|
