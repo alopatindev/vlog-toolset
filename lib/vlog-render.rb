@@ -294,10 +294,19 @@ def generate_config(options)
   File.open("#{options[:project_dir]}#{File::SEPARATOR}render.conf", 'w') do |render_conf_file|
     write_columns(render_conf_file, ['#filename', 'speed', 'start', 'end', 'text'])
     video_filenames = Dir.glob("#{options[:project_dir]}#{File::SEPARATOR}0*.mp4").sort
-    # TODO: parallel? or use server
-    for i in video_filenames
-      sound_with_single_channel_filename = prepare_for_vad(i)
-      system "cd #{options[:whisper_cpp_dir]} ; ./main -m models/ggml-#{WHISPER_CPP_MODEL}.bin --file #{sound_with_single_channel_filename} --language #{options[:language]} --output-json --output-file #{sound_with_single_channel_filename}"
+
+    sound_with_single_channel_filenames = video_filenames.map { |i| prepare_for_vad(i) }
+    command = [
+      './main',
+      '--model', "models/ggml-#{WHISPER_CPP_MODEL}.bin",
+      '--language', options[:language],
+      '--output-json'
+    ] + sound_with_single_channel_filenames
+    Dir.chdir options[:whisper_cpp_dir] do
+      system command.shelljoin
+    end
+
+    for i, sound_with_single_channel_filename in video_filenames.zip(sound_with_single_channel_filenames)
       FileUtils.rm_f sound_with_single_channel_filename
 
       transcribed_json = "#{sound_with_single_channel_filename}.json"
