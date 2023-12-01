@@ -323,6 +323,7 @@ def generate_config(options)
         '--output-json'
       ] + [options[:whisper_cpp_args]] + sound_with_single_channel_filenames
       Dir.chdir options[:whisper_cpp_dir] do
+        print "#{command}\n"
         system command.shelljoin_wrapped
       end
     end
