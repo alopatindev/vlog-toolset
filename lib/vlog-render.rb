@@ -28,7 +28,6 @@ require 'optparse'
 
 PREVIEW_WIDTH = 320
 CONFIG_FILENAME = 'render.conf'.freeze
-WHISPER_CPP_MODEL = 'base'.freeze
 RENDER_DEFAULT_SPEED = '1.00'
 
 def parse(filename, options)
@@ -321,10 +320,8 @@ def generate_config(options)
     else
       command = [
         './main',
-        '--model', "models/ggml-#{WHISPER_CPP_MODEL}.bin",
-        '--language', options[:language],
         '--output-json'
-      ] + sound_with_single_channel_filenames
+      ] + [options[:whisper_cpp_args]] + sound_with_single_channel_filenames
       Dir.chdir options[:whisper_cpp_dir] do
         system command.shelljoin_wrapped
       end
@@ -368,7 +365,7 @@ end
 
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
-    opts.set_banner('Usage: vlog-render -p project_dir/ [other options]')
+    opts.set_banner('Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]')
     opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-L', '--line <num>',
@@ -388,11 +385,12 @@ def parse_options!(options, args)
             "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
       options[:cleanup] = c == 'true'
     end
-    opts.on('-l', '--language <en|ru|...|auto>', "Spoken language to recognize (default: #{options[:language]})") do |l|
-      options[:language] = l
-    end
     opts.on('-w', '--whisper-cpp-dir <dir>', 'whisper.cpp directory') do |w|
       options[:whisper_cpp_dir] = w
+    end
+    opts.on('-W', '--whisper-args <dir>',
+            "Additional whisper.cpp arguments (default: #{options[:whisper_cpp_args]})") do |w|
+      options[:whisper_cpp_args] += w
     end
   end
 
@@ -415,7 +413,7 @@ options = {
   preview: true,
   line_in_file: 1,
   cleanup: false,
-  language: 'auto'
+  whisper_cpp_args: '--model models/ggml-medium.bin --language auto'
 }
 
 parse_options!(options, ARGV)
@@ -456,4 +454,11 @@ mpv_args =
   else
     ['--pause', output_filename]
   end
-system (MPV + mpv_args).shelljoin_wrapped
+
+command_escaped = (MPV + mpv_args).shelljoin_wrapped
+if options[:preview]
+  system command_escaped
+else
+  print("done, you can run:\n")
+  print(command_escaped + "\n")
+end

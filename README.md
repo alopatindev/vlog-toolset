@@ -80,8 +80,7 @@ q / Ctrl+C - QUIT
 - plays a video by a given position
 
 ```
-./bin/vlog-render -h
-Usage: vlog-render -p project_dir/ [other options]
+Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]
   -p, --project <dir>              Project directory
   -L, --line <num>                 Line in render.conf file, to play by given position (default: 1)
   -P, --preview <true|false>       Preview mode. It will also start a video player by a given position (default: true)
@@ -89,8 +88,8 @@ Usage: vlog-render -p project_dir/ [other options]
   -S, --speed <num>                Speed factor (default: 1.2)
   -V, --video-filters <filters>    ffmpeg video filters (default: 'hqdn3d,hflip,vignette')
   -c, --cleanup <true|false>       Remove temporary files, instead of reusing them in future (default: false)
-  -l, --language <en|ru|...|auto>  Spoken language to recognize (default: auto)
   -w, --whisper-cpp-dir <dir>      whisper.cpp directory
+  -W, --whisper-args <dir>         Additional whisper.cpp arguments (default: --model models/ggml-medium.bin --language auto)
 
 ./bin/vlog-render -p ~/video/new-cool-video-project --preview false --whisper-cpp-dir path/to/whisper-cpp-dir
 ```
