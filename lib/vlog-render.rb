@@ -140,7 +140,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
   thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   temp_videos = segments.map.with_index do |seg, index|
-    # FIXME: make less confusing paths, perhaps with hashing
+    # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
     ext = '.mp4'
     line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
@@ -351,7 +351,7 @@ def generate_config(options)
 end
 
 def filename_to_clip(filename)
-  # 000123_000001.mp4 => 123 is clip, 1 is subclip
+  # 000123_000000.mp4 => 123 is clip, 0 is subclip
   basename = File.basename(filename)
   basename.split('_').first.to_i
 end
@@ -463,3 +463,7 @@ else
   print("done, you can run:\n")
   print(command_escaped + "\n")
 end
+
+# TODO: add --gc flag to remove no longer needed tmp/output files
+# TODO: rename tmp to cache? .cache? probably no
+# TODO: final render to both HEVC and H.264, in parallel
