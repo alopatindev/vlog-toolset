@@ -413,7 +413,7 @@ options = {
   preview: true,
   line_in_file: 1,
   cleanup: false,
-  whisper_cpp_args: '--model models/ggml-medium.bin --language auto'
+  whisper_cpp_args: '--model models/ggml-base.bin --language auto'
 }
 
 parse_options!(options, ARGV)

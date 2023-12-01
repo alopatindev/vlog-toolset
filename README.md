@@ -15,6 +15,11 @@ I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automat
 - alsa-utils (tested with 1.2.9)
 - mpv (tested with 0.36.0)
 - whisper.cpp (tested with `641f2f4`)
+    - build for
+        - [NVIDIA proprietary](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#nvidia-gpu-support) driver
+        - or [other GPUs](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#opencl-gpu-support-via-clblast)
+        - or [CPU](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#blas-cpu-support-via-openblas)
+    - download [model(s)](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#quick-start) (base and/or `medium` are recommended)
 - android-tools (tested with 34.0.0, adb version is 1.0.41)
     - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
 
