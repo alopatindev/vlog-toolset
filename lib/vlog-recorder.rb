@@ -412,7 +412,7 @@ def parse_options!(options, args)
             "Set lowest brightness to save device power (default: #{options[:change_brightness]})") do |b|
       options[:change_brightness] = b == 'true'
     end
-    opts.on('-m', '--mpv-args <mpv-args>', "Additional mpv arguments (default: #{options[:mpv_args]})") do |s|
+    opts.on('-m', '--mpv-args <mpv-args>', "Additional mpv arguments (default: \"#{options[:mpv_args]})\"") do |s|
       options[:mpv_args] = s
     end
     opts.on('-P', '--pause-between-shots <seconds>',

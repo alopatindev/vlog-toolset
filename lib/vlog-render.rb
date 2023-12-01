@@ -389,7 +389,7 @@ def parse_options!(options, args)
       options[:whisper_cpp_dir] = w
     end
     opts.on('-W', '--whisper-cpp-args <dir>',
-            "Additional whisper.cpp arguments (default: #{options[:whisper_cpp_args]})") do |w|
+            "Additional whisper.cpp arguments (default: \"#{options[:whisper_cpp_args]}\")") do |w|
       options[:whisper_cpp_args] += w
     end
   end

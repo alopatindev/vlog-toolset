@@ -57,7 +57,7 @@ Usage: vlog-recorder -p project_dir/ [other options]
   -o, --opencamera-dir <dir>       Open Camera directory path on Android device (default: "/storage/emulated/0/DCIM/OpenCamera")
   -b <true|false>,                 Set lowest brightness to save device power (default: false)
       --change-brightness
-  -m, --mpv-args <mpv-args>        Additional mpv arguments (default: --vf=hflip --volume-max=300 --volume=130 --speed=1.2)
+  -m, --mpv-args <mpv-args>        Additional mpv arguments (default: "--vf=hflip --volume-max=300 --volume=130 --speed=1.2)"
   -P <seconds>,                    Minimum pause between shots for auto trimming (default: 2.0)
       --pause-between-shots
   -a, --aggressiveness <0..1>      How aggressively to filter out non-speech (default: 0.4)
@@ -94,7 +94,7 @@ Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]
   -V, --video-filters <filters>    ffmpeg video filters (default: 'hqdn3d,hflip,vignette')
   -c, --cleanup <true|false>       Remove temporary files, instead of reusing them in future (default: false)
   -w, --whisper-cpp-dir <dir>      whisper.cpp directory
-  -W, --whisper-cpp-args <dir>     Additional whisper.cpp arguments (default: --model models/ggml-base.bin --language auto)
+  -W, --whisper-cpp-args <dir>     Additional whisper.cpp arguments (default: "--model models/ggml-base.bin --language auto")
 
 ./bin/vlog-render -p ~/video/new-cool-video-project --preview false --whisper-cpp-dir path/to/whisper-cpp-dir
 ```
