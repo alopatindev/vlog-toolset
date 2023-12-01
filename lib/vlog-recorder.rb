@@ -18,6 +18,7 @@
 require 'media_utils'
 require 'microphone'
 require 'numeric'
+require 'os_utils'
 require 'phone'
 require 'shellwords_utils'
 require 'voice/detect_voice'
@@ -305,8 +306,9 @@ class DevicesFacade
     size = 80
     if text.nil?
       recording = @recording ? '🔴' : '⬜'
-      battery_level, battery_temperature, free_storage = @phone.get_system_info
-      text = "[ #{recording} ] [ battery: #{battery_level} / #{battery_temperature} | storage: #{free_storage} ]"
+      phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
+      free_storage = parse_free_storage(`df -k #{@project_dir}`)
+      text = "[ #{recording} | storage: #{free_storage} ] [ battery: #{phone_battery_level} / #{phone_battery_temperature} | storage: #{free_phone_storage} ]"
     end
     postfix = ' ' * (size - text.length)
     print "#{text}#{postfix}\r"

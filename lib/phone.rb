@@ -15,6 +15,7 @@
 
 require 'colorize'
 require 'numeric'
+require 'os_utils'
 require 'set'
 
 class Phone
@@ -211,17 +212,11 @@ class Phone
                                  .map { |line| line.gsub(/.*: /, '').to_i / 10 }
                                  .map do |value|
                                    text = "#{value}°C"
-                                   value >= 60 ? text.red : text
+                                   value >= 55 ? text.red : text
                                  end
                                  .first
 
-    free_storage = adb_shell("df -h #{@opencamera_dir}")
-                   .split("\n")
-                   .reverse
-                   .map { |line| line.gsub(/\s+/, ' ').split(' ')[3] }
-                   .map { |value| value.to_i <= 2 ? value.red : value }
-                   .first
-
+    free_storage = parse_free_storage(adb_shell("df -k #{@opencamera_dir}"))
     [battery_level, battery_temperature, free_storage]
   end
 
