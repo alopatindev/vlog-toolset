@@ -310,7 +310,11 @@ class DevicesFacade
       free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`)
       text = "[ #{recording} | storage: #{free_storage} ] [ battery: #{phone_battery_level} / #{phone_battery_temperature} | storage: #{free_phone_storage} ]"
     end
-    postfix = ' ' * (size - text.length)
+
+    spaces = size - text.length
+    raise if spaces < 0
+
+    postfix = ' ' * spaces
     print "#{text}#{postfix}\r"
     STDOUT.flush
   end
