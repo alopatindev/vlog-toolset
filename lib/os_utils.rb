@@ -16,8 +16,7 @@
 require 'colorize'
 
 def parse_free_storage(df)
-  line = df.split("\n").last
-  kib = line.gsub(/\s+/, ' ').split(' ')[3].to_i
+  kib = df.split("\n").map { |line| line.split.first(6) }.transpose.to_h['Available'].to_i
   gib = kib / (1024**2)
   text = "#{gib}G"
   gib <= 4 ? text.red : text

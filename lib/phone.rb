@@ -216,7 +216,7 @@ class Phone
                                  end
                                  .first
 
-    free_storage = parse_free_storage(adb_shell("df -k #{@opencamera_dir}"))
+    free_storage = parse_free_storage(adb_shell("LANG=C df -Pk #{@opencamera_dir}"))
     [battery_level, battery_temperature, free_storage]
   end
 

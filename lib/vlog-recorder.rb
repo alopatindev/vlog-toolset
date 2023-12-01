@@ -307,7 +307,7 @@ class DevicesFacade
     if text.nil?
       recording = @recording ? '🔴' : '⬜'
       phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
-      free_storage = parse_free_storage(`df -k #{@project_dir}`)
+      free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`)
       text = "[ #{recording} | storage: #{free_storage} ] [ battery: #{phone_battery_level} / #{phone_battery_temperature} | storage: #{free_phone_storage} ]"
     end
     postfix = ' ' * (size - text.length)
