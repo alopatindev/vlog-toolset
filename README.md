@@ -14,6 +14,7 @@ I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automat
 - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
 - alsa-utils (tested with 1.2.9)
 - mpv (tested with 0.36.0)
+- whisper.cpp (tested with `641f2f4`)
 - android-tools (tested with 34.0.0, adb version is 1.0.41)
     - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
 
@@ -88,8 +89,10 @@ Usage: vlog-render -p project_dir/ [other options]
   -S, --speed <num>                Speed factor (default: 1.2)
   -V, --video-filters <filters>    ffmpeg video filters (default: 'hqdn3d,hflip,vignette')
   -c, --cleanup <true|false>       Remove temporary files, instead of reusing them in future (default: false)
+  -l, --language <en|ru|...|auto>  Spoken language to recognize (default: auto)
+  -w, --whisper-cpp-dir <dir>      whisper.cpp directory
 
-./bin/vlog-render -p ~/video/new-cool-video-project --preview false
+./bin/vlog-render -p ~/video/new-cool-video-project --preview false --whisper-cpp-dir path/to/whisper-cpp-dir
 ```
 
 - it also runs voice recognition in a selected language

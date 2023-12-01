@@ -31,8 +31,18 @@ end
 
 def prepare_for_vad(filename)
   output_filename = "#{filename}.vad.wav"
-  command = FFMPEG + ['-i', filename, '-af', EXTRACT_LEFT_CHANNEL_FILTER, '-ar', VAD_SAMPLING_RATE, '-vn',
-                      output_filename]
+  command = FFMPEG + [
+    '-i', filename,
+    '-af', EXTRACT_LEFT_CHANNEL_FILTER,
+    '-ar', VAD_SAMPLING_RATE,
+    '-c:a', 'pcm_s16le',
+    '-vn',
+    output_filename
+  ]
   system "#{command.shelljoin_wrapped}"
   output_filename
+end
+
+def clamp_speed(speed)
+  speed.clamp(0.5, 2.0)
 end

@@ -22,11 +22,14 @@ require 'shellwords_utils'
 require 'concurrent'
 require 'fileutils'
 require 'io/console'
+require 'json'
 require 'mkmf'
 require 'optparse'
 
 PREVIEW_WIDTH = 320
 CONFIG_FILENAME = 'render.conf'.freeze
+WHISPER_CPP_MODEL = 'base'.freeze
+RENDER_DEFAULT_SPEED = '1.00'
 
 def parse(filename, options)
   File.open filename do |f|
@@ -288,8 +291,38 @@ def test_merge_small_pauses
 end
 
 def generate_config(options)
-  script_filename = File.join(__dir__, '..', 'lib', 'generate_conf.py')
-  system script_filename, options[:project_dir]
+  File.open("#{options[:project_dir]}#{File::SEPARATOR}render.conf", 'w') do |render_conf_file|
+    write_columns(render_conf_file, ['#filename', 'speed', 'start', 'end', 'text'])
+    video_filenames = Dir.glob("#{options[:project_dir]}#{File::SEPARATOR}0*.mp4").sort
+    # TODO: parallel? or use server
+    for i in video_filenames
+      sound_with_single_channel_filename = prepare_for_vad(i)
+      system "cd #{options[:whisper_cpp_dir]} ; ./main -m models/ggml-#{WHISPER_CPP_MODEL}.bin --file #{sound_with_single_channel_filename} --language #{options[:language]} --output-json --output-file #{sound_with_single_channel_filename}"
+      FileUtils.rm_f sound_with_single_channel_filename
+
+      transcribed_json = "#{sound_with_single_channel_filename}.json"
+      for transcription in JSON.parse(File.read(transcribed_json))['transcription']
+        line = [
+          File.basename(i),
+          RENDER_DEFAULT_SPEED,
+          ms_to_sec(transcription['offsets']['from']),
+          ms_to_sec(transcription['offsets']['to']),
+          transcription['text']
+        ]
+        write_columns(render_conf_file, line)
+      end
+
+      FileUtils.rm_f transcribed_json
+    end
+  end
+end
+
+def write_columns(file, columns)
+  file.write(columns.join("\t") + "\n")
+end
+
+def ms_to_sec(ms)
+  ms.to_f / 1000.0
 end
 
 def parse_options!(options, args)
@@ -315,6 +348,12 @@ def parse_options!(options, args)
             "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
       options[:cleanup] = c == 'true'
     end
+    opts.on('-l', '--language <en|ru|...|auto>', "Spoken language to recognize (default: #{options[:language]})") do |l|
+      options[:language] = l
+    end
+    opts.on('-w', '--whisper-cpp-dir <dir>', 'whisper.cpp directory') do |w|
+      options[:whisper_cpp_dir] = w
+    end
   end
 
   parser.parse!(args)
@@ -335,7 +374,8 @@ options = {
   min_pause_between_shots: 0.1,
   preview: true,
   line_in_file: 1,
-  cleanup: false
+  cleanup: false,
+  language: 'auto'
 }
 
 parse_options!(options, ARGV)
