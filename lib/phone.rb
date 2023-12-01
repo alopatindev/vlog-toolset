@@ -24,6 +24,11 @@ class Phone
   MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
   POLL_WAIT_TIME = 0.3
 
+  PORTRAIT = 0
+  REVERSED_PORTRAIT = 180
+  LANDSCAPE_FRONT_CAMERA_ON_LEFT = 90
+  LANDSCAPE_FRONT_CAMERA_ON_RIGHT = 270
+
   def initialize(temp_dir, options, logger)
     @temp_dir = temp_dir
 
@@ -122,16 +127,21 @@ class Phone
   end
 
   def tap(x, y)
-    screen_x, screen_y =
-      if @rotation == 0 # normal portrait
-        [@left + (1.0 - y) * (@right - @left), @top + x * (@bottom - @top)]
-      elsif @rotation == 90 # landsape, front camera is on the left
-        [@left + x * (@right - @left), @top + y * (@bottom - @top)]
-      elsif @rotation == 180 # reversed portrait
-        [@left + (1.0 - y) * (@right - @left), @top + x * (@bottom - @top)]
-      elsif @rotation == 270 # landscape, camera is on the right
-        [@left + (1.0 - x) * (@right - @left), @top + (1.0 - y) * (@bottom - @top)]
-      end
+    width = @right - @left
+    height = @bottom - @top
+    if @rotation == PORTRAIT
+      @screen_x = @left + (1.0 - y) * width
+      @screen_y = @top + x * height
+    elsif @rotation == LANDSCAPE_FRONT_CAMERA_ON_LEFT
+      @screen_x = @left + x * width
+      @screen_y = @top + y * height
+    elsif @rotation == REVERSED_PORTRAIT
+      @screen_x = @left + (1.0 - y) * width
+      @screen_y = @top + x * height
+    elsif @rotation == LANDSCAPE_FRONT_CAMERA_ON_RIGHT
+      @screen_x = @left + (1.0 - x) * width
+      @screen_y = @top + (1.0 - y) * height
+    end
 
     @logger.debug "rotation=#{@rotation} screen_x=#{screen_x}, screen_y=#{screen_y}"
     adb_shell("input tap #{screen_x.to_i} #{screen_y.to_i}")
