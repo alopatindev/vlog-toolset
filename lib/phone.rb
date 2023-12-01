@@ -53,7 +53,6 @@ class Phone
     opencamera_was_active = opencamera_active?
     run_opencamera unless opencamera_was_active
     unlock_auto_rotate
-    update_app_bounds!
     @initial_brightness = get_brightness
     set_front_camera unless opencamera_was_active
   end
@@ -127,20 +126,22 @@ class Phone
   end
 
   def tap(x, y)
+    update_app_bounds!
+
     width = @right - @left
     height = @bottom - @top
     if @rotation == PORTRAIT
-      @screen_x = @left + (1.0 - y) * width
-      @screen_y = @top + x * height
+      screen_x = @left + (1.0 - y) * width
+      screen_y = @top + x * height
     elsif @rotation == LANDSCAPE_FRONT_CAMERA_ON_LEFT
-      @screen_x = @left + x * width
-      @screen_y = @top + y * height
+      screen_x = @left + x * width
+      screen_y = @top + y * height
     elsif @rotation == REVERSED_PORTRAIT
-      @screen_x = @left + (1.0 - y) * width
-      @screen_y = @top + x * height
+      screen_x = @left + (1.0 - y) * width
+      screen_y = @top + x * height
     elsif @rotation == LANDSCAPE_FRONT_CAMERA_ON_RIGHT
-      @screen_x = @left + (1.0 - x) * width
-      @screen_y = @top + (1.0 - y) * height
+      screen_x = @left + (1.0 - x) * width
+      screen_y = @top + (1.0 - y) * height
     end
 
     @logger.debug "rotation=#{@rotation} screen_x=#{screen_x}, screen_y=#{screen_y}"
@@ -182,29 +183,16 @@ class Phone
   end
 
   def update_app_bounds!
-    if adb_shell('dumpsys window') =~ /mAppBounds=Rect\(([0-9]*),\s([0-9]*)\s-\s([0-9]*),\s([0-9]*)\).*mRotation=ROTATION_([0-9]*)/
-      @left = Regexp.last_match(1).to_i
-      @top = Regexp.last_match(2).to_i
-      @right = Regexp.last_match(3).to_i
-      @bottom = Regexp.last_match(4).to_i
-      @rotation = Regexp.last_match(5).to_i
-    else
-      # TODO
-      dumpsys = adb_shell('dumpsys display')
-      @left = 0
-      @top = 0
-      if dumpsys =~ /mDisplayWidth=([0-9]{2,}?)\n\s*mDisplayHeight=([0-9]{2,}?)\n/
-        @right = Regexp.last_match(1).to_i
-        @bottom = Regexp.last_match(2).to_i
-        @rotation = 0
-      elsif dumpsys =~ /deviceWidth=([0-9]{2,}?),\sdeviceHeight=([0-9]{2,}?)\}/
-        @right = Regexp.last_match(2).to_i
-        @bottom = Regexp.last_match(1).to_i
-        @rotation = 180
-      else
-        raise 'Failed to fetch display size'
-      end
+    unless adb_shell('dumpsys window') =~ /mAppBounds=Rect\(([0-9]*),\s([0-9]*)\s-\s([0-9]*),\s([0-9]*)\).*mRotation=ROTATION_([0-9]*)/
+      raise 'Failed to fetch display size'
     end
+
+    @left = Regexp.last_match(1).to_i
+    @top = Regexp.last_match(2).to_i
+    @right = Regexp.last_match(3).to_i
+    @bottom = Regexp.last_match(4).to_i
+    @rotation = Regexp.last_match(5).to_i
+
     @logger.debug "device left=#{@left}, right=#{@right}, top=#{@top}, bottom=#{@bottom}"
   end
 
