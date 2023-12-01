@@ -15,8 +15,9 @@
 
 require 'colorize'
 require 'numeric'
-require 'os_utils'
 require 'set'
+
+require 'os_utils'
 
 class Phone
   APP_ID = 'net.sourceforge.opencamera'.freeze
@@ -47,8 +48,7 @@ class Phone
     opencamera_was_active = opencamera_active?
     run_opencamera unless opencamera_was_active
     unlock_auto_rotate
-    @width, @height = get_size
-    @logger.debug "device width=#{@width}, height=#{@height}"
+    update_app_bounds!
     @initial_brightness = get_brightness
     set_front_camera unless opencamera_was_active
   end
@@ -122,9 +122,19 @@ class Phone
   end
 
   def tap(x, y)
-    screen_x = (x * @height).to_i
-    screen_y = (y * @width).to_i
-    adb_shell("input tap #{screen_x} #{screen_y}")
+    screen_x, screen_y =
+      if @rotation == 0 # normal portrait
+        [@left + (1.0 - y) * (@right - @left), @top + x * (@bottom - @top)]
+      elsif @rotation == 90 # landsape, front camera is on the left
+        [@left + x * (@right - @left), @top + y * (@bottom - @top)]
+      elsif @rotation == 180 # reversed portrait
+        [@left + (1.0 - y) * (@right - @left), @top + x * (@bottom - @top)]
+      elsif @rotation == 270 # landscape, camera is on the right
+        [@left + (1.0 - x) * (@right - @left), @top + (1.0 - y) * (@bottom - @top)]
+      end
+
+    @logger.debug "rotation=#{@rotation} screen_x=#{screen_x}, screen_y=#{screen_y}"
+    adb_shell("input tap #{screen_x.to_i} #{screen_y.to_i}")
   end
 
   def locked?
@@ -161,28 +171,31 @@ class Phone
     tap 0.955, 0.292
   end
 
-  def get_size
-    dumpsys = adb_shell('dumpsys display')
-    width, height =
+  def update_app_bounds!
+    if adb_shell('dumpsys window') =~ /mAppBounds=Rect\(([0-9]*),\s([0-9]*)\s-\s([0-9]*),\s([0-9]*)\).*mRotation=ROTATION_([0-9]*)/
+      @left = Regexp.last_match(1).to_i
+      @top = Regexp.last_match(2).to_i
+      @right = Regexp.last_match(3).to_i
+      @bottom = Regexp.last_match(4).to_i
+      @rotation = Regexp.last_match(5).to_i
+    else
+      # TODO
+      dumpsys = adb_shell('dumpsys display')
+      @left = 0
+      @top = 0
       if dumpsys =~ /mDisplayWidth=([0-9]{2,}?)\n\s*mDisplayHeight=([0-9]{2,}?)\n/
-        width = Regexp.last_match(1).to_i
-        height = Regexp.last_match(2).to_i
-        [width, height]
+        @right = Regexp.last_match(1).to_i
+        @bottom = Regexp.last_match(2).to_i
+        @rotation = 0
       elsif dumpsys =~ /deviceWidth=([0-9]{2,}?),\sdeviceHeight=([0-9]{2,}?)\}/
-        width = Regexp.last_match(1).to_i
-        height = Regexp.last_match(2).to_i
-        [width, height].reverse
+        @right = Regexp.last_match(2).to_i
+        @bottom = Regexp.last_match(1).to_i
+        @rotation = 180
       else
         raise 'Failed to fetch display size'
       end
-
-    if adb_shell('dumpsys window') =~ /mAppBounds=Rect\([0-9\s-]*,\s0\s-\s([0-9]*),\s[0-9\s-]*\)/
-      new_height = Regexp.last_match(1).to_i
-      @logger.debug "height #{height} => #{new_height}"
-      height = new_height
     end
-
-    [width, height]
+    @logger.debug "device left=#{@left}, right=#{@right}, top=#{@top}, bottom=#{@bottom}"
   end
 
   def get_brightness
