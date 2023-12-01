@@ -141,7 +141,7 @@ class Phone
   end
 
   def unlock_auto_rotate
-    adb_shell('adb shell settings put system accelerometer_rotation 1')
+    adb_shell('settings put system accelerometer_rotation 1')
   end
 
   def opencamera_active?
@@ -149,7 +149,7 @@ class Phone
   end
 
   def run_opencamera
-    system "#{@adb_shell} am start -n #{MAIN_ACTIVITY} && sleep 3", out: File::NULL
+    system "#{@adb_shell} am start -n #{MAIN_ACTIVITY} && sleep 3", out: File::NULL, err: File::NULL
   end
 
   def close_opencamera
