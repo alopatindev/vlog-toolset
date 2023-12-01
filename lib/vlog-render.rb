@@ -453,7 +453,7 @@ mpv_args =
     print "player_position = #{player_position}\n"
     MPV + ["--start=#{player_position}", '--no-fs', output_filename]
   else
-    ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs', '--pause', output_filename]
+    ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs', output_filename]
   end
 
 command_escaped = mpv_args.shelljoin_wrapped
