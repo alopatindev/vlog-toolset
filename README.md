@@ -91,7 +91,7 @@ Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]
   -P, --preview <true|false>       Preview mode. It will also start a video player by a given position (default: true)
   -f, --fps <num>                  Constant frame rate (default: 30)
   -S, --speed <num>                Speed factor (default: 1.2)
-  -V, --video-filters <filters>    ffmpeg video filters (default: 'hqdn3d,hflip,vignette')
+  -V, --video-filters <filters>    ffmpeg video filters (default: "hqdn3d,hflip,vignette")
   -c, --cleanup <true|false>       Remove temporary files, instead of reusing them in future (default: false)
   -w, --whisper-cpp-dir <dir>      whisper.cpp directory
   -W, --whisper-cpp-args <dir>     Additional whisper.cpp arguments (default: "--model models/ggml-base.bin --language auto")

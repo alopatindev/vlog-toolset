@@ -379,7 +379,7 @@ def parse_options!(options, args)
     end
     opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f.to_i }
     opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
-    opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: '#{options[:video_filters]}')") do |v|
+    opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}")") do |v|
       options[:video_filters] = v
     end
     opts.on('-c', '--cleanup <true|false>',
