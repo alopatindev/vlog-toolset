@@ -94,7 +94,7 @@ Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]
   -V, --video-filters <filters>    ffmpeg video filters (default: 'hqdn3d,hflip,vignette')
   -c, --cleanup <true|false>       Remove temporary files, instead of reusing them in future (default: false)
   -w, --whisper-cpp-dir <dir>      whisper.cpp directory
-  -W, --whisper-args <dir>         Additional whisper.cpp arguments (default: --model models/ggml-medium.bin --language auto)
+  -W, --whisper-cpp-args <dir>     Additional whisper.cpp arguments (default: --model models/ggml-base.bin --language auto)
 
 ./bin/vlog-render -p ~/video/new-cool-video-project --preview false --whisper-cpp-dir path/to/whisper-cpp-dir
 ```
