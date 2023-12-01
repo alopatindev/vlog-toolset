@@ -116,27 +116,6 @@ Usage: vlog-render -p project_dir/ [other options]
 vi ~/video/new-cool-video-project/render.conf
 ```
 
-## vlog-play-segments
-- plays longest pauses
-    - to check the quality of video montage (useful if you do it manually, with video editors)
-- plays parts with voice only
-- or plays both voiced + silent parts
-    - silent parts will be sped up
-
-```
-./bin/vlog-play-segments -h
-Usage: vlog-play-segments [options] -i video.mp4
-  -i, --i <filename>               Video to play
-  -S, --speed <num>                Speed factor (default: 1.5)
-  -m, --mode <silence|voice|both>  Play silent parts starting from longest segment OR voice only OR both, but silences will be sped up (default: silence)
-  -P <seconds>,                    Minimum pause between shots (default: 0.5)
-      --pause-between-shots
-  -w, --window <num>               Time window before and after the segment (default: 0.0)
-  -a, --aggressiveness <0..3>      How aggressively to filter out non-speech (default: 3)
-
-./bin/vlog-play-segments -i ~/video/new-cool-video-project/output.mp4
-```
-
 ## Known issues/limitations
 - it's just a dumb dirty PoC, it's not necessarily gonna work on your hardware
     - I use ~~Meizu MX4~~ Xiaomi Mi 8

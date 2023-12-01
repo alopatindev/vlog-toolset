@@ -140,23 +140,26 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
 
   thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
-  temp_videos = segments.map.with_index do |seg, _index|
+  temp_videos = segments.map.with_index do |seg, index|
     # FIXME: make less confusing paths, perhaps with hashing
     ext = '.mp4'
     line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
-    base_output_filename = ([seg[:index].with_leading_zeros] + seg.reject { |key|
+    # base_output_filename = ([seg[:index].with_leading_zeros] + seg.reject { |key|
+    #  key == :index
+    # }.values.map(&:to_s) + [preview.to_s]).join('_')
+    base_output_filename = (seg.reject { |key|
       key == :index
     }.values.map(&:to_s) + [preview.to_s]).join('_')
     output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
     temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
 
     thread_pool.post do
-      audio_filters = "atempo=#{options[:speed]}"
+      audio_filters = "atempo=#{seg[:speed]}"
       video_filters = [
         options[:video_filters],
         "fps=#{fps}",
-        "setpts=(1/#{options[:speed]})*PTS"
+        "setpts=(1/#{seg[:speed]})*PTS" # TODO: is it correct?
       ].join(',')
       if preview
         video_filters = [
@@ -192,6 +195,8 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         output_filename
       ]
       system command.shelljoin_wrapped
+
+      print "#{basename} (#{index + 1}/#{segments.length})\n"
 
       FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
     rescue StandardError => e
@@ -291,20 +296,38 @@ def test_merge_small_pauses
 end
 
 def generate_config(options)
-  # TODO: if file exists - open with r+ and skip to last recorded clip
-  File.open("#{options[:project_dir]}#{File::SEPARATOR}render.conf", 'w') do |render_conf_file|
-    write_columns(render_conf_file, ['#filename', 'speed', 'start', 'end', 'text'])
+  render_conf_filename = "#{options[:project_dir]}#{File::SEPARATOR}render.conf"
+  exists = File.exist?(render_conf_filename)
+  File.open(render_conf_filename, exists ? 'r+' : 'w') do |render_conf_file|
     video_filenames = Dir.glob("#{options[:project_dir]}#{File::SEPARATOR}0*.mp4").sort
+    if exists
+      # skip all clips listed in the config (including commented ones),
+      # don't write already removed subclips
+      last_line = render_conf_file.readlines.last
+      first_column = last_line.split("\t")[0]
+      last_recorded_filename = first_column.split('#').last.strip
+      last_recorded_clip = filename_to_clip(last_recorded_filename)
+      print "last_recorded_clip = #{last_recorded_clip}\n"
+      skip_clips = video_filenames.filter { |i| filename_to_clip(i) <= last_recorded_clip }.length
+      print "skip_clips = #{skip_clips}\n"
+      video_filenames = video_filenames.drop(skip_clips)
+    else
+      write_columns(render_conf_file, ['#filename', 'speed', 'start', 'end', 'text'])
+    end
 
     sound_with_single_channel_filenames = video_filenames.map { |i| prepare_for_vad(i) }
-    command = [
-      './main',
-      '--model', "models/ggml-#{WHISPER_CPP_MODEL}.bin",
-      '--language', options[:language],
-      '--output-json'
-    ] + sound_with_single_channel_filenames
-    Dir.chdir options[:whisper_cpp_dir] do
-      system command.shelljoin
+    if sound_with_single_channel_filenames.empty?
+      print "nothing to transcribe\n"
+    else
+      command = [
+        './main',
+        '--model', "models/ggml-#{WHISPER_CPP_MODEL}.bin",
+        '--language', options[:language],
+        '--output-json'
+      ] + sound_with_single_channel_filenames
+      Dir.chdir options[:whisper_cpp_dir] do
+        system command.shelljoin_wrapped
+      end
     end
 
     # TODO: jsons and vad.wavs are supposed to be in tmp
@@ -329,6 +352,12 @@ def generate_config(options)
   end
 end
 
+def filename_to_clip(filename)
+  # 000123_000001.mp4 => 123 is clip, 1 is subclip
+  basename = File.basename(filename)
+  basename.split('_').first.to_i
+end
+
 def write_columns(file, columns)
   file.write(columns.join("\t") + "\n")
 end
@@ -338,7 +367,6 @@ def ms_to_sec(ms)
 end
 
 def parse_options!(options, args)
-  # TODO: add -l --language <en|ru|...|auto> option?
   parser = OptionParser.new do |opts|
     opts.set_banner('Usage: vlog-render -p project_dir/ [other options]')
     opts.set_summary_indent('  ')
@@ -426,6 +454,6 @@ mpv_args =
     print "player_position = #{player_position}\n"
     ["--start=#{player_position}", '--no-fs', output_filename]
   else
-    [output_filename]
+    ['--pause', output_filename]
   end
 system (MPV + mpv_args).shelljoin_wrapped
