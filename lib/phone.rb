@@ -29,8 +29,6 @@ class Phone
   LANDSCAPE_FRONT_CAMERA_ON_LEFT = 90
   LANDSCAPE_FRONT_CAMERA_ON_RIGHT = 270
 
-  attr_reader :rotation
-
   def initialize(temp_dir, options, logger)
     @temp_dir = temp_dir
 
@@ -182,6 +180,10 @@ class Phone
   def set_front_camera
     @logger.debug 'set_front_camera'
     tap 0.955, 0.292
+  end
+
+  def rotation
+    (@rotation - 90) % 360
   end
 
   def update_app_bounds!
