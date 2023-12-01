@@ -138,8 +138,8 @@ Usage: vlog-play-segments [options] -i video.mp4
 - it's just a dumb dirty PoC, it's not necessarily gonna work on your hardware
     - I use ~~Meizu MX4~~ Xiaomi Mi 8
         - front camera faces at me
+        - microphone and camera are allowed
         - autorotation is enabled
-        - the device is at landscape position (counterclockwise from normal position)
             - if auto-rotate is broken — try to reboot your phone
 - paths with spaces and weird characters are unsupported
 

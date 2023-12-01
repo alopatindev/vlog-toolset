@@ -331,7 +331,8 @@ class DevicesFacade
                            .map { |f| File.basename(f) }
                            .index(last_clip_filename) || clips.length - 1
 
-    mpv_args = @mpv_args.shellsplit + ["--playlist-start=#{position_in_playlist}", clips.join(' ')]
+    mpv_args = @mpv_args.shellsplit + ["--video-rotate=#{(@phone.rotation - 90) % 360}", "--playlist-start=#{position_in_playlist}",
+                                       clips.join(' ')]
 
     command = MPV + mpv_args
     @logger.debug command

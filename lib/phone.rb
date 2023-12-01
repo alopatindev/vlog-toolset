@@ -29,6 +29,8 @@ class Phone
   LANDSCAPE_FRONT_CAMERA_ON_LEFT = 90
   LANDSCAPE_FRONT_CAMERA_ON_RIGHT = 270
 
+  attr_reader :rotation
+
   def initialize(temp_dir, options, logger)
     @temp_dir = temp_dir
 
