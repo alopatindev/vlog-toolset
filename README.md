@@ -52,7 +52,7 @@ Usage: vlog-recorder -p project_dir/ [other options]
   -o, --opencamera-dir <dir>       Open Camera directory path on Android device (default: "/storage/emulated/0/DCIM/OpenCamera")
   -b <true|false>,                 Set lowest brightness to save device power (default: false)
       --change-brightness
-  -m, --mpv-args <mpv-args>        Additional mpv arguments (default: --no-config --fs --vf=hflip --volume-max=300 --volume=130 --af=scaletempo2 --speed=1.2)
+  -m, --mpv-args <mpv-args>        Additional mpv arguments (default: --vf=hflip --volume-max=300 --volume=130 --speed=1.2)
   -P <seconds>,                    Minimum pause between shots for auto trimming (default: 2.0)
       --pause-between-shots
   -a, --aggressiveness <0..1>      How aggressively to filter out non-speech (default: 0.4)

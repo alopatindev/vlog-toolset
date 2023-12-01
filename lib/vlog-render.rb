@@ -146,8 +146,8 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
     base_output_filename = ([seg[:index].with_leading_zeros] + seg.reject { |key|
-                                                                 key == :index
-                                                               }.values.map(&:to_s) + [preview.to_s]).join('_')
+      key == :index
+    }.values.map(&:to_s) + [preview.to_s]).join('_')
     output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
     temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
 
@@ -408,9 +408,12 @@ end.sum / segments.length
 
 print "average words per second = #{words_per_second}\n"
 
-if options[:preview]
-  player_position = compute_player_position segments, options
-  print "player_position = #{player_position}\n"
-  command = MPV + ["--start=#{player_position}", output_filename]
-  system command.shelljoin_wrapped
-end
+mpv_args =
+  if options[:preview]
+    player_position = compute_player_position segments, options
+    print "player_position = #{player_position}\n"
+    ["--start=#{player_position}", '--no-fs', output_filename]
+  else
+    [output_filename]
+  end
+system (MPV + mpv_args).shelljoin_wrapped

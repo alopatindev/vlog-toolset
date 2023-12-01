@@ -442,7 +442,7 @@ options = {
   android_id: '',
   opencamera_dir: '/storage/emulated/0/DCIM/OpenCamera',
   change_brightness: false,
-  mpv_args: '--fs --vf=hflip --volume-max=300 --volume=130 --speed=1.2',
+  mpv_args: '--vf=hflip --volume-max=300 --volume=130 --speed=1.2',
   min_pause_between_shots: 2.0,
   aggressiveness: 0.4,
   debug: false
