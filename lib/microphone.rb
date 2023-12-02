@@ -24,7 +24,6 @@ class Microphone
     @logger = logger
     @temp_dir = temp_dir
 
-    # TODO: use left channel only? or extract left channel with ffmpeg?
     @arecord_command = ['exec', 'arecord', '--quiet', '--nonblock'] + arecord_args.shellsplit
     @arecord_pipe = nil
   end

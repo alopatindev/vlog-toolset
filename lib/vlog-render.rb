@@ -126,11 +126,12 @@ def merge_small_pauses(segments, min_pause_between_shots)
 end
 
 def process_and_split_videos(segments, options, output_dir, temp_dir)
-  video_codec = if is_hevc_nvenc_supported
-                  'hevc_nvenc'
-                else
-                  'libx265 -preset ultrafast -crf 18'
-                end
+  video_codec =
+    if is_nvenc_supported
+      'hevc_nvenc'
+    else
+      'libx265 -preset ultrafast -crf 18'
+    end
 
   print "processing video clips\n"
 
@@ -144,9 +145,6 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     ext = '.mp4'
     line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
-    # base_output_filename = ([seg[:index].with_leading_zeros] + seg.reject { |key|
-    #  key == :index
-    # }.values.map(&:to_s) + [preview.to_s]).join('_')
     base_output_filename = (seg.reject { |key|
       key == :index
     }.values.map(&:to_s) + [preview.to_s]).join('_')
@@ -238,22 +236,85 @@ def concat_videos(temp_videos, output_filename)
   print "done\n"
 end
 
+def optimize_for_youtube(output_filename, options, temp_dir)
+  print "reencoding for youtube\n"
+
+  output_basename_no_ext = "#{File.basename(output_filename, File.extname(output_filename))}.youtube"
+  temp_youtube_flac_h264_filename = File.join(temp_dir, "#{output_basename_no_ext}.flac.h264.mp4")
+  temp_youtube_opus_filename = File.join(temp_dir, "#{output_basename_no_ext}.opus")
+  temp_youtube_wav_filename = File.join(temp_dir, "#{output_basename_no_ext}.wav")
+  output_youtube_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mp4")
+
+  video_codec =
+    if is_nvenc_supported
+      'h264_nvenc -preset slow'
+    else
+      'libx264 -preset ultrafast -crf 18'
+    end
+
+  command =
+    FFMPEG + [
+      '-threads', Concurrent.processor_count,
+      '-i', output_filename,
+      '-vcodec', video_codec,
+      '-acodec', 'flac',
+      '-pix_fmt', 'yuv420p',
+      '-movflags', 'faststart',
+      '-strict', '-2',
+      temp_youtube_flac_h264_filename
+    ]
+  system command.shelljoin_wrapped
+
+  command = FFMPEG + [
+    '-i', temp_youtube_flac_h264_filename,
+    temp_youtube_wav_filename
+  ]
+  system command.shelljoin_wrapped
+
+  print "encoding to opus\n"
+  system ['opusenc', '--bitrate', 510, temp_youtube_wav_filename, temp_youtube_opus_filename].shelljoin_wrapped
+
+  print "producing youtube output\n"
+  command = FFMPEG + [
+    '-an',
+    '-i', temp_youtube_flac_h264_filename,
+    '-i', temp_youtube_opus_filename,
+    '-c', 'copy',
+    '-strict', '-2',
+    output_youtube_filename
+  ]
+  system command.shelljoin_wrapped
+
+  return unless options[:cleanup]
+
+  FileUtils.rm_f [temp_youtube_flac_h264_filename, temp_youtube_wav_filename,
+                  temp_youtube_opus_filename]
+end
+
 def compute_player_position(segments, options)
   segments.select { |seg| seg[:index] < options[:line_in_file] - 1 }
           .map { |seg| seg[:end_position] - seg[:start_position] }
           .sum / clamp_speed(options[:speed])
 end
 
-def is_hevc_nvenc_supported
-  command = FFMPEG + ['--help', 'encoder=hevc_nvenc']
-  if `#{command.shelljoin_wrapped}`.include? 'is not recognized'
-    print "ffmpeg was built without hevc_nvenc support\n"
+def is_nvenc_supported
+  if !encoder_supported('hevc_nvenc') || !encoder_supported('h264_nvenc')
     false
   elsif (find_executable 'nvcc').nil?
     print "nvidia-cuda-toolkit is not installed\n"
     false
   elsif !File.exist?('/dev/nvidia0')
     print "nvidia module is not loaded\n"
+    false
+  else
+    true
+  end
+end
+
+def encoder_supported(encoder)
+  command = FFMPEG + ['--help', "encoder=#{encoder}"]
+  if `#{command.shelljoin_wrapped}`.include? 'is not recognized'
+    print "ffmpeg was built without #{encoder} support\n"
     false
   else
     true
@@ -295,7 +356,7 @@ def test_merge_small_pauses
 end
 
 def generate_config(options)
-  render_conf_filename = "#{options[:project_dir]}#{File::SEPARATOR}render.conf"
+  render_conf_filename = File.join(options[:project_dir], 'render.conf')
   exists = File.exist?(render_conf_filename)
   File.open(render_conf_filename, exists ? 'r+' : 'w') do |render_conf_file|
     video_filenames = Dir.glob("#{options[:project_dir]}#{File::SEPARATOR}0*.mp4").sort
@@ -379,7 +440,7 @@ def parse_options!(options, args)
     end
     opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f.to_i }
     opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
-    opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}")") do |v|
+    opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}\")") do |v|
       options[:video_filters] = v
     end
     opts.on('-c', '--cleanup <true|false>',
@@ -392,6 +453,10 @@ def parse_options!(options, args)
     opts.on('-W', '--whisper-cpp-args <dir>',
             "Additional whisper.cpp arguments (default: \"#{options[:whisper_cpp_args]}\")") do |w|
       options[:whisper_cpp_args] += " #{w}"
+    end
+    opts.on('-y', '--youtube <true|false>',
+            "Additionally optimize for youtube (default: #{options[:youtube]})") do |y|
+      options[:youtube] = y == 'true'
     end
   end
 
@@ -414,7 +479,8 @@ options = {
   preview: true,
   line_in_file: 1,
   cleanup: false,
-  whisper_cpp_args: '--model models/ggml-base.bin --language auto'
+  whisper_cpp_args: '--model models/ggml-base.bin --language auto',
+  youtube: false
 }
 
 parse_options!(options, ARGV)
@@ -445,25 +511,21 @@ words_per_second = segments.map do |seg|
   seg[:words] / duration
 end.sum / segments.length
 
+output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir)
+
 print "average words per second = #{words_per_second}\n"
 
-mpv_args =
-  if options[:preview]
-    player_position = compute_player_position segments, options
-    print "player_position = #{player_position}\n"
-    MPV + ["--start=#{player_position}", '--no-fs', output_filename]
-  else
-    ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs', output_filename]
-  end
-
-command_escaped = mpv_args.shelljoin_wrapped
 if options[:preview]
-  system command_escaped
+  player_position = compute_player_position segments, options
+  print "player_position = #{player_position}\n"
+  command = MPV + ["--start=#{player_position}", '--no-fs', output_filename]
+  system command.shelljoin_wrapped
 else
-  print("done, you can run:\n")
-  print(command_escaped + "\n")
+  print("done 🎉\n")
+  print("you can run:\n\n")
+  mpv_args = ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs']
+  print(mpv_args + [output_filename].shelljoin_wrapped + "\n\n")
+  print(mpv_args + [output_youtube_filename].shelljoin_wrapped + "\n\n") if options[:youtube]
 end
 
 # TODO: add --gc flag to remove no longer needed tmp/output files
-# TODO: rename tmp to cache? .cache? probably no
-# TODO: final render to both HEVC and H.264, in parallel

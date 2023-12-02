@@ -234,8 +234,14 @@ class DevicesFacade
       output_filename = "#{camera_filename}_#{subclip_num}.processed.mp4"
       temp_filename = "#{camera_filename}_#{subclip_num}.cut.mp4"
 
-      command = FFMPEG + ['-ss', start_position, '-i', camera_filename, '-to', end_position - start_position, '-an',
-                          '-codec', 'copy', temp_filename]
+      command = FFMPEG + [
+        '-ss', start_position,
+        '-i', camera_filename,
+        '-to', end_position - start_position,
+        '-an',
+        '-codec', 'copy',
+        temp_filename
+      ]
       system command.shelljoin_wrapped
       FileUtils.mv temp_filename, output_filename, force: true
 

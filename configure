@@ -1,10 +1,9 @@
 #!/bin/sh
 
 # TODO: rename to install-dependencies.sh ?
+# TODO: download sync-audio-tracks?
 
 ADB_REPULL_COMMIT="f253e1a27be58a457ed02bb116788c43f9e37798"
-
-# TODO: if gentoo - --break-system-packages
 
 echo "Checking installed dependencies..."
 for i in ruby python3 pip3 ffmpeg sync-audio-tracks.sh arecord mpv adb; do
@@ -20,25 +19,17 @@ echo "Installing dependencies..."
 set -euo pipefail
 cd "$(dirname $0)"
 
+gem install concurrent-ruby colorize
+
 # TODO: add versions
 
-pip3 install --user openai-whisper
-#pip3 install --user faster-whisper==0.10.0
-
-pip3 install --user --break-system-packages onnxruntime torchaudio
-
 # TODO: if nvidia-cuda-toolkit is installed, etc.; AND if torch cuda version is not installed
-# https://github.com/openai/whisper/discussions/47
 #pip3 uninstall --break-system-packages torch
-#pip3 install --user --break-system-packages torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+#pip3 install --user --break-system-packages torch torchvision torchaudio onnxruntime --extra-index-url https://download.pytorch.org/whl/cu116
 
-# TODO: pip3 install --user --break-system-packages numpy==1.24 # TODO: whisper requires old numpy
-
-# TODO: load base module once, to download it
+# TODO: load whisper.cpp base module once, to download it
 
 wget "https://gist.githubusercontent.com/alopatindev/e94ff95ea834500abe2da81ac2a7764f/raw/${ADB_REPULL_COMMIT}/adb_repull.py" -O lib/adb_repull.py
 chmod +x lib/adb_repull.py
-
-gem install concurrent-ruby colorize
 
 echo "Done"
