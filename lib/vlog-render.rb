@@ -272,7 +272,13 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   system command.shelljoin_wrapped
 
   print "encoding to opus\n"
-  system ['opusenc', '--bitrate', 510, temp_youtube_wav_filename, temp_youtube_opus_filename].shelljoin_wrapped
+  system [
+    'opusenc',
+    '--quiet',
+    '--bitrate', 510,
+    temp_youtube_wav_filename,
+    temp_youtube_opus_filename
+  ].shelljoin_wrapped
 
   print "producing youtube output\n"
   command = FFMPEG + [
@@ -285,10 +291,12 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   ]
   system command.shelljoin_wrapped
 
-  return unless options[:cleanup]
+  if options[:cleanup]
+    FileUtils.rm_f [temp_youtube_flac_h264_filename, temp_youtube_wav_filename,
+                    temp_youtube_opus_filename]
+  end
 
-  FileUtils.rm_f [temp_youtube_flac_h264_filename, temp_youtube_wav_filename,
-                  temp_youtube_opus_filename]
+  output_youtube_filename
 end
 
 def compute_player_position(segments, options)
@@ -511,8 +519,6 @@ words_per_second = segments.map do |seg|
   seg[:words] / duration
 end.sum / segments.length
 
-output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir)
-
 print "average words per second = #{words_per_second}\n"
 
 if options[:preview]
@@ -521,11 +527,13 @@ if options[:preview]
   command = MPV + ["--start=#{player_position}", '--no-fs', output_filename]
   system command.shelljoin_wrapped
 else
+  output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
+
   print("done 🎉\n")
   print("you can run:\n\n")
   mpv_args = ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs']
-  print(mpv_args + [output_filename].shelljoin_wrapped + "\n\n")
-  print(mpv_args + [output_youtube_filename].shelljoin_wrapped + "\n\n") if options[:youtube]
+  print((mpv_args + [output_filename]).shelljoin_wrapped + "\n\n")
+  print((mpv_args + [output_youtube_filename]).shelljoin_wrapped + "\n\n") if options[:youtube]
 end
 
 # TODO: add --gc flag to remove no longer needed tmp/output files
