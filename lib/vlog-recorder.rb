@@ -210,7 +210,7 @@ class DevicesFacade
 
     if trim_noise
       voice_segments = detect_voice sync_sound_filename, MIN_SHOT_SIZE, @min_pause_between_shots, @aggressiveness
-      @logger.debug "voice segments: #{voice_segments.join(',')}"
+      @logger.debug "voice segments: #{voice_segments.join(',')} (aggressiveness=#{@aggressiveness})"
 
       unless voice_segments.empty?
         segments = voice_segments
@@ -438,7 +438,7 @@ def parse_options!(options, args)
     end
     opts.on('-a',
             '--aggressiveness <0..1>', "How aggressively to filter out non-speech (default: #{options[:aggressiveness]})") do |a|
-      options[:aggressiveness] = a.to_i
+      options[:aggressiveness] = a.to_f
     end
     opts.on('-d', '--debug <true|false>', "Show debug messages (default: #{options[:debug]})") do |d|
       options[:debug] = d == 'true'

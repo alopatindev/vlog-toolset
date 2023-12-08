@@ -20,7 +20,7 @@ require 'fileutils'
 
 def detect_voice(sound_filename, min_shot_size, min_pause_between_shots, agressiveness)
   first_segment_correction = 0.5
-  speech_pad = 0.2
+  speech_pad = 0.1
 
   script_filename = File.join(__dir__, 'detect_voice.py')
 
