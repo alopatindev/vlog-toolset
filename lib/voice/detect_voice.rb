@@ -25,9 +25,11 @@ def detect_voice(sound_filename, min_shot_size, min_pause_between_shots, agressi
   script_filename = File.join(__dir__, 'detect_voice.py')
 
   sound_with_single_channel_filename = prepare_for_vad(sound_filename)
-  command = [script_filename, VAD_SAMPLING_RATE, sound_with_single_channel_filename, agressiveness, min_shot_size,
+  command = [script_filename, sound_with_single_channel_filename, VAD_SAMPLING_RATE, agressiveness, min_shot_size,
              min_pause_between_shots, speech_pad]
   output = `#{command.shelljoin_wrapped} 2>>/dev/null`
+
+  raise "#{command} failed" if $?.exitstatus != 0
 
   FileUtils.rm_f sound_with_single_channel_filename
 

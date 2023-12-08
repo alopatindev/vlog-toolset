@@ -209,7 +209,7 @@ class DevicesFacade
     end
 
     if trim_noise
-      voice_segments = detect_voice sync_sound_filename, MIN_SHOT_SIZE, @min_pause_between_shots, @aggressiveness
+      voice_segments = detect_voice(sync_sound_filename, MIN_SHOT_SIZE, @min_pause_between_shots, @aggressiveness)
       @logger.debug "voice segments: #{voice_segments.join(',')} (aggressiveness=#{@aggressiveness})"
 
       unless voice_segments.empty?

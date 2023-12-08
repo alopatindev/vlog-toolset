@@ -59,7 +59,7 @@ class Phone
     return if opencamera_was_active
 
     set_front_camera
-    sleep 0.8
+    sleep 2.0
     focus
     sleep 0.5
     lock_exposure
