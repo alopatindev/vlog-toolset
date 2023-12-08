@@ -29,6 +29,8 @@ class Phone
   LANDSCAPE_FRONT_CAMERA_ON_LEFT = 90
   LANDSCAPE_FRONT_CAMERA_ON_RIGHT = 270
 
+  attr_reader :rotation
+
   def initialize(temp_dir, options, logger)
     @temp_dir = temp_dir
 
@@ -142,6 +144,8 @@ class Phone
     elsif @rotation == LANDSCAPE_FRONT_CAMERA_ON_RIGHT
       screen_x = @left + (1.0 - x) * width
       screen_y = @top + (1.0 - y) * height
+    else
+      raise 'unexpected rotation'
     end
 
     @logger.debug "rotation=#{@rotation} screen_x=#{screen_x}, screen_y=#{screen_y}"
@@ -180,10 +184,6 @@ class Phone
   def set_front_camera
     @logger.debug 'set_front_camera'
     tap 0.955, 0.292
-  end
-
-  def rotation
-    (@rotation - 90) % 360
   end
 
   def update_app_bounds!

@@ -143,6 +143,7 @@ class DevicesFacade
     clip_num = @clip_num
     phone_filename = @phone.filename(clip_num)
     sound_filename = @microphone.filename(clip_num)
+    rotation = @phone.rotation
 
     if @saving_clips.include?(clip_num) || phone_filename.nil? || sound_filename.nil?
       @logger.debug "save_clip: skipping #{clip_num}"
@@ -162,7 +163,7 @@ class DevicesFacade
         @logger.debug "save_clip: processed_sound_filenames=#{processed_sound_filenames}"
 
         processed_video_filenames = process_video(camera_filename, segments)
-        output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num)
+        output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation)
         remove_files [camera_filename, sound_filename,
                       sync_sound_filename] + processed_sound_filenames + processed_video_filenames
         @logger.info "save_clip: #{clip_num} as #{output_filenames} ok"
@@ -173,7 +174,7 @@ class DevicesFacade
     end
   end
 
-  def merge_files(processed_sound_filenames, processed_video_filenames, clip_num)
+  def merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation)
     processed_sound_filenames
       .zip(processed_video_filenames)
       .each_with_index
@@ -181,7 +182,7 @@ class DevicesFacade
       @logger.debug "save_clip: merging files #{f} #{subclip_num}"
 
       processed_sound_filename, processed_video_filename = f
-      output_filename = get_output_filename clip_num, subclip_num
+      output_filename = get_output_filename clip_num, subclip_num, rotation
       @logger.debug "save_clip: output_filename=#{output_filename}"
       command = FFMPEG + ['-i', processed_sound_filename, '-an', '-i', processed_video_filename, '-shortest',
                           '-strict', '-2', '-codec', 'copy', '-movflags', 'faststart', output_filename]
@@ -249,8 +250,13 @@ class DevicesFacade
     end
   end
 
-  def get_output_filename(clip_num, subclip_num)
-    File.join @project_dir, "#{clip_num.with_leading_zeros}_#{subclip_num.with_leading_zeros}.mp4"
+  def get_output_filename(clip_num, subclip_num, rotation)
+    prefix = File.join @project_dir, "#{clip_num.with_leading_zeros}_#{subclip_num.with_leading_zeros}"
+    if rotation.nil?
+      Dir[prefix + '*'].first
+    else
+      "#{prefix}_#{rotation}.mp4"
+    end
   end
 
   def synchronize_sound(camera_filename, sound_filename)
@@ -332,13 +338,18 @@ class DevicesFacade
     last_clip_num = parse_clip_num clips.last
     @logger.debug "play clip: #{last_clip_num}"
 
-    last_clip_filename = File.basename(get_output_filename(last_clip_num, subclip_num = 0))
+    last_clip_filename = File.basename(get_output_filename(last_clip_num, subclip_num = 0, rotation = nil))
+    rotation = last_clip_filename.split('_')[2].split('.')[0].to_i
+    restored_rotation = (rotation - 90) % 360
+
     position_in_playlist = clips
                            .map { |f| File.basename(f) }
                            .index(last_clip_filename) || clips.length - 1
 
-    mpv_args = @mpv_args.shellsplit + ["--video-rotate=#{@phone.rotation}", "--playlist-start=#{position_in_playlist}",
+    mpv_args = @mpv_args.shellsplit + ["--video-rotate=#{restored_rotation}", "--playlist-start=#{position_in_playlist}",
                                        clips.join(' ')]
+
+    # TODO: add current rotation to filename and use it in render?
 
     command = MPV + mpv_args
     @logger.debug command

@@ -17,6 +17,7 @@
 
 require 'media_utils'
 require 'numeric'
+require 'phone'
 require 'shellwords_utils'
 
 require 'concurrent'
@@ -125,10 +126,39 @@ def merge_small_pauses(segments, min_pause_between_shots)
   end
 end
 
+def rotation_filter(basename)
+  print "basename=#{basename}\n"
+  rotation = basename.split('_')[2]
+  rotation =
+    if rotation.nil?
+      Phone::LANDSCAPE_FRONT_CAMERA_ON_LEFT
+    else
+      rotation.split('.')[0].to_i
+    end
+  print "rotation=#{rotation}\n"
+  if rotation == Phone::PORTRAIT
+    'transpose=dir=cclock'
+  elsif rotation == Phone::REVERSED_PORTRAIT
+    'transpose=dir=clock'
+  elsif rotation == Phone::LANDSCAPE_FRONT_CAMERA_ON_LEFT
+    ''
+  elsif rotation == Phone::LANDSCAPE_FRONT_CAMERA_ON_RIGHT
+    'transpose=dir=clock,transpose=dir=clock'
+  else
+    raise 'unexpected rotation'
+  end
+end
+
+def remove_file_if_empty(filename)
+  return unless File.exist?(filename) && File.size(filename) == 0
+
+  File.delete(filename)
+end
+
 def process_and_split_videos(segments, options, output_dir, temp_dir)
   video_codec =
     if nvenc_is_supported('hevc_nvenc')
-      'hevc_nvenc' # TODO: quality, preset
+      'hevc_nvenc -preset p1 -cq 18 -qp 18'
     else
       'libx265 -preset ultrafast -crf 18'
     end
@@ -145,6 +175,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     ext = '.mp4'
     line_in_config = seg[:index] + 1
     basename = File.basename seg[:video_filename]
+
     base_output_filename = (seg.reject { |key|
       key == :index
     }.values.map(&:to_s) + [preview.to_s]).join('_')
@@ -154,10 +185,11 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     thread_pool.post do
       audio_filters = "atempo=#{seg[:speed]}"
       video_filters = [
+        rotation_filter(basename),
         options[:video_filters],
         "fps=#{fps}",
         "setpts=(1/#{seg[:speed]})*PTS" # TODO: is it correct?
-      ].join(',')
+      ].reject { |i| i.empty? }.join(',')
       if preview
         video_filters = [
           "scale=#{PREVIEW_WIDTH}:-1",
@@ -178,6 +210,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         '-movflags', 'faststart',
         temp_cut_output_filename
       ]
+      remove_file_if_empty(temp_cut_output_filename)
       system command.shelljoin_wrapped
 
       command = FFMPEG_NO_OVERWRITE + [
@@ -191,6 +224,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         '-movflags', 'faststart',
         output_filename
       ]
+      remove_file_if_empty(output_filename)
       system command.shelljoin_wrapped
 
       print "#{basename} (#{index + 1}/#{segments.length})\n"
@@ -415,6 +449,8 @@ def generate_config(options)
       FileUtils.rm_f transcribed_json
     end
   end
+
+  exists
 end
 
 def filename_to_clip(filename)
@@ -491,10 +527,14 @@ options = {
 
 parse_options!(options, ARGV)
 
-generate_config(options)
-
 project_dir = options[:project_dir]
 config_filename = File.join project_dir, CONFIG_FILENAME
+
+old_config = generate_config(options)
+unless old_config
+  print "\nNow edit #{config_filename} and restart render to finish\n"
+  exit 0
+end
 
 output_postfix = options[:preview] ? '_preview' : ''
 output_filename = File.join project_dir, "output#{output_postfix}.mp4"
