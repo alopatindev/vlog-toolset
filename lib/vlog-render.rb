@@ -127,7 +127,6 @@ def merge_small_pauses(segments, min_pause_between_shots)
 end
 
 def rotation_filter(basename)
-  print "basename=#{basename}\n"
   rotation = basename.split('_')[2]
   rotation =
     if rotation.nil?
@@ -135,7 +134,6 @@ def rotation_filter(basename)
     else
       rotation.split('.')[0].to_i
     end
-  print "rotation=#{rotation}\n"
   if rotation == Phone::PORTRAIT
     'transpose=dir=cclock'
   elsif rotation == Phone::REVERSED_PORTRAIT

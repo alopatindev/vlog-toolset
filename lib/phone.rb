@@ -56,7 +56,7 @@ class Phone
     run_opencamera unless opencamera_was_active
     unlock_auto_rotate
     @initial_brightness = get_brightness
-    set_front_camera unless opencamera_was_active
+    # set_front_camera unless opencamera_was_active
   end
 
   def move_to_host(phone_filename, clip_num)
