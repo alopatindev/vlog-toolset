@@ -41,16 +41,14 @@ def main(args):
     available_threads = max(torch.get_num_threads(), os.cpu_count())
     torch.set_num_threads(available_threads)
 
-    model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
-                                  model='silero_vad',
-                                  force_reload=False,
-                                  onnx=USE_ONNX)
+    model, utils = torch.hub.load(
+        repo_or_dir='snakers4/silero-vad',
+        model='silero_vad',
+        force_reload=False,
+        onnx=USE_ONNX
+    )
 
-    (get_speech_timestamps,
-     save_audio,
-     read_audio,
-     VADIterator,
-     collect_chunks) = utils
+    get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks = utils
 
     audio = read_audio(sound_filename, sampling_rate=sampling_rate)
     speech_timestamps = get_speech_timestamps(
