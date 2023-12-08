@@ -407,7 +407,6 @@ def generate_config(options)
       last_recorded_clip = filename_to_clip(last_recorded_filename)
       print "last_recorded_clip = #{last_recorded_clip}\n"
       skip_clips = video_filenames.filter { |i| filename_to_clip(i) <= last_recorded_clip }.length
-      print "skip_clips = #{skip_clips}\n"
       video_filenames = video_filenames.drop(skip_clips)
     else
       write_columns(render_conf_file, ['#filename', 'speed', 'start', 'end', 'text'])

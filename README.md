@@ -138,8 +138,8 @@ vi ~/video/new-cool-video-project/render.conf
         - Video format - **MPEG4 HEVC**
         - Video picture profiles - TODO
         - Video frame rate (approx) - 30
-    - Processing settings - Anti-banding - TODO
     - Camera API - Camera2 API
+    - If you recording with artificial lighting and you experience flickering: Processing settings - Anti-banding - Auto (or precisely 50 Hz in my case)
 
 ## TODO: RIIR?
 - [adb](https://github.com/kpcyrd/forensic-adb/blob/736f7c43d116b6334af3c1d8c4a41f9ae06ff812/src/lib.rs#L754)
@@ -155,4 +155,4 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions; read LICENSE.txt for details.
 
-Copyright (C) 2018—2023  Alexander Lopatin <alopatindev ät gmail dot com>
+Copyright (C) 2018—∞  Alexander Lopatin <alopatindev ät gmail dot com>

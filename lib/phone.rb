@@ -56,7 +56,13 @@ class Phone
     run_opencamera unless opencamera_was_active
     unlock_auto_rotate
     @initial_brightness = get_brightness
-    # set_front_camera unless opencamera_was_active
+    return if opencamera_was_active
+
+    set_front_camera
+    sleep 0.8
+    focus
+    sleep 0.5
+    lock_exposure
   end
 
   def move_to_host(phone_filename, clip_num)
@@ -178,12 +184,17 @@ class Phone
   end
 
   def close_opencamera
-    adb_shell('input keyevent KEYCODE_BACK')
+    adb_shell("am force-stop #{APP_ID}")
   end
 
   def set_front_camera
     @logger.debug 'set_front_camera'
     tap 0.955, 0.292
+  end
+
+  def lock_exposure
+    @logger.debug 'lock_exposure'
+    tap 0.08, 0.92
   end
 
   def update_app_bounds!
