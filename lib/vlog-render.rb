@@ -46,7 +46,7 @@ def parse(filename, options)
         final_speed = clamp_speed(speed.to_f * options[:speed])
         min_speed = 1.0 # FIXME: set min speed to 44.1/48?
         if final_speed < min_speed
-          print "segment #{video_filename} has speed #{final_speed} < 1; forcing speed #{min_speed}\n"
+          print("segment #{video_filename} has speed #{final_speed} < 1; forcing speed #{min_speed}\n")
           final_speed = min_speed
         end
 
@@ -65,7 +65,7 @@ def parse(filename, options)
 end
 
 def apply_delays(segments)
-  print "computing delays\n"
+  print("computing delays\n")
 
   delay_time = 1.0
 
@@ -161,7 +161,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
       'libx265 -preset ultrafast -crf 18'
     end
 
-  print "processing video clips\n"
+  print("processing video clips\n")
 
   fps = options[:fps]
   preview = options[:preview]
@@ -226,11 +226,11 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
       remove_file_if_empty(output_filename)
       system command.shelljoin_wrapped
 
-      print "#{basename} (#{index + 1}/#{segments.length})\n"
+      print("#{basename} (#{index + 1}/#{segments.length})\n")
 
       FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
     rescue StandardError => e
-      print "exception for segment #{seg}: #{e} #{e.backtrace}\n"
+      print("exception for segment #{seg}: #{e} #{e.backtrace}\n")
     end
 
     output_filename
@@ -243,7 +243,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
 end
 
 def concat_videos(temp_videos, output_filename)
-  print "rendering to #{output_filename}\n"
+  print("rendering to #{output_filename}\n")
 
   parts = temp_videos.map { |f| "file 'file:#{f}'" }
                      .join "\n"
@@ -266,11 +266,11 @@ def concat_videos(temp_videos, output_filename)
     f.close_write
   end
 
-  print "done\n"
+  print("done\n")
 end
 
 def optimize_for_youtube(output_filename, options, temp_dir)
-  print "reencoding for youtube\n"
+  print("reencoding for youtube\n")
 
   output_basename_no_ext = "#{File.basename(output_filename, File.extname(output_filename))}.youtube"
   temp_youtube_flac_h264_filename = File.join(temp_dir, "#{output_basename_no_ext}.flac.h264.mp4")
@@ -304,7 +304,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   ]
   system command.shelljoin_wrapped
 
-  print "encoding to opus\n"
+  print("encoding to opus\n")
   system [
     'opusenc',
     '--quiet',
@@ -313,7 +313,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
     temp_youtube_opus_filename
   ].shelljoin_wrapped
 
-  print "producing youtube output\n"
+  print("producing youtube output\n")
   command = FFMPEG + [
     '-an',
     '-i', temp_youtube_flac_h264_filename,
@@ -340,10 +340,10 @@ end
 
 def nvidia_cuda_is_ready
   if (find_executable 'nvcc').nil?
-    print "nvidia-cuda-toolkit is not installed\n"
+    print("nvidia-cuda-toolkit is not installed\n")
     false
   elsif !File.exist?('/dev/nvidia0')
-    print "nvidia module is not loaded\n"
+    print("nvidia module is not loaded\n")
     false
   else
     true
@@ -352,8 +352,8 @@ end
 
 def nvenc_is_supported(encoder)
   command = FFMPEG + ['--help', "encoder=#{encoder}"]
-  if `#{command.shelljoin_wrapped}`.include? 'is not recognized'
-    print "ffmpeg was built without #{encoder} support\n"
+  if `#{command.shelljoin_wrapped}`.include?('is not recognized')
+    print("ffmpeg was built without #{encoder} support\n")
     false
   else
     nvidia_cuda_is_ready
@@ -406,7 +406,7 @@ def generate_config(options)
       first_column = last_line.split("\t")[0]
       last_recorded_filename = first_column.split('#').last.strip
       last_recorded_clip = filename_to_clip(last_recorded_filename)
-      print "last_recorded_clip = #{last_recorded_clip}\n"
+      print("last_recorded_clip = #{last_recorded_clip}\n")
       skip_clips = video_filenames.filter { |i| filename_to_clip(i) <= last_recorded_clip }.length
       video_filenames = video_filenames.drop(skip_clips)
     else
@@ -415,14 +415,14 @@ def generate_config(options)
 
     sound_with_single_channel_filenames = video_filenames.map { |i| prepare_for_vad(i) }
     if sound_with_single_channel_filenames.empty?
-      print "nothing to transcribe\n"
+      print("nothing to transcribe\n")
     else
       command = [
         './main',
         '--output-json'
       ] + [options[:whisper_cpp_args]] + sound_with_single_channel_filenames
       Dir.chdir options[:whisper_cpp_dir] do
-        print "#{command}\n"
+        print("#{command}\n")
         system command.shelljoin_wrapped
       end
     end
@@ -504,7 +504,7 @@ def parse_options!(options, args)
 
   return unless options[:project_dir].nil?
 
-  print parser.help
+  print(parser.help)
   exit 1
 end
 
@@ -556,11 +556,11 @@ words_per_second = segments.map do |seg|
   seg[:words] / duration
 end.sum / segments.length
 
-print "average words per second = #{words_per_second}\n"
+print("average words per second = #{words_per_second}\n")
 
 if options[:preview]
   player_position = compute_player_position segments, options
-  print "player_position = #{player_position}\n"
+  print("player_position = #{player_position}\n")
   command = MPV + ["--start=#{player_position}", '--no-fs', output_filename]
   system command.shelljoin_wrapped
 else

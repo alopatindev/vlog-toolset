@@ -65,7 +65,7 @@ class DevicesFacade
 
     logger.info('initialized')
 
-    print "\r"
+    print("\r")
     STDOUT.flush
   end
 
@@ -377,7 +377,7 @@ class DevicesFacade
       raise if spaces < 0
 
       postfix = ' ' * spaces
-      print "#{text}#{postfix}\r"
+      print("#{text}#{postfix}\r")
       STDOUT.flush
     end
   end
@@ -516,16 +516,16 @@ def parse_options!(options, args)
 
   return unless options[:project_dir].nil?
 
-  print parser.help
+  print(parser.help)
   exit 1
 end
 
 def show_cursor
-  print "\e[?25h"
+  print("\e[?25h")
 end
 
 def hide_cursor
-  print "\e[?25l"
+  print("\e[?25l")
 end
 
 options = {
@@ -543,7 +543,7 @@ parse_options!(options, ARGV)
 
 begin
   hide_cursor
-  print 'Initializing...'
+  print('Initializing...')
 
   project_dir = options[:project_dir]
   temp_dir = File.join project_dir, 'tmp'
