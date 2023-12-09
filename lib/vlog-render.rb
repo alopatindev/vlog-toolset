@@ -155,7 +155,7 @@ end
 
 def process_and_split_videos(segments, options, output_dir, temp_dir)
   video_codec =
-    if nvenc_is_supported('hevc_nvenc')
+    if nvenc_supported?('hevc_nvenc')
       'hevc_nvenc -preset p1 -cq 18 -qp 18'
     else
       'libx265 -preset ultrafast -crf 18'
@@ -280,7 +280,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   output_youtube_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mp4")
 
   video_codec =
-    if nvenc_is_supported('h264_nvenc')
+    if nvenc_supported?('h264_nvenc')
       'h264_nvenc -preset slow -cq 18'
     else
       'libx264 -preset ultrafast -crf 18'
@@ -339,7 +339,7 @@ def compute_player_position(segments, options)
           .sum / clamp_speed(options[:speed])
 end
 
-def nvidia_cuda_is_ready
+def nvidia_cuda_ready?
   if (find_executable 'nvcc').nil?
     print("nvidia-cuda-toolkit is not installed\n")
     false
@@ -351,13 +351,13 @@ def nvidia_cuda_is_ready
   end
 end
 
-def nvenc_is_supported(encoder)
+def nvenc_supported?(encoder)
   command = FFMPEG + ['--help', "encoder=#{encoder}"]
   if `#{command.shelljoin_wrapped}`.include?('is not recognized')
     print("ffmpeg was built without #{encoder} support\n")
     false
   else
-    nvidia_cuda_is_ready
+    nvidia_cuda_ready?
   end
 end
 

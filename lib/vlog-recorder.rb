@@ -132,7 +132,7 @@ class DevicesFacade
   end
 
   def delete_unsaved_clip
-    if is_saving_current_clip
+    if saving_current_clip?
       false
     else
       ok = @microphone.delete_clip @clip_num
@@ -143,7 +143,7 @@ class DevicesFacade
 
   def delete_clip
     @logger.debug 'delete_clip'
-    if is_saving_current_clip
+    if saving_current_clip?
       delete_last_subclip
     else
       ok = delete_unsaved_clip
@@ -167,7 +167,7 @@ class DevicesFacade
     sound_filename = @microphone.filename(clip_num)
     rotation = @phone.rotation
 
-    if is_saving_current_clip || phone_filename.nil? || sound_filename.nil?
+    if saving_current_clip? || phone_filename.nil? || sound_filename.nil?
       @logger.debug "save_clip: skipping #{clip_num}"
     else
       @logger.info "save_clip #{clip_num}"
@@ -205,7 +205,7 @@ class DevicesFacade
     end
   end
 
-  def is_saving_current_clip
+  def saving_current_clip?
     clip_num = @clip_num
     @status_mutex.synchronize do
       @saving_clips.include?(clip_num)

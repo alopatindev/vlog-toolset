@@ -54,7 +54,7 @@ class Phone
 
     raise 'You need to unlock the screen' if locked?
 
-    raise 'You need to unmute the phone mic' if mic_is_muted?
+    raise 'You need to unmute the phone mic' if mic_muted?
 
     unlock_auto_rotate
     close_opencamera
@@ -181,7 +181,7 @@ class Phone
     Regexp.last_match(1) == 'true'
   end
 
-  def mic_is_muted?
+  def mic_muted?
     dumpsys = adb_shell('dumpsys audio')
     dumpsys.match?(/mic mute.*=true/)
   end
