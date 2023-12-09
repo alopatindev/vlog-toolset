@@ -47,7 +47,7 @@ class DevicesFacade
     @mpv_args = options[:mpv_args]
     @logger = logger
 
-    @wait_for_rec_startup_or_finalization = false
+    @wait_for_rec_startup_or_finalization = 0
     @recording = false
 
     @clip_num = get_last_clip_num || 0
@@ -101,15 +101,10 @@ class DevicesFacade
 
   def toggle_recording
     @recording = !@recording
-
-    @wait_for_rec_startup_or_finalization = true
-    show_status nil
     if @recording
       @clip_num += 1
     else
-      sleep WAIT_AFTER_REC_STOPPED
-      @wait_for_rec_startup_or_finalization = false
-      show_status nil
+      wait_rec(WAIT_AFTER_REC_STOPPED)
     end
 
     @logger.debug "toggle_recording to #{@recording} clip_num=#{@clip_num}"
@@ -119,9 +114,7 @@ class DevicesFacade
 
     return unless @recording
 
-    sleep WAIT_AFTER_REC_STARTED
-    @wait_for_rec_startup_or_finalization = false
-    show_status nil
+    wait_rec(WAIT_AFTER_REC_STARTED)
   end
 
   def focus
@@ -338,8 +331,8 @@ class DevicesFacade
     size = 80
     if text.nil?
       recording =
-        if @wait_for_rec_startup_or_finalization
-          'WAIT ⌛❗'
+        if @wait_for_rec_startup_or_finalization > 0
+          "WAIT(#{@wait_for_rec_startup_or_finalization.to_i}) ⌛❗"
         elsif @recording
           '🔴'
         else
@@ -382,6 +375,16 @@ class DevicesFacade
     command = MPV + mpv_args
     @logger.debug command
     system command.shelljoin_wrapped
+  end
+
+  def wait_rec(pause)
+    @wait_for_rec_startup_or_finalization = pause
+    while @wait_for_rec_startup_or_finalization > 0
+      show_status nil
+      sleep 1.0
+      @wait_for_rec_startup_or_finalization -= 1
+    end
+    show_status nil
   end
 end
 
