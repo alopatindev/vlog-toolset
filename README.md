@@ -86,7 +86,7 @@ q - QUIT
     - video denoiser, mirror, vignette and/or whatever you [specify](https://ffmpeg.org/ffmpeg-filters.html#Video-Filters)
 - renders video clips to a final video
     - also H.265/HVEC, with hardware acceleration if available
-- plays a video by a given position
+- plays a video from a given position
 
 ```
 Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]

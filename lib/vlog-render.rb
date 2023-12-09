@@ -530,7 +530,8 @@ config_filename = File.join project_dir, CONFIG_FILENAME
 
 old_config = generate_config(options)
 unless old_config
-  print "\nNow edit #{config_filename} and restart render to finish\n"
+  print("Configuration file is ready! 🎉\n")
+  print("Now edit #{config_filename} and restart this script to finish\n")
   exit 0
 end
 
