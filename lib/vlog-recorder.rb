@@ -23,6 +23,7 @@ require 'phone'
 require 'shellwords_utils'
 require 'voice/detect_voice'
 
+require 'colorize'
 require 'concurrent'
 require 'fileutils'
 require 'io/console'
@@ -332,7 +333,7 @@ class DevicesFacade
     if text.nil?
       recording =
         if @wait_for_rec_startup_or_finalization > 0
-          "WAIT(#{@wait_for_rec_startup_or_finalization.to_i}) ⌛❗"
+          'WAIT'.red + "(#{@wait_for_rec_startup_or_finalization.to_i}) ⌛❗"
         elsif @recording
           '🔴'
         else
@@ -369,8 +370,6 @@ class DevicesFacade
 
     mpv_args = @mpv_args.shellsplit + ["--video-rotate=#{restored_rotation}", "--playlist-start=#{position_in_playlist}",
                                        clips.join(' ')]
-
-    # TODO: add current rotation to filename and use it in render?
 
     command = MPV + mpv_args
     @logger.debug command
