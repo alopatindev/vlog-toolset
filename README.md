@@ -147,7 +147,7 @@ vi ~/video/new-cool-video-project/render.conf
 
 ## TODO: Rewrite this prototype in Rust?
 - support other sources (webcams, screencasting)
-    - support multiple sources at the same time
+    - support multiple sources (cams, mics) at the same time
 - [adb](https://github.com/kpcyrd/forensic-adb/blob/736f7c43d116b6334af3c1d8c4a41f9ae06ff812/src/lib.rs#L754)
     - `pull` performance comparing `android-tools`? for USB 2 and 3
 

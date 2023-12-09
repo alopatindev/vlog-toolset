@@ -17,7 +17,6 @@ require 'numeric'
 require 'shellwords_utils'
 
 require 'fileutils'
-require 'io/console'
 
 # TODO: handle temporary USB connection failure
 
@@ -28,6 +27,8 @@ class Microphone
 
     @arecord_command = ['exec', 'arecord', '--quiet', '--nonblock'] + arecord_args.shellsplit
     @arecord_pipe = nil
+
+    raise 'Mic is not connected' unless connected?
   end
 
   def toggle_recording(clip_num)
@@ -38,7 +39,7 @@ class Microphone
       @arecord_pipe = IO.popen "#{command.shelljoin_wrapped} >/dev/null 2>&1"
     else
       @logger.debug "kill #{@arecord_pipe.pid} clip_num=#{clip_num}"
-      Process.kill 'SIGTERM', @arecord_pipe.pid
+      kill_process(@arecord_pipe.pid)
       @logger.debug "arecord says: '#{@arecord_pipe.read}'"
       @arecord_pipe.close
       @arecord_pipe = nil
@@ -51,7 +52,7 @@ class Microphone
       false
     else
       @logger.debug "mic.delete_clip #{clip_num}: #{sound_filename}"
-      FileUtils.rm_f sound_filename
+      FileUtils.rm_f(sound_filename)
       true
     end
   end
@@ -64,4 +65,36 @@ class Microphone
   def unchecked_filename(clip_num)
     File.join @temp_dir, clip_num.with_leading_zeros + '.wav'
   end
+
+  def recording?
+    !@arecord_pipe.nil? && !@arecord_pipe.closed? && !process_running?(@arecord_pipe.pid)
+  end
+
+  def connected?
+    if recording?
+      true
+    else
+      command = @arecord_command + [
+        '--duration=1',
+        '--test-nowait',
+        '--quiet',
+        '/dev/null'
+      ]
+      system("#{command.shelljoin_wrapped} 2>>/dev/null")
+      $?.exitstatus == 0
+    end
+  end
+end
+
+# TODO: move to process_utils.rb
+
+def process_running?(pid)
+  Process.waitpid(pid, Process::WNOHANG).nil?
+rescue Errno::ECHILD
+  false
+end
+
+def kill_process(pid)
+  Process.kill 'SIGTERM', pid
+rescue Errno::ESRCH
 end

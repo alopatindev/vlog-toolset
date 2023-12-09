@@ -13,6 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
+# TODO: rename to numeric_utils
+
 class Numeric
   def with_leading_zeros
     format('0%05d', self)

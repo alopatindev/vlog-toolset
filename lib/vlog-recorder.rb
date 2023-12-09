@@ -26,6 +26,7 @@ require 'voice/detect_voice'
 require 'colorize'
 require 'concurrent'
 require 'fileutils'
+require 'io/console'
 require 'logger'
 require 'optparse'
 
@@ -373,8 +374,9 @@ class DevicesFacade
             ['⚡❌', nil]
           end
 
+        mic_status = @microphone.connected? ? '' : ' | 🎙️❌'
         free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`, free_phone_storage)
-        text = "[ #{recording}#{media_processing}] [ 💻 | 💾 #{free_storage} ] [ 📞 | #{phone_status} ]"
+        text = "[ #{recording}#{media_processing}] [ 💻 | 💾 #{free_storage}#{mic_status} ] [ 📞 | #{phone_status} ]"
       end
 
       spaces = size - text.length
