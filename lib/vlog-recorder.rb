@@ -34,6 +34,7 @@ require 'optparse'
 
 class DevicesFacade
   MIN_SHOT_SIZE = 1.0
+  WAIT_RECORDING_INITIALIZATION = 4.0
 
   def initialize(options, temp_dir, logger)
     @project_dir = options[:project_dir]
@@ -44,7 +45,7 @@ class DevicesFacade
     @mpv_args = options[:mpv_args]
     @logger = logger
 
-    @wait_initialization = Concurrent::AtomicBoolean.new(false)
+    @wait_initialization = false
     @recording = false
 
     @clip_num = get_last_clip_num || 0
@@ -58,7 +59,6 @@ class DevicesFacade
 
     @phone = Phone.new(temp_dir, options, logger)
     @phone.set_brightness(0)
-
 
     logger.info('initialized')
   end
@@ -99,12 +99,22 @@ class DevicesFacade
 
   def toggle_recording
     @recording = !@recording # TODO: wait 2 seconds before updating status to recording?
-    @clip_num += 1 if @recording
+    if @recording
+      @wait_initialization = true
+      show_status nil
+      @clip_num += 1
+    end
 
     @logger.debug "toggle_recording to #{@recording} clip_num=#{@clip_num}"
 
     @microphone.toggle_recording @clip_num
     @phone.toggle_recording @clip_num, @recording
+
+    return unless @recording
+
+    sleep WAIT_RECORDING_INITIALIZATION
+    @wait_initialization = false
+    show_status nil
   end
 
   def focus
@@ -322,7 +332,7 @@ class DevicesFacade
     if text.nil?
       recording =
         if @recording
-          @wait_initialization.value ? 'WAIT...' : '🔴'
+          @wait_initialization ? 'WAIT...' : '🔴'
         else
           '⬜'
         end
@@ -379,7 +389,7 @@ def show_help
   puts 'p - PLAY last saved clip'
   puts 'f - FOCUS camera on center'
   puts 'h - show HELP'
-  puts 'q / Ctrl+C - QUIT'
+  puts 'q - QUIT'
   puts
 end
 

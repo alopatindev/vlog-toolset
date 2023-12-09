@@ -52,11 +52,10 @@ class Phone
 
     raise 'You need to unlock the screen' if locked?
 
-    opencamera_was_active = opencamera_active?
-    run_opencamera unless opencamera_was_active
     unlock_auto_rotate
+    close_opencamera
+    run_opencamera
     @initial_brightness = get_brightness
-    return if opencamera_was_active
 
     set_front_camera
     sleep 2.0
@@ -173,10 +172,6 @@ class Phone
 
   def unlock_auto_rotate
     adb_shell('settings put system accelerometer_rotation 1')
-  end
-
-  def opencamera_active?
-    adb_shell('dumpsys window windows').match?(/mCurrentFocus=Window\{[0-9a-f]* u0 #{MAIN_ACTIVITY}/)
   end
 
   def run_opencamera
