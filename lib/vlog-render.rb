@@ -198,11 +198,12 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
 
       # might be uneeded step anymore,
       # but still might be useful for NLE video editors
+      dt = seg[:end_position] - seg[:start_position]
       command = FFMPEG_NO_OVERWRITE + [
         '-threads', Concurrent.processor_count,
         '-ss', seg[:start_position],
         '-i', seg[:video_filename],
-        '-to', seg[:end_position] - seg[:start_position],
+        '-to', dt,
         '-strict', '-2',
         '-codec', 'copy',
         '-movflags', 'faststart',

@@ -15,9 +15,11 @@
 
 require 'colorize'
 
-def parse_free_storage(df)
+MIN_SIZE = 4
+
+def parse_free_storage(df, min = MIN_SIZE)
   kib = df.split("\n").map { |line| line.split.first(6) }.transpose.to_h['Available'].to_i
   gib = kib / (1024**2)
   text = "#{gib}G"
-  gib <= 4 ? text.red : text
+  gib <= [MIN_SIZE, min].max ? text.red : text
 end

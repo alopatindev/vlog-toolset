@@ -44,9 +44,14 @@ class DevicesFacade
     @mpv_args = options[:mpv_args]
     @logger = logger
 
+    @wait_initialization = Concurrent::AtomicBoolean.new(false)
     @recording = false
+
     @clip_num = get_last_clip_num || 0
     @logger.debug "clip_num is #{@clip_num}"
+
+    @media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
+    @saving_clips = Set.new
 
     arecord_args = options[:arecord_args]
     @microphone = Microphone.new(temp_dir, arecord_args, logger)
@@ -54,8 +59,6 @@ class DevicesFacade
     @phone = Phone.new(temp_dir, options, logger)
     @phone.set_brightness(0)
 
-    @thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
-    @saving_clips = Set.new
 
     logger.info('initialized')
   end
@@ -95,7 +98,7 @@ class DevicesFacade
   end
 
   def toggle_recording
-    @recording = !@recording
+    @recording = !@recording # TODO: wait 2 seconds before updating status to recording?
     @clip_num += 1 if @recording
 
     @logger.debug "toggle_recording to #{@recording} clip_num=#{@clip_num}"
@@ -151,7 +154,7 @@ class DevicesFacade
       @logger.info "save_clip #{clip_num}"
       @saving_clips.add(clip_num)
 
-      @thread_pool.post do
+      @media_thread_pool.post do
         camera_filename = @phone.move_to_host(phone_filename, clip_num)
         @logger.debug "save_clip: camera_filename=#{camera_filename} sound_filename=#{sound_filename}"
 
@@ -310,17 +313,22 @@ class DevicesFacade
     @phone.restore_brightness
     @phone.close_opencamera
 
-    @thread_pool.shutdown
-    @thread_pool.wait_for_termination
+    @media_thread_pool.shutdown
+    @media_thread_pool.wait_for_termination
   end
 
   def show_status(text)
     size = 80
     if text.nil?
-      recording = @recording ? '🔴' : '⬜'
+      recording =
+        if @recording
+          @wait_initialization.value ? 'WAIT...' : '🔴'
+        else
+          '⬜'
+        end
       phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
-      free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`)
-      text = "[ #{recording} | storage: #{free_storage} ] [ battery: #{phone_battery_level} / #{phone_battery_temperature} | storage: #{free_phone_storage} ]"
+      free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`, free_phone_storage.to_f)
+      text = "[ #{recording} ] [ 💻 | 💾 #{free_storage} ] [ 📞 | #{phone_battery_level} / #{phone_battery_temperature} | 💾 #{free_phone_storage} ]"
     end
 
     spaces = size - text.length
