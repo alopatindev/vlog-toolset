@@ -36,7 +36,7 @@ require 'optparse'
 class DevicesFacade
   MIN_SHOT_SIZE = 1.0
 
-  WAIT_AFTER_REC_STARTED = 3.0
+  WAIT_AFTER_REC_STARTED = 5.0
   WAIT_AFTER_REC_STOPPED = 2.0
 
   def initialize(options, temp_dir, logger)
@@ -93,10 +93,17 @@ class DevicesFacade
   def start_recording
     return if @recording
 
-    if @phone.connected?
+    if @phone.connected? && @microphone.connected?
+      raise 'Unexpected state: Open Camera is not the active window' unless @phone.opencamera_running?
+
+      @phone.run_opencamera
+      @microphone.force_invalidate_connection
+      show_status nil
+
       @logger.debug 'start recording'
       toggle_recording
     else
+      @phone.force_invalidate_connection
       show_status nil
     end
   end
@@ -369,14 +376,15 @@ class DevicesFacade
         phone_status, free_phone_storage =
           if @phone.connected?
             phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
-            ["#{phone_battery_level} / #{phone_battery_temperature} | 💾 #{free_phone_storage}", free_phone_storage.to_f]
+            [" | #{phone_battery_level} / #{phone_battery_temperature} | 💾 #{free_phone_storage}",
+             free_phone_storage.to_f]
           else
-            ['⚡❌', nil]
+            ['❌', nil]
           end
 
         mic_status = @microphone.connected? ? '' : ' | 🎙️❌'
         free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`, free_phone_storage)
-        text = "[ #{recording}#{media_processing}] [ 💻 | 💾 #{free_storage}#{mic_status} ] [ 📞 | #{phone_status} ]"
+        text = "[ #{recording}#{media_processing}] [ 💻 | 💾 #{free_storage}#{mic_status} ] [ 📞#{phone_status} ]"
       end
 
       spaces = size - text.length

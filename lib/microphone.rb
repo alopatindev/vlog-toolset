@@ -17,16 +17,22 @@ require 'numeric'
 require 'shellwords_utils'
 
 require 'fileutils'
+require 'lru_redux'
 
+# TODO: rename to Mic
 # TODO: handle temporary USB connection failure
 
 class Microphone
+  CONNECTED_TTL_SECS = 15
+
   def initialize(temp_dir, arecord_args, logger)
     @logger = logger
     @temp_dir = temp_dir
 
     @arecord_command = ['exec', 'arecord', '--quiet', '--nonblock'] + arecord_args.shellsplit
     @arecord_pipe = nil
+
+    @connected_cache = LruRedux::TTL::Cache.new(1, CONNECTED_TTL_SECS)
 
     raise 'Mic is not connected' unless connected?
   end
@@ -73,7 +79,10 @@ class Microphone
   def connected?
     if recording?
       true
+    elsif @connected_cache.key?(:connected)
+      true
     else
+      @logger.debug 'connection state expired'
       command = @arecord_command + [
         '--duration=1',
         '--test-nowait',
@@ -81,8 +90,17 @@ class Microphone
         '/dev/null'
       ]
       system("#{command.shelljoin_wrapped} 2>>/dev/null")
-      $?.exitstatus == 0
+
+      is_connected = $?.exitstatus == 0
+      @connected_cache[:connected] = true if is_connected
+      @logger.debug "is_connected=#{is_connected}"
+
+      is_connected
     end
+  end
+
+  def force_invalidate_connection
+    @connected_cache.delete(:connected)
   end
 end
 

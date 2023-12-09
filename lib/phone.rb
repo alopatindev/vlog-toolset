@@ -23,6 +23,7 @@ class Phone
   APP_ID = 'net.sourceforge.opencamera'.freeze
   MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
   POLL_WAIT_TIME = 0.3
+  CAMERA_INITIALIZATION_TIME = 3.0
 
   PORTRAIT = 0
   REVERSED_PORTRAIT = 180
@@ -48,13 +49,15 @@ class Phone
     @filenames = Set.new
     @filenames = get_new_filenames.to_set
 
-    raise 'Phone is not connected' unless connected?
+    raise 'Phone is not connected via USB Debugging' unless connected?
 
     wakeup
 
-    raise 'You need to unlock the screen' if locked?
+    raise 'Phone Screen is Locked' if locked?
 
-    raise 'You need to unmute the phone mic' if mic_muted?
+    raise 'Phone Mic is Muted' if mic_muted?
+
+    raise 'Phone Camera is Blocked by user' if camera_blocked?
 
     unlock_auto_rotate
     close_opencamera
@@ -173,12 +176,20 @@ class Phone
   end
 
   def locked?
-    dumpsys = adb_shell('dumpsys window')
-    unless dumpsys =~ /mDreamingLockscreen=(.*?)\s/ || dumpsys =~ /mShowingLockscreen=(.*?)\s/
-      raise 'Failed to check if device is locked'
+    dumpsys = adb_shell('dumpsys deviceidle')
+    unless dumpsys =~ /mScreenLocked=(.*?)\s/
+      dumpsys = adb_shell('dumpsys window')
+      unless dumpsys =~ /mDreamingLockscreen=(.*?)\s/ || dumpsys =~ /mShowingLockscreen=(.*?)\s/
+        raise 'Failed to check if device is locked'
+      end
     end
-
     Regexp.last_match(1) == 'true'
+  end
+
+  def camera_blocked?
+    # TODO
+    false
+    # adb_shell('dumpsys media.camera').include?('Device 0 is closed')
   end
 
   def mic_muted?
@@ -194,8 +205,16 @@ class Phone
     adb_shell('settings put system accelerometer_rotation 1')
   end
 
+  def opencamera_running?
+    adb_shell('dumpsys window windows').match?(/(mCurrentFocus|mHoldScreenWindow)=Window\{[0-9a-f]* u0 #{MAIN_ACTIVITY}/)
+  end
+
   def run_opencamera
-    system "#{@adb_shell} am start -n #{MAIN_ACTIVITY} && sleep 3", out: File::NULL, err: File::NULL
+    already_running = `#{@adb_shell} am start -n #{MAIN_ACTIVITY} 2>>/dev/stdout`.include?('Warning: Activity not started')
+    return if already_running
+
+    @logger.debug 'waiting for phone camera initialization'
+    sleep CAMERA_INITIALIZATION_TIME
   end
 
   def close_opencamera

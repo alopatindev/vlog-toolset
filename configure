@@ -19,7 +19,7 @@ echo "Installing dependencies..."
 set -euo pipefail
 cd "$(dirname $0)"
 
-gem install concurrent-ruby colorize
+gem install colorize concurrent-ruby lru_redux
 
 # TODO: add versions
 
