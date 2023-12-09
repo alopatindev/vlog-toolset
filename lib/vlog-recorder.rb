@@ -252,7 +252,7 @@ class DevicesFacade
         last = segments.length - 1
         segments[last][1] = [end_position, segments[last][1]].min
 
-        segments = segments.select { |r| r[0] < r[1] }
+        segments = segments.filter { |r| r[0] < r[1] }
       end
     end
 
@@ -298,7 +298,7 @@ class DevicesFacade
     command = ['sync-audio-tracks.sh', sound_filename, camera_filename, output_filename]
     sync_offset = `#{command.shelljoin_wrapped}`
                   .split("\n")
-                  .select { |line| line.start_with? 'offset is' }
+                  .filter { |line| line.start_with? 'offset is' }
                   .map { |line| line.sub(/^offset is /, '').sub(/ seconds$/, '').to_f }
                   .first || 0.0
 

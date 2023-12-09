@@ -333,7 +333,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
 end
 
 def compute_player_position(segments, options)
-  segments.select { |seg| seg[:index] < options[:line_in_file] - 1 }
+  segments.filter { |seg| seg[:index] < options[:line_in_file] - 1 }
           .map { |seg| seg[:end_position] - seg[:start_position] }
           .sum / clamp_speed(options[:speed])
 end

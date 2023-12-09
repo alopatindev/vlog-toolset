@@ -233,14 +233,14 @@ class Phone
 
   def get_system_info
     dumpsys = adb_shell('dumpsys battery').split("\n")
-    battery_level = dumpsys.select { |line| line.include? 'level: ' }
+    battery_level = dumpsys.filter { |line| line.include? 'level: ' }
                            .map { |line| line.gsub(/.*: /, '') }
                            .map do |value|
                              text = "#{value}%"
                              value.to_i <= 20 ? "🪫#{text}".red : "🔋#{text}"
                            end
                            .first
-    battery_temperature = dumpsys.select { |line| line.include? 'temperature: ' }
+    battery_temperature = dumpsys.filter { |line| line.include? 'temperature: ' }
                                  .map { |line| line.gsub(/.*: /, '').to_i / 10 }
                                  .map do |value|
                                    text = "#{value}°C"
