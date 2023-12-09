@@ -34,7 +34,9 @@ require 'optparse'
 
 class DevicesFacade
   MIN_SHOT_SIZE = 1.0
-  WAIT_RECORDING_INITIALIZATION = 4.0
+
+  WAIT_AFTER_REC_STARTED = 4.0
+  WAIT_AFTER_REC_STOPPED = 2.0
 
   def initialize(options, temp_dir, logger)
     @project_dir = options[:project_dir]
@@ -45,7 +47,7 @@ class DevicesFacade
     @mpv_args = options[:mpv_args]
     @logger = logger
 
-    @wait_initialization = false
+    @wait_for_rec_startup_or_finalization = false
     @recording = false
 
     @clip_num = get_last_clip_num || 0
@@ -98,11 +100,16 @@ class DevicesFacade
   end
 
   def toggle_recording
-    @recording = !@recording # TODO: wait 2 seconds before updating status to recording?
+    @recording = !@recording
+
+    @wait_for_rec_startup_or_finalization = true
+    show_status nil
     if @recording
-      @wait_initialization = true
-      show_status nil
       @clip_num += 1
+    else
+      sleep WAIT_AFTER_REC_STOPPED
+      @wait_for_rec_startup_or_finalization = false
+      show_status nil
     end
 
     @logger.debug "toggle_recording to #{@recording} clip_num=#{@clip_num}"
@@ -112,8 +119,8 @@ class DevicesFacade
 
     return unless @recording
 
-    sleep WAIT_RECORDING_INITIALIZATION
-    @wait_initialization = false
+    sleep WAIT_AFTER_REC_STARTED
+    @wait_for_rec_startup_or_finalization = false
     show_status nil
   end
 
@@ -331,13 +338,16 @@ class DevicesFacade
     size = 80
     if text.nil?
       recording =
-        if @recording
-          @wait_initialization ? 'WAIT...' : '🔴'
+        if @wait_for_rec_startup_or_finalization
+          'WAIT ⌛❗'
+        elsif @recording
+          '🔴'
         else
           '⬜'
         end
       phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
       free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`, free_phone_storage.to_f)
+      media_processing = @saving_clips.empty? ? '' : " | ⌛ #{@saving_clips.length}" # TODO
       text = "[ #{recording} ] [ 💻 | 💾 #{free_storage} ] [ 📞 | #{phone_battery_level} / #{phone_battery_temperature} | 💾 #{free_phone_storage} ]"
     end
 
