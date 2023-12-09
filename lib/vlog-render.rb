@@ -166,7 +166,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
   fps = options[:fps]
   preview = options[:preview]
 
-  thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
+  media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   temp_videos = segments.map.with_index do |seg, index|
     # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
@@ -180,7 +180,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
     temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
 
-    thread_pool.post do
+    media_thread_pool.post do
       audio_filters = "atempo=#{seg[:speed]}"
       video_filters = [
         rotation_filter(basename),
@@ -236,8 +236,8 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     output_filename
   end
 
-  thread_pool.shutdown
-  thread_pool.wait_for_termination
+  media_thread_pool.shutdown
+  media_thread_pool.wait_for_termination
 
   temp_videos
 end

@@ -1,4 +1,6 @@
 # vlog-toolset
+Video and audio recording toolset for vloggers🎙️🎥🎬
+
 Designed to record vlogs with classical jump cuts
 using camera of Android-based device and microphone of GNU/Linux machine.
 I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automatic-jump-cuts-using-open-source-and-coding/) with Pitivi for my [YouTube channel](https://www.youtube.com/@codonaft).
@@ -71,7 +73,7 @@ d - STOP and DELETE current clip
 p - PLAY last saved clip
 f - FOCUS camera on center
 h - show HELP
-q / Ctrl+C - QUIT
+q - QUIT
 ```
 
 ## vlog-render
@@ -121,7 +123,7 @@ vi ~/video/new-cool-video-project/render.conf
 ```
 
 ## Known issues/limitations
-- it's just a dumb dirty PoC, it's not necessarily gonna work on your hardware
+- it's just a dumb dirty PoC/prototype, it's **not necessarily gonna work on your hardware**
     - I use ~~Meizu MX4~~ Xiaomi Mi 8
         - front camera faces at me
         - microphone and camera are allowed
@@ -141,7 +143,8 @@ vi ~/video/new-cool-video-project/render.conf
     - Camera API - Camera2 API
     - If you recording with artificial lighting and you experience flickering: Processing settings - Anti-banding - Auto (or precisely 50 Hz in my case)
 
-## TODO: RIIR?
+## TODO: Rewrite this prototype in Rust?
+- support more sources at the same time: multiple phones/webcams, screencasting
 - [adb](https://github.com/kpcyrd/forensic-adb/blob/736f7c43d116b6334af3c1d8c4a41f9ae06ff812/src/lib.rs#L754)
     - `pull` performance comparing `android-tools`? for USB 2 and 3
 
