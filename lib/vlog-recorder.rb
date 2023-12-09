@@ -92,8 +92,12 @@ class DevicesFacade
   def start_recording
     return if @recording
 
-    @logger.debug 'start recording'
-    toggle_recording
+    if @phone.connected?
+      @logger.debug 'start recording'
+      toggle_recording
+    else
+      show_status nil
+    end
   end
 
   def stop_recording
@@ -362,7 +366,7 @@ class DevicesFacade
         media_processing = @saving_clips.empty? ? '' : " | 🔁 (#{@saving_clips.length}) "
 
         phone_status, free_phone_storage =
-          if @phone.is_connected
+          if @phone.connected?
             phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
             ["#{phone_battery_level} / #{phone_battery_temperature} | 💾 #{free_phone_storage}", free_phone_storage.to_f]
           else

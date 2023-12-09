@@ -48,14 +48,18 @@ class Phone
     @filenames = Set.new
     @filenames = get_new_filenames.to_set
 
+    raise 'Phone is not connected' unless connected?
+
     wakeup
 
     raise 'You need to unlock the screen' if locked?
 
-    # TODO: check whether sound is allowed
+    raise 'You need to unmute the phone mic' if mic_is_muted?
 
     unlock_auto_rotate
     close_opencamera
+    open_home_screen
+
     run_opencamera
     @initial_brightness = get_brightness
 
@@ -64,15 +68,6 @@ class Phone
     focus
     sleep 0.5
     lock_exposure
-  end
-
-  def is_connected
-    devices = `#{@adb} devices`.split("\n")[1..]
-    matching_lines =
-      devices
-      .filter { |i| i.end_with? "\tdevice" }
-      .filter { |i| !@android_id.empty? || i.include?(@android_id) }
-    !matching_lines.empty?
   end
 
   def move_to_host(phone_filename, clip_num)
@@ -168,6 +163,15 @@ class Phone
     adb_shell("input tap #{screen_x.to_i} #{screen_y.to_i}")
   end
 
+  def connected?
+    devices = `#{@adb} devices`.split("\n")[1..]
+    matching_lines =
+      devices
+      .filter { |i| i.end_with? "\tdevice" }
+      .filter { |i| !@android_id.empty? || i.include?(@android_id) }
+    !matching_lines.empty?
+  end
+
   def locked?
     dumpsys = adb_shell('dumpsys window')
     unless dumpsys =~ /mDreamingLockscreen=(.*?)\s/ || dumpsys =~ /mShowingLockscreen=(.*?)\s/
@@ -175,6 +179,11 @@ class Phone
     end
 
     Regexp.last_match(1) == 'true'
+  end
+
+  def mic_is_muted?
+    dumpsys = adb_shell('dumpsys audio')
+    dumpsys.match?(/mic mute.*=true/)
   end
 
   def wakeup
@@ -191,6 +200,10 @@ class Phone
 
   def close_opencamera
     adb_shell("am force-stop #{APP_ID}")
+  end
+
+  def open_home_screen
+    adb_shell('input keyevent KEYCODE_HOME')
   end
 
   def set_front_camera
