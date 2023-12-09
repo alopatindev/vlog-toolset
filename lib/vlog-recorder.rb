@@ -359,10 +359,18 @@ class DevicesFacade
           else
             '⬜ '
           end
-        phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
-        free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`, free_phone_storage.to_f)
         media_processing = @saving_clips.empty? ? '' : " | 🔁 (#{@saving_clips.length}) "
-        text = "[ #{recording}#{media_processing}] [ 💻 | 💾 #{free_storage} ] [ 📞 | #{phone_battery_level} / #{phone_battery_temperature} | 💾 #{free_phone_storage} ]"
+
+        phone_status, free_phone_storage =
+          if @phone.is_connected
+            phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
+            ["#{phone_battery_level} / #{phone_battery_temperature} | 💾 #{free_phone_storage}", free_phone_storage.to_f]
+          else
+            ['⚡❌', nil]
+          end
+
+        free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`, free_phone_storage)
+        text = "[ #{recording}#{media_processing}] [ 💻 | 💾 #{free_storage} ] [ 📞 | #{phone_status} ]"
       end
 
       spaces = size - text.length
@@ -422,6 +430,7 @@ def remove_files(filenames)
 end
 
 def show_help
+  puts "\e[2J\e[f"
   puts 'r - (RE)START recording'
   puts 's - STOP and SAVE current clip'
   puts "S - STOP and SAVE current clip, don't use auto trimming"

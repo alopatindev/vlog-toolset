@@ -5,6 +5,8 @@ Designed to record vlogs with classical jump cuts
 using camera of Android-based device and microphone of GNU/Linux machine.
 I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automatic-jump-cuts-using-open-source-and-coding/) with Pitivi for my [YouTube channel](https://www.youtube.com/@codonaft).
 
+Currently can keep functioning well even if you experience temporary [USB phone connection failure](https://android.stackexchange.com/questions/193637/how-can-i-adb-pull-a-large-file-when-the-usb-connection-breaks-continuously).
+
 ## Installation
 
 ### GNU/Linux

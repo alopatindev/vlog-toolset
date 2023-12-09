@@ -39,8 +39,8 @@ class Phone
     @logger = logger
     @opencamera_dir = options[:opencamera_dir]
 
-    android_id = options[:android_id]
-    @adb_env = android_id.empty? ? '' : "ANDROID_SERIAL='#{android_id}'"
+    @android_id = options[:android_id]
+    @adb_env = @android_id.empty? ? '' : "ANDROID_SERIAL='#{@android_id}'"
     @adb = "#{@adb_env} adb"
     @adb_shell = "#{@adb} shell --"
 
@@ -64,6 +64,15 @@ class Phone
     focus
     sleep 0.5
     lock_exposure
+  end
+
+  def is_connected
+    devices = `#{@adb} devices`.split("\n")[1..]
+    matching_lines =
+      devices
+      .filter { |i| i.end_with? "\tdevice" }
+      .filter { |i| !@android_id.empty? || i.include?(@android_id) }
+    !matching_lines.empty?
   end
 
   def move_to_host(phone_filename, clip_num)

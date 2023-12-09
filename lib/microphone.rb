@@ -19,6 +19,8 @@ require 'shellwords_utils'
 require 'fileutils'
 require 'io/console'
 
+# TODO: handle temporary USB connection failure
+
 class Microphone
   def initialize(temp_dir, arecord_args, logger)
     @logger = logger

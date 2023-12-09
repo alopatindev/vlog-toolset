@@ -17,7 +17,8 @@ require 'colorize'
 
 MIN_SIZE = 4
 
-def parse_free_storage(df, min = MIN_SIZE)
+def parse_free_storage(df, min = nil)
+  min = MIN_SIZE if min.nil?
   kib = df.split("\n").map { |line| line.split.first(6) }.transpose.to_h['Available'].to_i
   gib = kib / (1024**2)
   text = "#{gib}G"
