@@ -1,5 +1,5 @@
 # vlog-toolset
-Video and audio recording toolset for vloggers🎙️🎥🎬
+Video and audio recording toolset for vloggers🎙️📹🎬
 
 Designed to record vlogs with classical jump cuts
 using camera of Android-based device and microphone of GNU/Linux machine.

@@ -26,7 +26,6 @@ require 'voice/detect_voice'
 require 'colorize'
 require 'concurrent'
 require 'fileutils'
-require 'io/console'
 require 'logger'
 require 'optparse'
 
@@ -36,7 +35,7 @@ require 'optparse'
 class DevicesFacade
   MIN_SHOT_SIZE = 1.0
 
-  WAIT_AFTER_REC_STARTED = 4.0
+  WAIT_AFTER_REC_STARTED = 3.0
   WAIT_AFTER_REC_STOPPED = 2.0
 
   def initialize(options, temp_dir, logger)
@@ -54,6 +53,7 @@ class DevicesFacade
     @clip_num = get_last_clip_num || 0
     @logger.debug "clip_num is #{@clip_num}"
 
+    @status_mutex = Mutex.new
     @media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
     @saving_clips = Set.new
 
@@ -64,6 +64,9 @@ class DevicesFacade
     @phone.set_brightness(0)
 
     logger.info('initialized')
+
+    print "\r"
+    STDOUT.flush
   end
 
   def get_clips(dirs)
@@ -124,7 +127,7 @@ class DevicesFacade
   end
 
   def delete_unsaved_clip
-    if @saving_clips.include? @clip_num
+    if is_saving_current_clip
       false
     else
       ok = @microphone.delete_clip @clip_num
@@ -135,7 +138,7 @@ class DevicesFacade
 
   def delete_clip
     @logger.debug 'delete_clip'
-    if @saving_clips.include? @clip_num
+    if is_saving_current_clip
       delete_last_subclip
     else
       ok = delete_unsaved_clip
@@ -159,11 +162,15 @@ class DevicesFacade
     sound_filename = @microphone.filename(clip_num)
     rotation = @phone.rotation
 
-    if @saving_clips.include?(clip_num) || phone_filename.nil? || sound_filename.nil?
+    if is_saving_current_clip || phone_filename.nil? || sound_filename.nil?
       @logger.debug "save_clip: skipping #{clip_num}"
     else
       @logger.info "save_clip #{clip_num}"
-      @saving_clips.add(clip_num)
+      @status_mutex.synchronize do
+        @saving_clips.add(clip_num)
+        @logger.debug "saving_clips.length=#{@saving_clips.length}"
+      end
+      show_status nil
 
       @media_thread_pool.post do
         camera_filename = @phone.move_to_host(phone_filename, clip_num)
@@ -181,10 +188,22 @@ class DevicesFacade
         remove_files [camera_filename, sound_filename,
                       sync_sound_filename] + processed_sound_filenames + processed_video_filenames
         @logger.info "save_clip: #{clip_num} as #{output_filenames} ok"
+
+        @status_mutex.synchronize do
+          @saving_clips.delete(clip_num)
+        end
+        show_status nil
       rescue StandardError => e
         @logger.info "ignoring saving of #{clip_num} as #{output_filename}"
         @logger.debug e
       end
+    end
+  end
+
+  def is_saving_current_clip
+    clip_num = @clip_num
+    @status_mutex.synchronize do
+      @saving_clips.include?(clip_num)
     end
   end
 
@@ -329,28 +348,30 @@ class DevicesFacade
   end
 
   def show_status(text)
-    size = 80
-    if text.nil?
-      recording =
-        if @wait_for_rec_startup_or_finalization > 0
-          'WAIT'.red + "(#{@wait_for_rec_startup_or_finalization.to_i}) ⌛❗"
-        elsif @recording
-          '🔴'
-        else
-          '⬜'
-        end
-      phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
-      free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`, free_phone_storage.to_f)
-      media_processing = @saving_clips.empty? ? '' : " | ⌛ #{@saving_clips.length}" # TODO
-      text = "[ #{recording} ] [ 💻 | 💾 #{free_storage} ] [ 📞 | #{phone_battery_level} / #{phone_battery_temperature} | 💾 #{free_phone_storage} ]"
+    @status_mutex.synchronize do
+      size = 80
+      if text.nil?
+        recording =
+          if @wait_for_rec_startup_or_finalization > 0
+            'WAIT'.red + "(#{@wait_for_rec_startup_or_finalization.to_i}) ⌛❗"
+          elsif @recording
+            '🔴 '
+          else
+            '⬜ '
+          end
+        phone_battery_level, phone_battery_temperature, free_phone_storage = @phone.get_system_info
+        free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`, free_phone_storage.to_f)
+        media_processing = @saving_clips.empty? ? '' : " | 🔁 (#{@saving_clips.length}) "
+        text = "[ #{recording}#{media_processing}] [ 💻 | 💾 #{free_storage} ] [ 📞 | #{phone_battery_level} / #{phone_battery_temperature} | 💾 #{free_phone_storage} ]"
+      end
+
+      spaces = size - text.length
+      raise if spaces < 0
+
+      postfix = ' ' * spaces
+      print "#{text}#{postfix}\r"
+      STDOUT.flush
     end
-
-    spaces = size - text.length
-    raise if spaces < 0
-
-    postfix = ' ' * spaces
-    print "#{text}#{postfix}\r"
-    STDOUT.flush
   end
 
   def play
@@ -377,11 +398,18 @@ class DevicesFacade
   end
 
   def wait_rec(pause)
-    @wait_for_rec_startup_or_finalization = pause
-    while @wait_for_rec_startup_or_finalization > 0
+    @status_mutex.synchronize do
+      @wait_for_rec_startup_or_finalization = pause
+    end
+
+    loop do
+      break if @status_mutex.synchronize { @wait_for_rec_startup_or_finalization } <= 0
+
       show_status nil
       sleep 1.0
-      @wait_for_rec_startup_or_finalization -= 1
+      @status_mutex.synchronize do
+        @wait_for_rec_startup_or_finalization -= 1
+      end
     end
     show_status nil
   end
@@ -483,6 +511,14 @@ def parse_options!(options, args)
   exit 1
 end
 
+def show_cursor
+  print "\e[?25h"
+end
+
+def hide_cursor
+  print "\e[?25l"
+end
+
 options = {
   trim_duration: 0.15,
   arecord_args: '--device=default --format=dat',
@@ -497,6 +533,9 @@ options = {
 parse_options!(options, ARGV)
 
 begin
+  hide_cursor
+  print 'Initializing...'
+
   project_dir = options[:project_dir]
   temp_dir = File.join project_dir, 'tmp'
   FileUtils.mkdir_p(temp_dir)
@@ -519,4 +558,7 @@ ensure
 
   devices.close unless devices.nil?
   logger.close unless logger.nil?
+
+  STDOUT.flush
+  show_cursor
 end

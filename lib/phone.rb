@@ -52,6 +52,8 @@ class Phone
 
     raise 'You need to unlock the screen' if locked?
 
+    # TODO: check whether sound is allowed
+
     unlock_auto_rotate
     close_opencamera
     run_opencamera
