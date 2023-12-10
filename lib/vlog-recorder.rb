@@ -59,7 +59,7 @@ class DevicesFacade
     @saving_clips = Set.new
 
     arecord_args = options[:arecord_args]
-    @microphone = Mic.new(temp_dir, arecord_args, logger)
+    @mic = Mic.new(temp_dir, arecord_args, logger)
 
     @phone = Phone.new(temp_dir, options, logger)
     @phone.set_brightness(0)
@@ -93,17 +93,17 @@ class DevicesFacade
   def start_recording
     return if @recording
 
-    if @phone.connected? && @microphone.connected?
+    if @phone.connected? && @mic.connected?
       raise 'Unexpected state: Open Camera is not the active window' unless @phone.opencamera_running?
 
       @phone.run_opencamera
-      @microphone.force_invalidate_connection
+      @mic.force_invalidate_connection
       show_status nil
 
       @logger.debug 'start recording'
       toggle_recording
     else
-      @phone.force_invalidate_connection
+      @mic.force_invalidate_connection
       show_status nil
     end
   end
@@ -125,7 +125,7 @@ class DevicesFacade
 
     @logger.debug "toggle_recording to #{@recording} clip_num=#{@clip_num}"
 
-    @microphone.toggle_recording @clip_num
+    @mic.toggle_recording @clip_num
     @phone.toggle_recording @clip_num, @recording
 
     return unless @recording
@@ -142,7 +142,7 @@ class DevicesFacade
     if saving_current_clip?
       false
     else
-      ok = @microphone.delete_clip @clip_num
+      ok = @mic.delete_clip @clip_num
       @phone.delete_clip @clip_num
       ok
     end
@@ -171,7 +171,7 @@ class DevicesFacade
     @logger.debug "save_clip: trim_noise = #{trim_noise}"
     clip_num = @clip_num
     phone_filename = @phone.filename(clip_num)
-    sound_filename = @microphone.filename(clip_num)
+    sound_filename = @mic.filename(clip_num)
     rotation = @phone.rotation
 
     if saving_current_clip? || phone_filename.nil? || sound_filename.nil?
@@ -384,7 +384,7 @@ class DevicesFacade
             ['❌', nil]
           end
 
-        mic_status = @microphone.connected? ? '' : ' | 🎙️❌'
+        mic_status = @mic.connected? ? '' : ' | 🎙️❌'
         free_storage = parse_free_storage(`LANG=C df -Pk #{@project_dir}`, free_phone_storage)
         text = "[ #{recording}#{media_processing}] [ 💻 | 💾 #{free_storage}#{mic_status} ] [ 📞#{phone_status} ]"
       end
