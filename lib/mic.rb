@@ -19,10 +19,9 @@ require 'shellwords_utils'
 require 'fileutils'
 require 'lru_redux'
 
-# TODO: rename to Mic
 # TODO: handle temporary USB connection failure
 
-class Microphone
+class Mic
   CONNECTED_TTL_SECS = 15
 
   def initialize(temp_dir, arecord_args, logger)

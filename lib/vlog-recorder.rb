@@ -16,7 +16,7 @@
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
 require 'media_utils'
-require 'microphone'
+require 'mic'
 require 'numeric_utils'
 require 'os_utils'
 require 'phone'
@@ -59,7 +59,7 @@ class DevicesFacade
     @saving_clips = Set.new
 
     arecord_args = options[:arecord_args]
-    @microphone = Microphone.new(temp_dir, arecord_args, logger)
+    @microphone = Mic.new(temp_dir, arecord_args, logger)
 
     @phone = Phone.new(temp_dir, options, logger)
     @phone.set_brightness(0)
