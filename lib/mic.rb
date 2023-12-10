@@ -14,6 +14,7 @@
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
 require 'numeric_utils'
+require 'process_utils'
 require 'shellwords_utils'
 
 require 'fileutils'
@@ -101,17 +102,4 @@ class Mic
   def force_invalidate_connection
     @connected_cache.delete(:connected)
   end
-end
-
-# TODO: move to process_utils.rb
-
-def process_running?(pid)
-  Process.waitpid(pid, Process::WNOHANG).nil?
-rescue Errno::ECHILD
-  false
-end
-
-def kill_process(pid)
-  Process.kill 'SIGTERM', pid
-rescue Errno::ESRCH
 end
