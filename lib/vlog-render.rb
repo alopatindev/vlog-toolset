@@ -261,7 +261,6 @@ def concat_videos(temp_videos, output_filename)
     output_filename
   ]
 
-  # TODO: remove shelljoin_wrapped?
   IO.popen(command.shelljoin_wrapped, 'w') do |f|
     f.puts parts
     f.close_write
