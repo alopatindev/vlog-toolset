@@ -208,6 +208,8 @@ class DevicesFacade
       rescue StandardError => e
         @logger.info "ignoring saving of #{clip_num} as #{output_filename}"
         @logger.debug e
+      ensure
+        @logger.debug 'media task has finished'
       end
     end
   end
