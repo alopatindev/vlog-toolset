@@ -40,10 +40,7 @@ class Phone
     @logger = logger
     @opencamera_dir = options[:opencamera_dir]
 
-    @android_id = options[:android_id]
-    @adb_env = @android_id.empty? ? '' : "ANDROID_SERIAL='#{@android_id}'"
-    @adb = "#{@adb_env} adb"
-    @adb_shell = "#{@adb} shell --"
+    set_android_id!(options[:android_id])
 
     @clip_num_to_filename = {}
     @filenames = Set.new
@@ -168,11 +165,17 @@ class Phone
 
   def connected?
     devices = `#{@adb} devices`.split("\n")[1..]
-    matching_lines =
+    android_ids =
       devices
       .filter { |i| i.end_with? "\tdevice" }
-      .filter { |i| !@android_id.empty? || i.include?(@android_id) }
-    !matching_lines.empty?
+      .map { |i| i.split("\t").first }
+      .filter { |i| @android_id.empty? || i == @android_id }
+    @logger.debug "android_ids=#{android_ids.inspect}"
+
+    found = !android_ids.empty?
+    set_android_id!(android_ids.first) if found && @android_id.empty?
+
+    found
   end
 
   def locked?
@@ -289,5 +292,13 @@ class Phone
     @logger.debug command
     `#{command}`.gsub("\r\n", "\n")
     # @logger.debug "#{command} => #{output}"
+  end
+
+  def set_android_id!(android_id)
+    @logger.debug "set_android_id #{android_id.inspect}"
+    @android_id = android_id
+    @adb_env = @android_id.empty? ? '' : "ANDROID_SERIAL='#{@android_id}'"
+    @adb = "#{@adb_env} adb"
+    @adb_shell = "#{@adb} shell --"
   end
 end
