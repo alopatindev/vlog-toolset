@@ -17,7 +17,7 @@
 
 require 'media_utils'
 require 'microphone'
-require 'numeric'
+require 'numeric_utils'
 require 'os_utils'
 require 'phone'
 require 'shellwords_utils'

@@ -16,7 +16,7 @@
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
 require 'media_utils'
-require 'numeric'
+require 'numeric_utils'
 require 'phone'
 require 'shellwords_utils'
 

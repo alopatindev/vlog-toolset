@@ -14,9 +14,9 @@
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
 require 'colorize'
-require 'numeric'
 require 'set'
 
+require 'numeric_utils'
 require 'os_utils'
 
 class Phone
