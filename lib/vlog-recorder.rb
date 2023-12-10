@@ -371,7 +371,7 @@ class DevicesFacade
           else
             '⬜ '
           end
-        media_processing = @saving_clips.empty? ? '' : " | 🔁 (#{@saving_clips.length}) "
+        media_processing = @saving_clips.empty? ? '' : "| 🔁 (#{@saving_clips.length}) "
 
         phone_status, free_phone_storage =
           if @phone.connected?
@@ -411,8 +411,8 @@ class DevicesFacade
                            .map { |f| File.basename(f) }
                            .index(last_clip_filename) || clips.length - 1
 
-    mpv_args = @mpv_args.shellsplit + ["--video-rotate=#{restored_rotation}", "--playlist-start=#{position_in_playlist}",
-                                       clips.join(' ')]
+    mpv_args = @mpv_args.shellsplit + ["--video-rotate=#{restored_rotation}",
+                                       "--playlist-start=#{position_in_playlist}"] + clips
 
     command = MPV + mpv_args
     @logger.debug command
@@ -557,7 +557,7 @@ parse_options!(options, ARGV)
 
 begin
   hide_cursor
-  print('Initializing...')
+  print("Initializing...\n")
 
   project_dir = options[:project_dir]
   temp_dir = File.join project_dir, 'tmp'
