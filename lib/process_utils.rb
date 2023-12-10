@@ -13,6 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
+require 'shellwords'
+
+class Array
+  def shelljoin_wrapped
+    shelljoin.gsub('\=', '=').gsub('\\ ', ' ') # https://github.com/ruby/shellwords/issues/1
+  end
+end
+
 def process_running?(pid)
   Process.waitpid(pid, Process::WNOHANG).nil?
 rescue Errno::ECHILD

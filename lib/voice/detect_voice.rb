@@ -14,7 +14,7 @@
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
 require 'media_utils'
-require 'shellwords_utils'
+require 'process_utils'
 
 require 'fileutils'
 

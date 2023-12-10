@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
-require 'shellwords_utils'
+require 'process_utils'
 
 FFMPEG = ['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error']
 FFMPEG_NO_OVERWRITE = ['ffmpeg', '-n', '-hide_banner', '-loglevel', 'panic']

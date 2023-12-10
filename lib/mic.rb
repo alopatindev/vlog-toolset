@@ -15,7 +15,6 @@
 
 require 'numeric_utils'
 require 'process_utils'
-require 'shellwords_utils'
 
 require 'fileutils'
 require 'lru_redux'
