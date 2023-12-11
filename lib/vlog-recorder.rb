@@ -38,7 +38,7 @@ class DevicesController
   MIN_SHOT_SIZE = 1.0
   MIN_SILENCE_SIZE = 10.0
 
-  WAIT_AFTER_REC_STARTED = 8.0
+  WAIT_AFTER_REC_STARTED = 5.0
   WAIT_AFTER_REC_STOPPED = 2.0
 
   WAIT_SILENCE_REC = 20.0
@@ -338,6 +338,17 @@ class DevicesController
       @media_thread_pool.post do
         camera_filename = @phone.move_to_host(phone_filename, clip_num)
         @logger.debug "save_clip: camera_filename=#{camera_filename} sound_filename=#{sound_filename}"
+
+        status_message = nil
+        # TODO: wav
+        # if get_volume_adjustment(camera_filename).nil?
+        #  status_message = 'Failed to record sound using PHONE. Mic failure?'.red
+        # end
+        status_message = 'Failed to record sound. Mic failure?'.red if get_volume_adjustment(sound_filename).nil?
+        if status_message.nil?
+          show_status(status_message)
+          sleep 3.0
+        end
 
         sync_offset, sync_sound_filename = synchronize_sound(camera_filename, sound_filename)
         @logger.debug "save_clip: sync_offset=#{sync_offset}"

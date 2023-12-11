@@ -58,6 +58,7 @@ class Phone
 
     unlock_auto_rotate
     close_opencamera
+    remove_old_opencamera_videos
     open_home_screen
 
     run_opencamera
@@ -222,6 +223,10 @@ class Phone
 
   def close_opencamera
     adb_shell("am force-stop #{APP_ID}")
+  end
+
+  def remove_old_opencamera_videos
+    adb_shell("rm -f #{@opencamera_dir}/.pending-* #{@opencamera_dir}/*")
   end
 
   def open_home_screen
