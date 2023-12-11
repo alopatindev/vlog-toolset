@@ -40,7 +40,9 @@ class DevicesController
 
   WAIT_AFTER_REC_STARTED = 8.0
   WAIT_AFTER_REC_STOPPED = 2.0
+
   WAIT_SILENCE_REC = 20.0
+  SILENCE_PADDING = 2.0
 
   def show_help
     clear
@@ -198,18 +200,16 @@ class DevicesController
     end
     show_status nil
 
-    padding = 2.0 # TODO: rename
     sound_duration = get_duration(sound_filename)
     if sound_duration < WAIT_SILENCE_REC
       message = "unexpected duration #{sound_duration}"
-      @logger.error message
       raise message
     end
 
     first_filename = File.join(@temp_dir, 'silence_a.wav')
     command = FFMPEG + [
       '-i', sound_filename,
-      '-ss', padding,
+      '-ss', SILENCE_PADDING,
       '-t', MIN_SILENCE_SIZE,
       '-c', 'copy',
       first_filename
@@ -221,7 +221,7 @@ class DevicesController
 
     command = FFMPEG + [
       '-i', sound_filename,
-      '-ss', sound_duration - padding - MIN_SILENCE_SIZE,
+      '-ss', sound_duration - SILENCE_PADDING - MIN_SILENCE_SIZE,
       '-t', MIN_SILENCE_SIZE,
       '-c', 'copy',
       second_filename
