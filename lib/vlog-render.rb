@@ -508,69 +508,73 @@ def parse_options!(options, args)
   exit 1
 end
 
-test_merge_small_pauses
-test_segments_overlap
+def main(argv)
+  test_merge_small_pauses
+  test_segments_overlap
 
-options = {
-  fps: 30,
-  speed: 1.2,
-  video_filters: 'hqdn3d,hflip,vignette',
-  min_pause_between_shots: 0.1,
-  preview: true,
-  line_in_file: 1,
-  cleanup: false,
-  whisper_cpp_args: '--model models/ggml-base.bin --language auto',
-  youtube: false
-}
+  options = {
+    fps: 30,
+    speed: 1.2,
+    video_filters: 'hqdn3d,hflip,vignette',
+    min_pause_between_shots: 0.1,
+    preview: true,
+    line_in_file: 1,
+    cleanup: false,
+    whisper_cpp_args: '--model models/ggml-base.bin --language auto',
+    youtube: false
+  }
 
-parse_options!(options, ARGV)
+  parse_options!(options, argv)
 
-project_dir = options[:project_dir]
-config_filename = File.join project_dir, CONFIG_FILENAME
+  project_dir = options[:project_dir]
+  config_filename = File.join project_dir, CONFIG_FILENAME
 
-old_config = generate_config(options)
-unless old_config
-  print("Configuration file is ready! 🎉\n")
-  print("Now edit #{config_filename} and restart this script to finish\n")
-  exit 0
+  old_config = generate_config(options)
+  unless old_config
+    print("Configuration file is ready! 🎉\n")
+    print("Now edit #{config_filename} and restart this script to finish\n")
+    exit 0
+  end
+
+  output_postfix = options[:preview] ? '_preview' : ''
+  output_filename = File.join project_dir, "output#{output_postfix}.mp4"
+
+  Dir.chdir project_dir
+
+  min_pause_between_shots = 0.1
+  segments = merge_small_pauses apply_delays(parse(config_filename, options)), min_pause_between_shots
+
+  output_dir = File.join project_dir, 'output'
+  temp_dir = File.join project_dir, 'tmp'
+  FileUtils.mkdir_p [output_dir, temp_dir]
+
+  temp_videos = process_and_split_videos segments, options, output_dir, temp_dir
+  concat_videos temp_videos, output_filename
+
+  words_per_second = segments.map do |seg|
+    dt = seg[:end_position] - seg[:start_position]
+    duration = dt / seg[:speed]
+    seg[:words] / duration
+  end.sum / segments.length
+
+  print("average words per second = #{words_per_second}\n")
+
+  if options[:preview]
+    player_position = compute_player_position segments, options
+    print("player_position = #{player_position}\n")
+    command = MPV + ["--start=#{player_position}", '--no-fs', output_filename]
+    system command.shelljoin_wrapped
+  else
+    output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
+
+    print("done 🎉\n")
+    print("you can run:\n\n")
+    mpv_args = ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs']
+    print((mpv_args + [output_filename]).shelljoin_wrapped + "\n\n")
+    print((mpv_args + [output_youtube_filename]).shelljoin_wrapped + "\n\n") if options[:youtube]
+  end
+
+  # TODO: add --gc flag to remove no longer needed tmp/output files
 end
 
-output_postfix = options[:preview] ? '_preview' : ''
-output_filename = File.join project_dir, "output#{output_postfix}.mp4"
-
-Dir.chdir project_dir
-
-min_pause_between_shots = 0.1
-segments = merge_small_pauses apply_delays(parse(config_filename, options)), min_pause_between_shots
-
-output_dir = File.join project_dir, 'output'
-temp_dir = File.join project_dir, 'tmp'
-FileUtils.mkdir_p [output_dir, temp_dir]
-
-temp_videos = process_and_split_videos segments, options, output_dir, temp_dir
-concat_videos temp_videos, output_filename
-
-words_per_second = segments.map do |seg|
-  dt = seg[:end_position] - seg[:start_position]
-  duration = dt / seg[:speed]
-  seg[:words] / duration
-end.sum / segments.length
-
-print("average words per second = #{words_per_second}\n")
-
-if options[:preview]
-  player_position = compute_player_position segments, options
-  print("player_position = #{player_position}\n")
-  command = MPV + ["--start=#{player_position}", '--no-fs', output_filename]
-  system command.shelljoin_wrapped
-else
-  output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
-
-  print("done 🎉\n")
-  print("you can run:\n\n")
-  mpv_args = ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs']
-  print((mpv_args + [output_filename]).shelljoin_wrapped + "\n\n")
-  print((mpv_args + [output_youtube_filename]).shelljoin_wrapped + "\n\n") if options[:youtube]
-end
-
-# TODO: add --gc flag to remove no longer needed tmp/output files
+main(ARGV)

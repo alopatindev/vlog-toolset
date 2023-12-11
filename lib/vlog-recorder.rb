@@ -544,46 +544,50 @@ def hide_cursor
   print("\e[?25l")
 end
 
-options = {
-  trim_duration: 0.15,
-  arecord_args: '--device=default --format=dat',
-  android_id: '',
-  opencamera_dir: '/storage/emulated/0/DCIM/OpenCamera',
-  change_brightness: false,
-  mpv_args: '--vf=hflip --volume-max=300 --volume=130 --speed=1.2',
-  min_pause_between_shots: 2.0,
-  aggressiveness: 0.4,
-  debug: false
-}
-parse_options!(options, ARGV)
+def main(argv)
+  options = {
+    trim_duration: 0.15,
+    arecord_args: '--device=default --format=dat',
+    android_id: '',
+    opencamera_dir: '/storage/emulated/0/DCIM/OpenCamera',
+    change_brightness: false,
+    mpv_args: '--vf=hflip --volume-max=300 --volume=130 --speed=1.2',
+    min_pause_between_shots: 2.0,
+    aggressiveness: 0.4,
+    debug: false
+  }
+  parse_options!(options, argv)
 
-begin
-  hide_cursor
-  print("Initializing...\n")
+  begin
+    hide_cursor
+    print("Initializing...\n")
 
-  project_dir = options[:project_dir]
-  temp_dir = File.join project_dir, 'tmp'
-  FileUtils.mkdir_p(temp_dir)
+    project_dir = options[:project_dir]
+    temp_dir = File.join project_dir, 'tmp'
+    FileUtils.mkdir_p(temp_dir)
 
-  logger = Logger.new File.join(project_dir, 'log.txt')
-  logger.level = Logger::WARN unless options[:debug]
+    logger = Logger.new File.join(project_dir, 'log.txt')
+    logger.level = Logger::WARN unless options[:debug]
 
-  logger.debug options
+    logger.debug options
 
-  devices = DevicesFacade.new options, temp_dir, logger
-  show_help
-  run_main_loop(devices)
-rescue SystemExit, Interrupt
-rescue StandardError => e
-  logger.fatal(e) unless logger.nil?
-  puts e
-ensure
-  puts 'Exiting...'
-  logger.info('exit') unless logger.nil?
+    devices = DevicesFacade.new options, temp_dir, logger
+    show_help
+    run_main_loop(devices)
+  rescue SystemExit, Interrupt
+  rescue StandardError => e
+    logger.fatal(e) unless logger.nil?
+    puts e
+  ensure
+    puts 'Exiting...'
+    logger.info('exit') unless logger.nil?
 
-  devices.close unless devices.nil?
-  logger.close unless logger.nil?
+    devices.close unless devices.nil?
+    logger.close unless logger.nil?
 
-  STDOUT.flush
-  show_cursor
+    STDOUT.flush
+    show_cursor
+  end
 end
+
+main(ARGV)
