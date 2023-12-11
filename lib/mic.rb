@@ -22,7 +22,7 @@ require 'lru_redux'
 # TODO: handle temporary USB connection failure
 
 class Mic
-  CONNECTED_TTL_SECS = 15
+  CONNECTION_RECHECK_SECS = 15
 
   def initialize(temp_dir, arecord_args, logger)
     @logger = logger
@@ -31,7 +31,7 @@ class Mic
     @arecord_command = ['exec', 'arecord', '--quiet', '--nonblock'] + arecord_args.shellsplit
     @arecord_pipe = nil
 
-    @connected_cache = LruRedux::TTL::Cache.new(1, CONNECTED_TTL_SECS)
+    @connected_cache = LruRedux::TTL::Cache.new(1, CONNECTION_RECHECK_SECS)
 
     raise 'Mic is not connected' unless connected?
   end

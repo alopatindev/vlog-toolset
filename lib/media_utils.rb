@@ -46,3 +46,13 @@ end
 def clamp_speed(speed)
   speed.clamp(0.5, 2.0)
 end
+
+def get_volume_adjustment(filename)
+  command = ['sox', filename, '--null', 'stat']
+  `#{command.shelljoin_wrapped} 2>&1`
+    .split("\n")
+    .map { |i| i.split('Volume adjustment:')[1] }
+    .filter { |i| !i.nil? }
+    .map { |i| i.to_f }
+    .first
+end

@@ -19,6 +19,11 @@ class Array
   def shelljoin_wrapped
     shelljoin.gsub('\=', '=').gsub('\\ ', ' ') # https://github.com/ruby/shellwords/issues/1
   end
+
+  # TODO: move?
+  def argmax
+    index(max)
+  end
 end
 
 def process_running?(pid)

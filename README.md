@@ -15,6 +15,7 @@ Currently can keep functioning well even if you experience temporary [USB phone 
 - python3 (tested with 3.11.5)
 - pip (tested with 23.2.1)
 - ffmpeg (tested with 4.4.4)
+- sox (tested with 14.4.2)
 - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
 - alsa-utils (tested with 1.2.9)
 - mpv (tested with 0.36.0)
@@ -129,11 +130,9 @@ vi ~/video/new-cool-video-project/render.conf
     - I use ~~Meizu MX4~~ Xiaomi Mi 8
         - front camera faces at me
         - microphone and camera are allowed
-        - autorotation is enabled
-            - if auto-rotate is broken — try to reboot your phone
 - paths with spaces and weird characters are unsupported
 
-## Recommended OpenCamera Settings
+## Recommended Open Camera Settings
 - ⋮
     - Grid - Phi 3x3
 - ⚙️
@@ -143,7 +142,12 @@ vi ~/video/new-cool-video-project/render.conf
         - Video picture profiles - TODO
         - Video frame rate (approx) - 30
     - Camera API - Camera2 API
-    - If you recording with artificial lighting and you experience flickering: Processing settings - Anti-banding - Auto (or precisely 50 Hz in my case)
+
+## Troubleshooting
+- auto-rotation fails
+    - reboot your phone
+- flickering when recording with artificial lighting
+    - Open Camera - ⚙️ - Processing settings - Anti-banding - Auto (or precisely 50 Hz in my case)
 
 ## TODO: Rewrite this prototype in Rust?
 - support other sources (webcams, screencasting)

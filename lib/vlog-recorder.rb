@@ -33,11 +33,74 @@ require 'optparse'
 # TODO: `mpv -v av://v4l2:/dev/video0` says "[ffmpeg/demuxer] video4linux2,v4l2: The V4L2 driver changed the video from 1920x1080 to 640x480"
 # possible solution "driver=v4l2:width=720:height=576:norm=PAL:outfmt=uyvy"
 
-class DevicesFacade
+# TODO: rename
+class DevicesController
   MIN_SHOT_SIZE = 1.0
+  MIN_SILENCE_SIZE = 10.0
 
-  WAIT_AFTER_REC_STARTED = 5.0
+  WAIT_AFTER_REC_STARTED = 8.0
   WAIT_AFTER_REC_STOPPED = 2.0
+  WAIT_SILENCE_REC = 20.0
+
+  def show_help
+    clear
+    puts "Project: #{@project_dir}"
+    puts
+    puts '----------------------------------------------------------------------'
+    puts '        R - (RE)START clip recording (loses unsaved clip)'
+    puts '        S - STOP and SAVE current clip'
+    puts "Shift + S - STOP and SAVE current clip, DON'T use auto silence removal"
+    puts '        D - STOP and DELETE current clip'
+    puts '        P - PLAY last saved clip'
+    puts '        F - FOCUS camera on center'
+    puts '----------------------------------------------------------------------'
+    puts 'Shift + R - (RE)START SILENCE recording attempt'
+    puts '----------------------------------------------------------------------'
+    puts '        H - show HELP'
+    puts '        Q - QUIT'
+    puts
+  end
+
+  def run_main_loop
+    loop do
+      show_status nil
+
+      case STDIN.getch
+      when 'q'
+        show_status 'Quit? y/n'
+        break if STDIN.getch == 'y'
+      when 'R'
+        stop_recording
+        show_status nil
+        start_silence_recording
+      when 'r'
+        if silence_recorded?
+          stop_recording
+          show_status nil
+          delete_unsaved_clip
+          start_recording
+        else
+          show_status 'You need to record SILENCE first, press "Shift + R"'
+          sleep 3.0
+        end
+      when 's'
+        stop_recording
+        save_clip true
+      when 'S'
+        stop_recording
+        save_clip false
+      when 'd'
+        stop_recording
+        delete_clip
+      when 'p'
+        play
+      when 'f'
+        focus
+      when 'h'
+        show_help
+      end
+    end
+  end
 
   def initialize(options, temp_dir, logger)
     @project_dir = options[:project_dir]
@@ -48,15 +111,14 @@ class DevicesFacade
     @mpv_args = options[:mpv_args]
     @logger = logger
 
-    @wait_for_rec_startup_or_finalization = 0
-    @recording = false
-
     @clip_num = get_last_clip_num || 0
     @logger.debug "clip_num is #{@clip_num}"
 
     @status_mutex = Mutex.new
     @media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
     @saving_clips = Set.new
+    @wait_for_rec_startup_or_finalization = 0
+    @recording = false
 
     arecord_args = options[:arecord_args]
     @mic = Mic.new(temp_dir, arecord_args, logger)
@@ -83,6 +145,14 @@ class DevicesFacade
       .max
   end
 
+  def get_last_silence_clip
+    get_clips([@project_dir]).filter { |i| i.include?('_silence.wav') }.first
+  end
+
+  def silence_recorded?
+    !get_last_silence_clip.nil?
+  end
+
   def parse_clip_num(filename)
     filename
       .gsub(/.*#{File::SEPARATOR}0*/, '')
@@ -91,7 +161,7 @@ class DevicesFacade
   end
 
   def start_recording
-    return if @recording
+    return if @status_mutex.synchronize { @recording }
 
     if @phone.connected? && @mic.connected?
       raise 'Unexpected state: Open Camera is not the active window' unless @phone.opencamera_running?
@@ -108,16 +178,97 @@ class DevicesFacade
     end
   end
 
+  def start_silence_recording
+    clip_num = @clip_num
+    @logger.info "start_silence_recording #{clip_num}"
+    return if @status_mutex.synchronize { @recording } || !@mic.connected?
+
+    @mic.force_invalidate_connection
+    @mic.toggle_recording clip_num
+    @status_mutex.synchronize { @recording = true }
+    wait_rec(WAIT_SILENCE_REC)
+
+    @mic.toggle_recording clip_num
+    sound_filename = @mic.filename(clip_num)
+
+    @status_mutex.synchronize do
+      @recording = false
+      @saving_clips.add(clip_num)
+      @logger.debug "saving_clips.length=#{@saving_clips.length}"
+    end
+    show_status nil
+
+    padding = 2.0 # TODO: rename
+    sound_duration = get_duration(sound_filename)
+    if sound_duration < WAIT_SILENCE_REC
+      message = "unexpected duration #{sound_duration}"
+      @logger.error message
+      raise message
+    end
+
+    first_filename = File.join(@temp_dir, 'silence_a.wav')
+    command = FFMPEG + [
+      '-i', sound_filename,
+      '-ss', padding,
+      '-t', MIN_SILENCE_SIZE,
+      '-c', 'copy',
+      first_filename
+    ]
+    @logger.debug command
+    system(command.shelljoin_wrapped)
+
+    second_filename = File.join(@temp_dir, 'silence_b.wav')
+
+    command = FFMPEG + [
+      '-i', sound_filename,
+      '-ss', sound_duration - padding - MIN_SILENCE_SIZE,
+      '-t', MIN_SILENCE_SIZE,
+      '-c', 'copy',
+      second_filename
+    ]
+    @logger.debug command
+    system(command.shelljoin_wrapped)
+
+    status_message = nil
+    files = [first_filename, second_filename]
+
+    volume_adjustments = files.map { |i| get_volume_adjustment(i) }.filter { |i| !i.nil? && i > 10.0 }
+    @logger.debug "volume_adjustments=#{volume_adjustments}, larger means sound is quieter"
+    if volume_adjustments.empty?
+      status_message = 'Failed to record silence! Too noisy environment? Mic failure?'.red
+    else
+      quietest_index = volume_adjustments.argmax
+      @logger.debug "quieter file index #{quietest_index}"
+      quietest_filename = files[quietest_index]
+      output_silence_filename = File.join(@project_dir, "#{clip_num.with_leading_zeros}_silence.wav")
+      remove_files([output_silence_filename])
+      File.rename(quietest_filename, output_silence_filename)
+      @logger.info "save_silence_clip: #{clip_num} as #{output_silence_filename} ok"
+    end
+
+    remove_files(files)
+
+    @status_mutex.synchronize do
+      @saving_clips.delete(clip_num)
+    end
+    show_status(status_message)
+    sleep 3.0 unless status_message.nil?
+  end
+
   def stop_recording
-    return unless @recording
+    return unless @status_mutex.synchronize { @recording }
 
     @logger.debug 'stop recording'
     toggle_recording
   end
 
   def toggle_recording
-    @recording = !@recording
-    if @recording
+    recording = @status_mutex.synchronize do
+      @recording = !@recording
+      @recording
+    end
+
+    if recording
       @clip_num += 1
     else
       wait_rec(WAIT_AFTER_REC_STOPPED)
@@ -126,9 +277,9 @@ class DevicesFacade
     @logger.debug "toggle_recording to #{@recording} clip_num=#{@clip_num}"
 
     @mic.toggle_recording @clip_num
-    @phone.toggle_recording @clip_num, @recording
+    @phone.toggle_recording @clip_num, recording
 
-    return unless @recording
+    return unless recording
 
     wait_rec(WAIT_AFTER_REC_STARTED)
   end
@@ -349,7 +500,7 @@ class DevicesFacade
   end
 
   def close
-    if @recording
+    if @status_mutex.synchronize { @recording }
       stop_recording
       save_clip true
     end
@@ -445,51 +596,6 @@ def remove_files(filenames)
   FileUtils.rm_f filenames
 end
 
-def show_help
-  puts "\e[2J\e[f"
-  puts 'r - (RE)START recording'
-  puts 's - STOP and SAVE current clip'
-  puts "S - STOP and SAVE current clip, don't use auto trimming"
-  puts 'd - STOP and DELETE current clip'
-  puts 'p - PLAY last saved clip'
-  puts 'f - FOCUS camera on center'
-  puts 'h - show HELP'
-  puts 'q - QUIT'
-  puts
-end
-
-def run_main_loop(devices)
-  loop do
-    devices.show_status nil
-
-    case STDIN.getch
-    when 'q'
-      devices.show_status 'Quit? y/n'
-      break if STDIN.getch == 'y'
-    when 'r'
-      devices.stop_recording
-      devices.show_status nil
-      devices.delete_unsaved_clip
-      devices.start_recording
-    when 's'
-      devices.stop_recording
-      devices.save_clip true
-    when 'S'
-      devices.stop_recording
-      devices.save_clip false
-    when 'd'
-      devices.stop_recording
-      devices.delete_clip
-    when 'p'
-      devices.play
-    when 'f'
-      devices.focus
-    when 'h'
-      show_help
-    end
-  end
-end
-
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
     opts.set_banner('Usage: vlog-recorder -p project_dir/ [other options]')
@@ -544,6 +650,10 @@ def hide_cursor
   print("\e[?25l")
 end
 
+def clear
+  print("\e[2J\e[f")
+end
+
 def main(argv)
   options = {
     trim_duration: 0.15,
@@ -571,9 +681,9 @@ def main(argv)
 
     logger.debug options
 
-    devices = DevicesFacade.new options, temp_dir, logger
-    show_help
-    run_main_loop(devices)
+    devices = DevicesController.new(options, temp_dir, logger)
+    devices.show_help
+    devices.run_main_loop
   rescue SystemExit, Interrupt
   rescue StandardError => e
     logger.fatal(e) unless logger.nil?
