@@ -18,24 +18,35 @@ require 'process_utils'
 
 require 'fileutils'
 
-def detect_voice(sound_filename, min_shot_size, min_pause_between_shots, agressiveness)
-  first_segment_correction = 0.5
-  speech_pad = 0.1
+FIRST_SEGMENT_CORRECTION = 0.3
+SPEECH_PADDING = 0.1
 
+def detect_voice(sound_filename, min_shot_size, min_pause_between_shots, agressiveness)
   script_filename = File.join(__dir__, 'detect_voice.py')
 
   sound_with_single_channel_filename = prepare_for_vad(sound_filename)
-  command = [script_filename, sound_with_single_channel_filename, VAD_SAMPLING_RATE, agressiveness, min_shot_size,
-             min_pause_between_shots, speech_pad]
+  command = [
+    script_filename,
+    sound_with_single_channel_filename,
+    VAD_SAMPLING_RATE,
+    agressiveness,
+    min_shot_size,
+    min_pause_between_shots,
+    SPEECH_PADDING
+  ]
   output = `#{command.shelljoin_wrapped} 2>>/dev/null`
 
   raise "#{command} failed" if $?.exitstatus != 0
 
   FileUtils.rm_f sound_with_single_channel_filename
 
-  output
+  segments =
+    output
     .split("\n")
     .map { |line| line.split(' ') }
-    .map { |r| r.map(&:to_f) }
-    .filter { |r| r.length == 2 }
+    .map { |seg| seg.map(&:to_f) }
+
+  segments[0][0] = [segments[0][0] - FIRST_SEGMENT_CORRECTION, 0.0].max unless segments.empty?
+
+  segments
 end
