@@ -35,7 +35,7 @@ class Phone
   def initialize(temp_dir, options, logger)
     @temp_dir = temp_dir
 
-    @change_brightness = options[:change_brightness]
+    @change_brightness = options[:change_brightness] # TODO: remove option?
 
     @logger = logger
     @opencamera_dir = options[:opencamera_dir]
@@ -63,6 +63,7 @@ class Phone
 
     run_opencamera
     @initial_brightness = get_brightness
+    @initial_night_display_auto_mode = set_night_display_auto_mode(0)
 
     set_front_camera
     sleep 2.0
@@ -267,8 +268,16 @@ class Phone
     adb_shell("settings put system screen_brightness #{brightness}").to_i
   end
 
-  def restore_brightness
+  def set_night_display_auto_mode(enabled)
+    was_enabled = adb_shell('settings get secure night_display_auto_mode')
+    adb_shell('settings put secure night_display_activated 0')
+    adb_shell("settings put secure night_display_auto_mode #{enabled}")
+    was_enabled
+  end
+
+  def restore_display_settings
     set_brightness @initial_brightness
+    set_night_display_auto_mode @initial_night_display_auto_mode
   end
 
   def get_system_info

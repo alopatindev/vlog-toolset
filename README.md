@@ -139,7 +139,6 @@ vi ~/video/new-cool-video-project/render.conf
     - Video settings…
         - Video resolution - FullHD 1920x1080 (16:9 2.07 MP)
         - Video format - **MPEG4 HEVC**
-        - Video picture profiles - TODO
         - Video frame rate (approx) - 30
     - Camera API - Camera2 API
 

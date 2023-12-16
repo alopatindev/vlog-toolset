@@ -516,7 +516,7 @@ class DevicesController
       save_clip true
     end
 
-    @phone.restore_brightness
+    @phone.restore_display_settings
     @phone.close_opencamera
 
     @media_thread_pool.shutdown
