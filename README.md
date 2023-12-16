@@ -69,14 +69,21 @@ Usage: vlog-recorder -p project_dir/ [other options]
   -d, --debug <true|false>         Show debug messages (default: false)
 
 ./bin/vlog-recorder -p ~/video/new-cool-video-project
-r - (RE)START recording
-s - STOP and SAVE current clip
-S - STOP and SAVE current clip, don't use auto trimming
-d - STOP and DELETE current clip
-p - PLAY last saved clip
-f - FOCUS camera on center
-h - show HELP
-q - QUIT
+...
+----------------------------------------------------------------------
+        R - (RE)START clip recording (loses unsaved clip)
+        S - STOP and SAVE current clip
+Shift + S - STOP and SAVE current clip, DON'T use auto silence removal
+        D - STOP and DELETE current clip
+        P - PLAY last saved clip
+        F - FOCUS camera on center
+----------------------------------------------------------------------
+Shift + R - (RE)START SILENCE recording attempt
+----------------------------------------------------------------------
+        H - show HELP
+        Q - QUIT
+
+[ ⬜ ] [ 💻 | 💾 466G ] [ 📞 | 🔋100% / 41°C | 💾 18G ]
 ```
 
 ## vlog-render
@@ -100,6 +107,7 @@ Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]
   -c, --cleanup <true|false>       Remove temporary files, instead of reusing them in future (default: false)
   -w, --whisper-cpp-dir <dir>      whisper.cpp directory
   -W, --whisper-cpp-args <dir>     Additional whisper.cpp arguments (default: "--model models/ggml-base.bin --language auto")
+  -y, --youtube <true|false>       Additionally optimize for youtube (default: false)
 
 ./bin/vlog-render -p ~/video/new-cool-video-project --preview false --whisper-cpp-dir path/to/whisper-cpp-dir
 ```
@@ -127,7 +135,7 @@ vi ~/video/new-cool-video-project/render.conf
 
 ## Known issues/limitations
 - it's just a dumb dirty PoC/prototype, it's **not necessarily gonna work on your hardware**
-    - I use ~~Meizu MX4~~ Xiaomi Mi 8
+    - I use Xiaomi Mi 8
         - front camera faces at me
         - microphone and camera are allowed
 - paths with spaces and weird characters are unsupported
@@ -151,6 +159,7 @@ vi ~/video/new-cool-video-project/render.conf
 ## TODO: Rewrite this prototype in Rust?
 - support other sources (webcams, screencasting)
     - support multiple sources (cams, mics) at the same time
+- support other operating systems
 - [adb](https://github.com/kpcyrd/forensic-adb/blob/736f7c43d116b6334af3c1d8c4a41f9ae06ff812/src/lib.rs#L754)
     - `pull` performance comparing `android-tools`? for USB 2 and 3
 
