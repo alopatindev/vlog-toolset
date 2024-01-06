@@ -570,8 +570,14 @@ def main(argv)
     print("done 🎉\n")
     print("you can run:\n\n")
     mpv_args = ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs']
-    print((mpv_args + [output_filename]).shelljoin_wrapped + "\n\n")
+    command = mpv_args + [output_filename]
+    print(command.shelljoin_wrapped + "\n\n")
     print((mpv_args + [output_youtube_filename]).shelljoin_wrapped + "\n\n") if options[:youtube]
+
+    # TODO: --play? --preview true?
+    # if options[:play]
+    system(command.shelljoin_wrapped)
+    # end
   end
 
   # TODO: add --gc flag to remove no longer needed tmp/output files

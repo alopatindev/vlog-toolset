@@ -41,6 +41,7 @@ class Phone
     @opencamera_dir = options[:opencamera_dir]
 
     set_android_id!(options[:android_id])
+    adb_shell("mkdir -p #{@opencamera_dir}")
 
     @clip_num_to_filename = {}
     @filenames = Set.new
