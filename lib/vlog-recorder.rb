@@ -552,7 +552,10 @@ class DevicesController
       end
 
       spaces = size - text.length
-      raise if spaces < 0
+      if spaces < 0
+        @logger.error "unexpected spaces=#{spaces}"
+        spaces = 1
+      end
 
       postfix = ' ' * spaces
       print("#{text}#{postfix}\r")
@@ -561,6 +564,8 @@ class DevicesController
   end
 
   def play
+    # TODO: don't play silence wav?
+
     clips = get_clips [@project_dir]
     return if clips.empty?
 
