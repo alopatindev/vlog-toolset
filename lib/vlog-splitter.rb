@@ -108,28 +108,37 @@ def main(argv)
   }
 
   parse_options!(options, argv)
+
   project_dir = options[:project_dir]
   temp_dir = File.join project_dir, 'tmp'
   FileUtils.mkdir_p(temp_dir)
 
   min_pause_between_shots = options[:min_pause_between_shots]
   aggressiveness = options[:aggressiveness]
-
-  clip_num = 1 # TODO: other clips
   rotation = 90 # TODO: detect from width and height; overwritable with options
-  camera_filename = File.join project_dir, "input_#{clip_num.with_leading_zeros}.mp4"
-  sync_sound_filename = prepare_sync_sound(camera_filename)
 
-  segments = detect_segments(sync_sound_filename, camera_filename, options)
-  print("clip_num=#{clip_num} segments=#{segments}\n")
-  processed_sound_filenames = process_sound(sync_sound_filename, segments)
-  print("clip_num=#{clip_num} processed_sound_filenames=#{processed_sound_filenames}\n")
-  processed_video_filenames = process_video(camera_filename, segments)
-  print("clip_num=#{clip_num} processed_video_filenames=#{processed_video_filenames}\n")
-  output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation, project_dir)
-  print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
-  FileUtils.rm_f processed_sound_filenames + processed_video_filenames
-  print("clip_num=#{clip_num} removed files\n")
+  camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
+  for camera_filename in camera_filenames
+    raise "Invalid filename #{camera_filename}" unless camera_filename =~ /input_([0-9]*?)\.mp4$/
+
+    clip_num = Regexp.last_match(1).to_i
+
+    sync_sound_filename = prepare_sync_sound(camera_filename)
+    segments = detect_segments(sync_sound_filename, camera_filename, options)
+    print("clip_num=#{clip_num} segments=#{segments}\n")
+    processed_sound_filenames = process_sound(sync_sound_filename, segments)
+    print("clip_num=#{clip_num} processed_sound_filenames=#{processed_sound_filenames}\n")
+
+    processed_video_filenames = process_video(camera_filename, segments)
+    print("clip_num=#{clip_num} processed_video_filenames=#{processed_video_filenames}\n")
+
+    output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation,
+                                   project_dir)
+    print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
+
+    FileUtils.rm_f processed_sound_filenames + processed_video_filenames
+    print("clip_num=#{clip_num} removed files\n")
+  end
 end
 
 main(ARGV)
