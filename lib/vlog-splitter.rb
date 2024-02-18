@@ -145,7 +145,6 @@ def main(argv)
   media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
-  print("wat = #{camera_filenames}\n\n")
   processed_clips = Dir.glob("#{project_dir}#{File::SEPARATOR}0*.mp4").map { |i| filename_to_clip(i) }.to_set
   print("processing #{processed_clips.length} inputs (total inputs: #{camera_filenames.length})\n")
 

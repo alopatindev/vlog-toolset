@@ -199,7 +199,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         video_filters = [
           "scale=#{preview_width}:-1",
           "#{video_filters}",
-          "drawtext=fontcolor=white:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
+          "drawtext=fontcolor=white:fontsize=#{preview_width / 24}:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
         ].join(',')
       end
 
@@ -506,6 +506,10 @@ def parse_options!(options, args)
             "Line in #{CONFIG_FILENAME} file, to play by given position (default: #{options[:line_in_file]})") do |l|
       options[:line_in_file] = l
     end
+    opts.on('-n', '--tmux-nvim <true|false>',
+            "Auto open Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
+      options[:tmux_nvim] = i == 'true'
+    end
     opts.on('-P', '--preview <true|false>',
             "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
       options[:preview] = p == 'true'
@@ -554,6 +558,7 @@ def main(argv)
     video_filters: 'hqdn3d,hflip,vignette',
     preview: true,
     line_in_file: 1,
+    tmux_nvim: true,
     cleanup: false,
     whisper_cpp_args: '--model models/ggml-base.bin --language auto',
     youtube: false,
@@ -565,7 +570,18 @@ def main(argv)
   project_dir = options[:project_dir]
   config_filename = File.join project_dir, CONFIG_FILENAME
 
+  # TODO: if line_in_file == 1 then get the render.conf line from nvim and put it to --line_in_file
+
   old_config = generate_config(options)
+
+  tmux_is_active = !ENV['TMUX'].nil?
+  nvim_socket = File.join(project_dir, 'nvim.sock')
+
+  if options[:tmux_nvim] && tmux_is_active && !File.socket?(nvim_socket) && File.file?('/usr/bin/nvim')
+    command = ['tmux', 'split-window', '-h', "nvim --listen #{nvim_socket} #{config_filename}"]
+    system command.shelljoin_wrapped
+  end
+
   unless old_config
     print("Configuration file is ready! 🎉\n")
     print("Now edit #{config_filename} and restart this script to finish\n")
