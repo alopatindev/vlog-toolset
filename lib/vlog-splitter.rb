@@ -32,7 +32,7 @@ require 'optparse'
 
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
-    opts.set_banner("Usage: vlog-splitter -p project_dir/ [other options]\nProject directory must contain input_000001.mp4, input_000002.mp4 ... as input files\n")
+    opts.set_banner("Usage: vlog-splitter -p project_dir/ [other options]\nProject directory must contain input_000001.mp4, input_000002.mp4 ... as input files (also optionally input_000001.wav, input_000002.wav ...)")
     opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-P', '--pause-between-shots <seconds>',
@@ -54,9 +54,8 @@ def parse_options!(options, args)
 end
 
 def prepare_sync_sound(filename)
-  # TODO: don't overwrite
   output_filename = "#{filename}.wav"
-  command = FFMPEG + [
+  command = FFMPEG_NO_OVERWRITE + [
     '-i', filename,
     '-af', EXTRACT_LEFT_CHANNEL_FILTER,
     '-vn',
@@ -122,15 +121,15 @@ def main(argv)
   sync_sound_filename = prepare_sync_sound(camera_filename)
 
   segments = detect_segments(sync_sound_filename, camera_filename, options)
-  print("segments=#{segments}\n")
+  print("clip_num=#{clip_num} segments=#{segments}\n")
   processed_sound_filenames = process_sound(sync_sound_filename, segments)
-  print("processed_sound_filenames=#{processed_sound_filenames}\n")
+  print("clip_num=#{clip_num} processed_sound_filenames=#{processed_sound_filenames}\n")
   processed_video_filenames = process_video(camera_filename, segments)
-  print("processed_video_filenames=#{processed_video_filenames}\n")
+  print("clip_num=#{clip_num} processed_video_filenames=#{processed_video_filenames}\n")
   output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation, project_dir)
-  print("output_filenames=#{output_filenames}\n")
-  FileUtils.rm_f [sync_sound_filename] + processed_sound_filenames + processed_video_filenames
-  print("removed files\n")
+  print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
+  FileUtils.rm_f processed_sound_filenames + processed_video_filenames
+  print("clip_num=#{clip_num} removed files\n")
 end
 
 main(ARGV)
