@@ -117,28 +117,37 @@ def main(argv)
   aggressiveness = options[:aggressiveness]
   rotation = 90 # TODO: detect from width and height; overwritable with options
 
+  media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
+
   camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
   for camera_filename in camera_filenames
-    raise "Invalid filename #{camera_filename}" unless camera_filename =~ /input_([0-9]*?)\.mp4$/
+    media_thread_pool.post do
+      raise "Invalid filename #{camera_filename}" unless camera_filename =~ /input_([0-9]*?)\.mp4$/
 
-    clip_num = Regexp.last_match(1).to_i
+      clip_num = Regexp.last_match(1).to_i
 
-    sync_sound_filename = prepare_sync_sound(camera_filename)
-    segments = detect_segments(sync_sound_filename, camera_filename, options)
-    print("clip_num=#{clip_num} segments=#{segments}\n")
-    processed_sound_filenames = process_sound(sync_sound_filename, segments)
-    print("clip_num=#{clip_num} processed_sound_filenames=#{processed_sound_filenames}\n")
+      sync_sound_filename = prepare_sync_sound(camera_filename)
+      segments = detect_segments(sync_sound_filename, camera_filename, options)
+      print("clip_num=#{clip_num} segments=#{segments}\n")
+      processed_sound_filenames = process_sound(sync_sound_filename, segments)
+      print("clip_num=#{clip_num} processed_sound_filenames=#{processed_sound_filenames}\n")
 
-    processed_video_filenames = process_video(camera_filename, segments)
-    print("clip_num=#{clip_num} processed_video_filenames=#{processed_video_filenames}\n")
+      processed_video_filenames = process_video(camera_filename, segments)
+      print("clip_num=#{clip_num} processed_video_filenames=#{processed_video_filenames}\n")
 
-    output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation,
-                                   project_dir)
-    print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
+      output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation,
+                                     project_dir)
+      print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
 
-    FileUtils.rm_f processed_sound_filenames + processed_video_filenames
-    print("clip_num=#{clip_num} removed files\n")
+      FileUtils.rm_f processed_sound_filenames + processed_video_filenames
+      print("clip_num=#{clip_num} removed files\n")
+    end
   end
+
+  media_thread_pool.shutdown
+  media_thread_pool.wait_for_termination
+
+  print("done 🎉\n")
 end
 
 main(ARGV)

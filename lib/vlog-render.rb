@@ -549,7 +549,7 @@ def main(argv)
 
   Dir.chdir project_dir
 
-  min_pause_between_shots = 0.1
+  min_pause_between_shots = 0.1 # FIXME: why not options[:min_pause_between_shots]?
   segments = merge_small_pauses apply_delays(parse(config_filename, options)), min_pause_between_shots
 
   output_dir = File.join project_dir, 'output'
