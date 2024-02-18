@@ -27,7 +27,7 @@ require 'json'
 require 'mkmf'
 require 'optparse'
 
-PREVIEW_WIDTH = 320
+PREVIEW_WIDTH = 320 # TODO: increase preview size for nvidia
 CONFIG_FILENAME = 'render.conf'.freeze
 RENDER_DEFAULT_SPEED = '1.00'
 
@@ -395,6 +395,7 @@ def test_merge_small_pauses
 end
 
 def generate_config(options)
+  # TODO: add commit hash to header
   render_conf_filename = File.join(options[:project_dir], 'render.conf')
   exists = File.exist?(render_conf_filename)
   File.open(render_conf_filename, exists ? 'r+' : 'w') do |render_conf_file|
@@ -498,6 +499,7 @@ def parse_options!(options, args)
             "Additionally optimize for youtube (default: #{options[:youtube]})") do |y|
       options[:youtube] = y == 'true'
     end
+    # TODO: iOS: ffmpeg -threads 16 -i output.mp4 -vcodec h264_nvenc -preset slow -cq 18 -to 10 -acodec alac -movflags faststart -strict -2 test4.mov
   end
 
   parser.parse!(args)

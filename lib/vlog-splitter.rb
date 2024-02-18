@@ -54,12 +54,11 @@ def parse_options!(options, args)
 end
 
 def prepare_sync_sound(filename)
+  # TODO: don't overwrite
   output_filename = "#{filename}.wav"
   command = FFMPEG + [
     '-i', filename,
     '-af', EXTRACT_LEFT_CHANNEL_FILTER,
-    # '-ar', 48_000, # TODO: extract?
-    # '-ar', 44_100, # TODO: extract? remove?
     '-vn',
     output_filename
   ]
@@ -117,9 +116,9 @@ def main(argv)
   min_pause_between_shots = options[:min_pause_between_shots]
   aggressiveness = options[:aggressiveness]
 
-  clip_num = 1
-  rotation = 90
-  camera_filename = File.join project_dir, "input_00000#{clip_num}.mp4" # TODO: leading zeros
+  clip_num = 1 # TODO: other clips
+  rotation = 90 # TODO: detect from width and height; overwritable with options
+  camera_filename = File.join project_dir, "input_#{clip_num.with_leading_zeros}.mp4"
   sync_sound_filename = prepare_sync_sound(camera_filename)
 
   segments = detect_segments(sync_sound_filename, camera_filename, options)
