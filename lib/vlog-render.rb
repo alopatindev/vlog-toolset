@@ -430,7 +430,7 @@ def test_merge_small_pauses
 end
 
 def generate_config(options)
-  # TODO: add commit hash to header
+  app_version = `cd #{options[:project_dir]} && git rev-parse HEAD`[..6]
   render_conf_filename = File.join(options[:project_dir], 'render.conf')
   exists = File.exist?(render_conf_filename)
   File.open(render_conf_filename, exists ? 'r+' : 'w') do |render_conf_file|
@@ -446,7 +446,7 @@ def generate_config(options)
       skip_clips = video_filenames.filter { |i| filename_to_clip(i) <= last_recorded_clip }.length
       video_filenames = video_filenames.drop(skip_clips)
     else
-      write_columns(render_conf_file, ['#filename', 'speed', 'start', 'end', 'text'])
+      write_columns(render_conf_file, ["#(vlog-toolset-#{app_version})filename", 'speed', 'start', 'end', 'text'])
     end
 
     sound_with_single_channel_filenames = video_filenames.map { |i| prepare_for_vad(i) }
@@ -581,7 +581,7 @@ def main(argv)
 
   Dir.chdir project_dir
 
-  min_pause_between_shots = 0.1
+  min_pause_between_shots = 0.1 # FIXME: should be in options, but -P is already used?
   segments = merge_small_pauses apply_delays(parse(config_filename, options)), min_pause_between_shots
 
   output_dir = File.join project_dir, 'output'
