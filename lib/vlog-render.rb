@@ -27,7 +27,6 @@ require 'json'
 require 'mkmf'
 require 'optparse'
 
-PREVIEW_WIDTH = 320 # TODO: increase preview size for nvidia
 CONFIG_FILENAME = 'render.conf'.freeze
 RENDER_DEFAULT_SPEED = '1.00'
 
@@ -154,11 +153,18 @@ def remove_file_if_empty(filename)
 end
 
 def process_and_split_videos(segments, options, output_dir, temp_dir)
+  is_nvenc_supported = nvenc_supported?('hevc_nvenc')
   video_codec =
-    if nvenc_supported?('hevc_nvenc')
+    if is_nvenc_supported
       'hevc_nvenc -preset p1 -cq 18 -qp 18'
     else
       'libx265 -preset ultrafast -crf 18'
+    end
+  preview_width =
+    if is_nvenc_supported
+      960
+    else
+      320
     end
 
   print("processing video clips\n")
@@ -190,9 +196,9 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
       ].reject { |i| i.empty? }.join(',')
       if preview
         video_filters = [
-          "scale=#{PREVIEW_WIDTH}:-1",
+          "scale=#{preview_width}:-1",
           "#{video_filters}",
-          "drawtext=fontcolor=white:x=#{PREVIEW_WIDTH / 3}:text=#{basename}/L#{line_in_config}"
+          "drawtext=fontcolor=white:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
         ].join(',')
       end
 
