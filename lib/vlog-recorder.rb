@@ -35,7 +35,6 @@ require 'optparse'
 
 # TODO: rename
 class DevicesController
-  MIN_SHOT_SIZE = 1.0
   MIN_SILENCE_SIZE = 10.0
 
   WAIT_AFTER_REC_STARTED = 5.0
@@ -358,7 +357,8 @@ class DevicesController
         @logger.debug "save_clip: processed_sound_filenames=#{processed_sound_filenames}"
 
         processed_video_filenames = process_video(camera_filename, segments)
-        output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation)
+        output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation,
+                                       @project_dir)
         remove_files [camera_filename, sound_filename,
                       sync_sound_filename] + processed_sound_filenames + processed_video_filenames
         @logger.info "save_clip: #{clip_num} as #{output_filenames} ok"
@@ -380,25 +380,6 @@ class DevicesController
     clip_num = @clip_num
     @status_mutex.synchronize do
       @saving_clips.include?(clip_num)
-    end
-  end
-
-  def merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation)
-    processed_sound_filenames
-      .zip(processed_video_filenames)
-      .each_with_index
-      .map do |f, subclip_num|
-      @logger.debug "save_clip: merging files #{f} #{subclip_num}"
-
-      processed_sound_filename, processed_video_filename = f
-      output_filename = get_output_filename clip_num, subclip_num, rotation
-      @logger.debug "save_clip: output_filename=#{output_filename}"
-      command = FFMPEG + ['-i', processed_sound_filename, '-an', '-i', processed_video_filename, '-shortest',
-                          '-strict', '-2', '-codec', 'copy', '-movflags', 'faststart', output_filename]
-      @logger.debug command
-      system command.shelljoin_wrapped
-
-      output_filename
     end
   end
 
@@ -438,36 +419,6 @@ class DevicesController
     segments
   end
 
-  def process_video(camera_filename, segments)
-    segments.each_with_index.map do |seg, subclip_num|
-      start_position, end_position = seg
-      output_filename = "#{camera_filename}_#{subclip_num}.processed.mp4"
-      temp_filename = "#{camera_filename}_#{subclip_num}.cut.mp4"
-
-      command = FFMPEG + [
-        '-ss', start_position,
-        '-i', camera_filename,
-        '-to', end_position - start_position,
-        '-an',
-        '-codec', 'copy',
-        temp_filename
-      ]
-      system command.shelljoin_wrapped
-      FileUtils.mv temp_filename, output_filename, force: true
-
-      output_filename
-    end
-  end
-
-  def get_output_filename(clip_num, subclip_num, rotation)
-    prefix = File.join @project_dir, "#{clip_num.with_leading_zeros}_#{subclip_num.with_leading_zeros}"
-    if rotation.nil?
-      Dir[prefix + '*'].first
-    else
-      "#{prefix}_#{rotation}.mp4"
-    end
-  end
-
   def synchronize_sound(camera_filename, sound_filename)
     output_filename = "#{sound_filename}.sync.wav"
 
@@ -479,35 +430,6 @@ class DevicesController
                   .first || 0.0
 
     [sync_offset, output_filename]
-  end
-
-  def process_sound(sync_sound_filename, segments)
-    audio_filters = [EXTRACT_LEFT_CHANNEL_FILTER]
-
-    segments.each_with_index.map do |seg, subclip_num|
-      start_position, end_position = seg
-      output_filename = "#{sync_sound_filename}_#{subclip_num}.flac"
-
-      ffmpeg_cut_args = ['-ss', start_position, '-i', sync_sound_filename, '-to', end_position - start_position,
-                         '-codec', 'copy']
-      ffmpeg_output_args = ['-af', "#{audio_filters.join(',')}", '-acodec', 'flac']
-
-      temp_filename = "#{sync_sound_filename}_#{subclip_num}.cut.wav"
-
-      command = FFMPEG + ffmpeg_cut_args + [temp_filename]
-      @logger.debug command
-      system command.shelljoin_wrapped, out: File::NULL
-
-      command = FFMPEG + ['-i', temp_filename] + ffmpeg_output_args + [output_filename]
-      @logger.debug command
-      system command.shelljoin_wrapped, out: File::NULL
-
-      remove_files temp_filename
-
-      raise "Failed to process #{output_filename}" unless File.file?(output_filename)
-
-      output_filename
-    end
   end
 
   def close
@@ -572,7 +494,8 @@ class DevicesController
     last_clip_num = parse_clip_num clips.last
     @logger.debug "play clip: #{last_clip_num}"
 
-    last_clip_filename = File.basename(get_output_filename(last_clip_num, subclip_num = 0, rotation = nil))
+    last_clip_filename = File.basename(get_output_filename(last_clip_num, subclip_num = 0, rotation = nil,
+                                                           project_dir = @project_dir))
     rotation = last_clip_filename.split('_')[2].split('.')[0].to_i
     restored_rotation = (rotation - 90) % 360
 
@@ -607,7 +530,6 @@ class DevicesController
 end
 
 def remove_files(filenames)
-  temp_files = filenames
   @logger.debug "removing #{filenames}"
   FileUtils.rm_f filenames
 end

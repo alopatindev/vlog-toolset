@@ -21,6 +21,8 @@ FFMPEG_NO_OVERWRITE = ['ffmpeg', '-n', '-hide_banner', '-loglevel', 'panic']
 EXTRACT_LEFT_CHANNEL_FILTER = 'pan=mono|c0=c0' # TODO: https://trac.ffmpeg.org/wiki/AudioChannelManipulation#Chooseaspecificchannel
 VAD_SAMPLING_RATE = 16_000
 
+MIN_SHOT_SIZE = 1.0
+
 MPV = ['mpv', '--no-config', '--really-quiet', '--no-resume-playback', '--af=scaletempo2', '--fs']
 
 def get_duration(filename)
@@ -55,4 +57,82 @@ def get_volume_adjustment(filename)
     .filter { |i| !i.nil? }
     .map { |i| i.to_f }
     .first
+end
+
+def process_sound(sync_sound_filename, segments)
+  audio_filters = [EXTRACT_LEFT_CHANNEL_FILTER]
+
+  segments.each_with_index.map do |seg, subclip_num|
+    start_position, end_position = seg
+    output_filename = "#{sync_sound_filename}_#{subclip_num}.flac"
+
+    ffmpeg_cut_args = ['-ss', start_position, '-i', sync_sound_filename, '-to', end_position - start_position,
+                       '-codec', 'copy']
+    ffmpeg_output_args = ['-af', "#{audio_filters.join(',')}", '-acodec', 'flac']
+
+    temp_filename = "#{sync_sound_filename}_#{subclip_num}.cut.wav"
+
+    command = FFMPEG + ffmpeg_cut_args + [temp_filename]
+    # @logger.debug command
+    system command.shelljoin_wrapped, out: File::NULL
+
+    command = FFMPEG + ['-i', temp_filename] + ffmpeg_output_args + [output_filename]
+    # @logger.debug command
+    system command.shelljoin_wrapped, out: File::NULL
+
+    FileUtils.rm_f temp_filename
+
+    raise "Failed to process #{output_filename}" unless File.file?(output_filename)
+
+    output_filename
+  end
+end
+
+def process_video(camera_filename, segments)
+  segments.each_with_index.map do |seg, subclip_num|
+    start_position, end_position = seg
+    output_filename = "#{camera_filename}_#{subclip_num}.processed.mp4"
+    temp_filename = "#{camera_filename}_#{subclip_num}.cut.mp4"
+
+    command = FFMPEG + [
+      '-ss', start_position,
+      '-i', camera_filename,
+      '-to', end_position - start_position,
+      '-an',
+      '-codec', 'copy',
+      temp_filename
+    ]
+    system command.shelljoin_wrapped
+    FileUtils.mv temp_filename, output_filename, force: true
+
+    output_filename
+  end
+end
+
+def merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation, project_dir)
+  processed_sound_filenames
+    .zip(processed_video_filenames)
+    .each_with_index
+    .map do |f, subclip_num|
+    # @logger.debug "save_clip: merging files #{f} #{subclip_num}"
+
+    processed_sound_filename, processed_video_filename = f
+    output_filename = get_output_filename clip_num, subclip_num, rotation, project_dir
+    # @logger.debug "save_clip: output_filename=#{output_filename}"
+    command = FFMPEG + ['-i', processed_sound_filename, '-an', '-i', processed_video_filename, '-shortest',
+                        '-strict', '-2', '-codec', 'copy', '-movflags', 'faststart', output_filename]
+    # @logger.debug command
+    system command.shelljoin_wrapped
+
+    output_filename
+  end
+end
+
+def get_output_filename(clip_num, subclip_num, rotation, project_dir)
+  prefix = File.join project_dir, "#{clip_num.with_leading_zeros}_#{subclip_num.with_leading_zeros}"
+  if rotation.nil?
+    Dir[prefix + '*'].first
+  else
+    "#{prefix}_#{rotation}.mp4"
+  end
 end
