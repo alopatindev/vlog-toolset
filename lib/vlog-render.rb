@@ -17,6 +17,7 @@
 
 require 'media_utils'
 require 'numeric_utils'
+require 'os_utils'
 require 'phone'
 require 'process_utils'
 
@@ -485,12 +486,6 @@ def generate_config(options)
   end
 
   exists
-end
-
-def filename_to_clip(filename)
-  # 000123_000000.mp4 => 123 is clip, 0 is subclip
-  basename = File.basename(filename)
-  basename.split('_').first.to_i
 end
 
 def write_columns(file, columns)

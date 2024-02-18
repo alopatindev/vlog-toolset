@@ -29,6 +29,7 @@ require 'fileutils'
 require 'io/console'
 require 'logger'
 require 'optparse'
+require 'set'
 
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
@@ -102,11 +103,34 @@ def detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
   segments
 end
 
+def process_clip(clip_num, camera_filename, options)
+  print("process_clip #{clip_num} #{camera_filename}\n")
+
+  print("clip_num=#{clip_num} preparing sync sound\n")
+  sync_offset, sync_sound_filename = prepare_sync_sound(camera_filename)
+  print("clip_num=#{clip_num} sync_offset=#{sync_offset}\n")
+  segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
+  print("clip_num=#{clip_num} segments=#{segments}\n")
+  processed_sound_filenames = process_sound(sync_sound_filename, segments)
+  print("clip_num=#{clip_num} processed_sound_filenames=#{processed_sound_filenames}\n")
+
+  processed_video_filenames = process_video(camera_filename, segments)
+  print("clip_num=#{clip_num} processed_video_filenames=#{processed_video_filenames}\n")
+
+  output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, options[:rotation],
+                                 options[:project_dir])
+  print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
+
+  FileUtils.rm_f [sync_sound_filename] + processed_sound_filenames + processed_video_filenames
+  print("clip_num=#{clip_num} ok\n")
+end
+
 def main(argv)
   # TODO: extract?
   options = {
     min_pause_between_shots: 2.0,
-    aggressiveness: 0.4
+    aggressiveness: 0.4,
+    rotation: '90' # TODO: detect from width and height; overwritable with options
   }
 
   parse_options!(options, argv)
@@ -117,48 +141,36 @@ def main(argv)
 
   min_pause_between_shots = options[:min_pause_between_shots]
   aggressiveness = options[:aggressiveness]
-  rotation = 90 # TODO: detect from width and height; overwritable with options
 
   media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
-  print("#{camera_filenames.length} inputs\n")
+  print("wat = #{camera_filenames}\n\n")
+  processed_clips = Dir.glob("#{project_dir}#{File::SEPARATOR}0*.mp4").map { |i| filename_to_clip(i) }.to_set
+  print("processing #{processed_clips.length} inputs (total inputs: #{camera_filenames.length})\n")
+
   for camera_filename in camera_filenames
+    clip_num = File.basename(camera_filename).split('_')[1].to_i
+    print("#{camera_filename} => clip_num=#{clip_num}\n")
+    if processed_clips.include?(clip_num)
+      print("skipping #{clip_num}\n")
+      next
+    end
+
+    print("for #{camera_filename}... (clip_num=#{clip_num})\n")
     media_thread_pool.post do
-      print("#{camera_filename} (?/#{camera_filenames.length})\n")
-      raise "Invalid filename #{camera_filename}" unless camera_filename =~ /input_([0-9]*?)\.mp4$/
-
-      print("getting clip_num\n")
-      clip_num = Regexp.last_match(1).to_i
-
-      print("preparing sync sound\n")
-      sync_offset, sync_sound_filename = prepare_sync_sound(camera_filename)
-      print("sync_offset=#{sync_offset}\n")
-      segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
-      print("clip_num=#{clip_num} segments=#{segments}\n")
-      processed_sound_filenames = process_sound(sync_sound_filename, segments)
-      print("clip_num=#{clip_num} processed_sound_filenames=#{processed_sound_filenames}\n")
-
-      processed_video_filenames = process_video(camera_filename, segments)
-      print("clip_num=#{clip_num} processed_video_filenames=#{processed_video_filenames}\n")
-
-      output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation,
-                                     project_dir)
-      print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
-
-      FileUtils.rm_f [sync_sound_filename] + processed_sound_filenames + processed_video_filenames
-      print("#{camera_filename} (#{clip_num}/#{camera_filenames.length}) ok\n")
+      print("! for #{camera_filename}... (clip_num=#{clip_num})\n")
+      process_clip(clip_num, camera_filename, options)
+      print("#{camera_filename} (#{clip_num}/#{camera_filenames.length})\n")
     rescue SystemExit, Interrupt
     rescue StandardError => e
       puts e
-    ensure
-      puts 'Exiting...'
-      STDOUT.flush
     end
   end
 
   media_thread_pool.shutdown
   media_thread_pool.wait_for_termination
+  STDOUT.flush
 
   print("done 🎉\n")
 end

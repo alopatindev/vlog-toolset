@@ -24,3 +24,9 @@ def parse_free_storage(df, min = nil)
   text = "#{gib}G"
   gib <= [MIN_SIZE, min].max ? text.red : text
 end
+
+def filename_to_clip(filename)
+  # 000123_000000.mp4 => 123 is clip, 0 is subclip
+  basename = File.basename(filename)
+  basename.split('_').first.to_i
+end
