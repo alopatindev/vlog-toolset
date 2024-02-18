@@ -338,6 +338,35 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   output_youtube_filename
 end
 
+def optimize_for_ios(output_filename, options)
+  print("reencoding for iOS\n")
+
+  output_basename_no_ext = "#{File.basename(output_filename, File.extname(output_filename))}.ios"
+  output_ios_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mov")
+
+  video_codec =
+    if nvenc_supported?('h264_nvenc')
+      'h264_nvenc -preset slow -cq 18'
+    else
+      'libx264 -preset ultrafast -crf 18'
+    end
+
+  print("producing ios output\n")
+  command =
+    FFMPEG + [
+      '-threads', Concurrent.processor_count,
+      '-i', output_filename,
+      '-vcodec', video_codec,
+      '-acodec', 'alac',
+      '-movflags', 'faststart',
+      '-strict', '-2',
+      output_ios_filename
+    ]
+  system command.shelljoin_wrapped
+
+  output_ios_filename
+end
+
 def compute_player_position(segments, options)
   segments.filter { |seg| seg[:index] < options[:line_in_file] - 1 }
           .map { |seg| seg[:end_position] - seg[:start_position] }
@@ -505,7 +534,10 @@ def parse_options!(options, args)
             "Additionally optimize for youtube (default: #{options[:youtube]})") do |y|
       options[:youtube] = y == 'true'
     end
-    # TODO: iOS: ffmpeg -threads 16 -i output.mp4 -vcodec h264_nvenc -preset slow -cq 18 -to 10 -acodec alac -movflags faststart -strict -2 test4.mov
+    opts.on('-I', '--ios <true|false>',
+            "Additionally optimize for iOS (default: #{options[:ios]})") do |i|
+      options[:ios] = i == 'true'
+    end
   end
 
   parser.parse!(args)
@@ -529,7 +561,8 @@ def main(argv)
     line_in_file: 1,
     cleanup: false,
     whisper_cpp_args: '--model models/ggml-base.bin --language auto',
-    youtube: false
+    youtube: false,
+    ios: false
   }
 
   parse_options!(options, argv)
@@ -574,13 +607,13 @@ def main(argv)
     system command.shelljoin_wrapped
   else
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
+    output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
 
     print("done 🎉\n")
     print("you can run:\n\n")
     mpv_args = ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs']
     command = mpv_args + [output_filename]
     print(command.shelljoin_wrapped + "\n\n")
-    print((mpv_args + [output_youtube_filename]).shelljoin_wrapped + "\n\n") if options[:youtube]
 
     # TODO: --play? --preview true?
     # if options[:play]

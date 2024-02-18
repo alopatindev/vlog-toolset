@@ -54,6 +54,7 @@ def parse_options!(options, args)
 end
 
 def prepare_sync_sound(filename)
+  # TODO: actually run sync if both camera sound and mic sound exist
   output_filename = "#{filename}.wav"
   command = FFMPEG_NO_OVERWRITE + [
     '-i', filename,
