@@ -421,19 +421,6 @@ class DevicesController
     segments
   end
 
-  def synchronize_sound(camera_filename, sound_filename)
-    output_filename = "#{sound_filename}.sync.wav"
-
-    command = ['sync-audio-tracks.sh', sound_filename, camera_filename, output_filename]
-    sync_offset = `#{command.shelljoin_wrapped}`
-                  .split("\n")
-                  .filter { |line| line.start_with? 'offset is' }
-                  .map { |line| line.sub(/^offset is /, '').sub(/ seconds$/, '').to_f }
-                  .first || 0.0
-
-    [sync_offset, output_filename]
-  end
-
   def close
     if @status_mutex.synchronize { @recording }
       stop_recording

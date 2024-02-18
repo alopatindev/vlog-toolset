@@ -59,6 +59,19 @@ def get_volume_adjustment(filename)
     .first
 end
 
+def synchronize_sound(camera_filename, sound_filename)
+  output_filename = "#{sound_filename}.sync.wav"
+
+  command = ['sync-audio-tracks.sh', sound_filename, camera_filename, output_filename]
+  sync_offset = `#{command.shelljoin_wrapped}`
+                .split("\n")
+                .filter { |line| line.start_with? 'offset is' }
+                .map { |line| line.sub(/^offset is /, '').sub(/ seconds$/, '').to_f }
+                .first || 0.0
+
+  [sync_offset, output_filename]
+end
+
 def process_sound(sync_sound_filename, segments)
   audio_filters = [EXTRACT_LEFT_CHANNEL_FILTER]
 

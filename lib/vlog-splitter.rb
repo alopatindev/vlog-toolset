@@ -122,13 +122,18 @@ def main(argv)
   media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
+  print("#{camera_filenames.length} inputs\n")
   for camera_filename in camera_filenames
     media_thread_pool.post do
+      print("#{camera_filename} (?/#{camera_filenames.length})\n")
       raise "Invalid filename #{camera_filename}" unless camera_filename =~ /input_([0-9]*?)\.mp4$/
 
+      print("getting clip_num\n")
       clip_num = Regexp.last_match(1).to_i
 
+      print("preparing sync sound\n")
       sync_offset, sync_sound_filename = prepare_sync_sound(camera_filename)
+      print("sync_offset=#{sync_offset}\n")
       segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
       print("clip_num=#{clip_num} segments=#{segments}\n")
       processed_sound_filenames = process_sound(sync_sound_filename, segments)
@@ -143,6 +148,12 @@ def main(argv)
 
       FileUtils.rm_f [sync_sound_filename] + processed_sound_filenames + processed_video_filenames
       print("#{camera_filename} (#{clip_num}/#{camera_filenames.length}) ok\n")
+    rescue SystemExit, Interrupt
+    rescue StandardError => e
+      puts e
+    ensure
+      puts 'Exiting...'
+      STDOUT.flush
     end
   end
 

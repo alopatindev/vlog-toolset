@@ -430,7 +430,7 @@ def test_merge_small_pauses
 end
 
 def generate_config(options)
-  app_version = `cd #{options[:project_dir]} && git rev-parse HEAD`[..6]
+  app_version = `git rev-parse HEAD`[..6]
   render_conf_filename = File.join(options[:project_dir], 'render.conf')
   exists = File.exist?(render_conf_filename)
   File.open(render_conf_filename, exists ? 'r+' : 'w') do |render_conf_file|
