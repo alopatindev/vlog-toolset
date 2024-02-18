@@ -53,24 +53,25 @@ def parse_options!(options, args)
   exit 1
 end
 
-def prepare_sync_sound(filename)
-  # TODO: actually run sync if both camera sound and mic sound exist
-  output_filename = "#{filename}.wav"
+def prepare_sync_sound(camera_filename)
+  sound_filename = "#{camera_filename.gsub(/\.mp4$/, '')}.wav"
   command = FFMPEG_NO_OVERWRITE + [
-    '-i', filename,
+    '-i', camera_filename,
     '-af', EXTRACT_LEFT_CHANNEL_FILTER,
     '-vn',
-    output_filename
+    sound_filename
   ]
   system "#{command.shelljoin_wrapped}"
-  output_filename
+
+  sync_offset, sync_sound_filename = synchronize_sound(camera_filename, sound_filename)
+  [sync_offset, sync_sound_filename]
 end
 
-def detect_segments(sync_sound_filename, camera_filename, options)
+def detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
   sync_sound_duration = get_duration(sync_sound_filename)
   duration = [get_duration(camera_filename), sync_sound_duration].min
 
-  start_position = 0.0
+  start_position = [0.0, sync_offset.abs].max
   end_position = duration
 
   segments = []
@@ -127,8 +128,8 @@ def main(argv)
 
       clip_num = Regexp.last_match(1).to_i
 
-      sync_sound_filename = prepare_sync_sound(camera_filename)
-      segments = detect_segments(sync_sound_filename, camera_filename, options)
+      sync_offset, sync_sound_filename = prepare_sync_sound(camera_filename)
+      segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
       print("clip_num=#{clip_num} segments=#{segments}\n")
       processed_sound_filenames = process_sound(sync_sound_filename, segments)
       print("clip_num=#{clip_num} processed_sound_filenames=#{processed_sound_filenames}\n")
@@ -140,8 +141,8 @@ def main(argv)
                                      project_dir)
       print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
 
-      FileUtils.rm_f processed_sound_filenames + processed_video_filenames
-      print("clip_num=#{clip_num} removed files\n")
+      FileUtils.rm_f [sync_sound_filename] + processed_sound_filenames + processed_video_filenames
+      print("clip_num=#{clip_num} removed files => ok\n")
     end
   end
 
