@@ -359,6 +359,7 @@ def optimize_for_ios(output_filename, options)
       '-i', output_filename,
       '-vcodec', video_codec,
       '-acodec', 'alac',
+      '-pix_fmt', 'yuv420p',
       '-movflags', 'faststart',
       '-strict', '-2',
       output_ios_filename
