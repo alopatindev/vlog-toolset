@@ -556,7 +556,6 @@ def main(argv)
     fps: 30,
     speed: 1.2,
     video_filters: 'hqdn3d,hflip,vignette',
-    min_pause_between_shots: 0.1,
     preview: true,
     line_in_file: 1,
     cleanup: false,
@@ -582,7 +581,7 @@ def main(argv)
 
   Dir.chdir project_dir
 
-  min_pause_between_shots = 0.1 # FIXME: why not options[:min_pause_between_shots]?
+  min_pause_between_shots = 0.1
   segments = merge_small_pauses apply_delays(parse(config_filename, options)), min_pause_between_shots
 
   output_dir = File.join project_dir, 'output'
