@@ -142,7 +142,7 @@ def main(argv)
       print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
 
       FileUtils.rm_f [sync_sound_filename] + processed_sound_filenames + processed_video_filenames
-      print("clip_num=#{clip_num} removed files => ok\n")
+      print("#{camera_filename} (#{clip_num}/#{camera_filenames.length}) ok\n")
     end
   end
 
