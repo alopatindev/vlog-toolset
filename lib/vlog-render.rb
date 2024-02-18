@@ -616,6 +616,11 @@ def main(argv)
     print("player_position = #{player_position}\n")
     command = MPV + ["--start=#{player_position}", '--no-fs', output_filename]
     system command.shelljoin_wrapped
+    # TODO: send from mpv lua plugin to nvim (with non-blocking, via neovim lua-client):
+    #         go to line if
+    #           current file is render.conf
+    #           and current mode is normal
+    #           (and file is saved?)
   else
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
