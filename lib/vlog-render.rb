@@ -163,7 +163,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     end
   preview_width =
     if is_nvenc_supported
-      960
+      720
     else
       320
     end
@@ -506,13 +506,13 @@ def parse_options!(options, args)
             "Line in #{CONFIG_FILENAME} file, to play by given position (default: #{options[:line_in_file]})") do |l|
       options[:line_in_file] = l
     end
-    opts.on('-n', '--tmux-nvim <true|false>',
-            "Auto open Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
-      options[:tmux_nvim] = i == 'true'
-    end
     opts.on('-P', '--preview <true|false>',
             "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
       options[:preview] = p == 'true'
+    end
+    opts.on('-n', '--tmux-nvim <true|false>',
+            "Auto open render.conf (during preview mode) in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
+      options[:tmux_nvim] = i == 'true'
     end
     opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f.to_i }
     opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
@@ -577,8 +577,8 @@ def main(argv)
   tmux_is_active = !ENV['TMUX'].nil?
   nvim_socket = File.join(project_dir, 'nvim.sock')
 
-  if options[:tmux_nvim] && tmux_is_active && !File.socket?(nvim_socket) && File.file?('/usr/bin/nvim')
-    command = ['tmux', 'split-window', '-h', "nvim --listen #{nvim_socket} #{config_filename}"]
+  if options[:preview] && options[:tmux_nvim] && tmux_is_active && !File.socket?(nvim_socket) && File.file?('/usr/bin/nvim')
+    command = ['tmux', 'split-window', '-v', "nvim --listen #{nvim_socket} #{config_filename}"]
     system command.shelljoin_wrapped
   end
 
@@ -614,7 +614,7 @@ def main(argv)
   if options[:preview]
     player_position = compute_player_position segments, options
     print("player_position = #{player_position}\n")
-    command = MPV + ["--start=#{player_position}", '--no-fs', output_filename]
+    command = MPV + ["--start=#{player_position}", '--no-fs', '--geometry=30%+0+0', output_filename]
     system command.shelljoin_wrapped
     # TODO: send from mpv lua plugin to nvim (with non-blocking, via neovim lua-client):
     #         go to line if

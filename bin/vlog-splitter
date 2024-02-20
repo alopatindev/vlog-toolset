@@ -16,6 +16,7 @@
 # along with vlog-toolset. If not, see <http://www.gnu.org/licenses/>.
 
 BINDIR="$(dirname $0)"
+cd "${BINDIR}/.."
 export RUBYOPT="-I${BINDIR}/../lib"
 
 ruby lib/vlog-splitter.rb "$@"

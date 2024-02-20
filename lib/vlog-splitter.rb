@@ -142,34 +142,34 @@ def main(argv)
   min_pause_between_shots = options[:min_pause_between_shots]
   aggressiveness = options[:aggressiveness]
 
-  media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
+  # media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
   processed_clips = Dir.glob("#{project_dir}#{File::SEPARATOR}0*.mp4").map { |i| filename_to_clip(i) }.to_set
-  print("processing #{processed_clips.length} inputs (total inputs: #{camera_filenames.length})\n")
+  print("already processed #{processed_clips.length} inputs (total inputs: #{camera_filenames.length})\n")
 
   for camera_filename in camera_filenames
     clip_num = File.basename(camera_filename).split('_')[1].to_i
-    print("#{camera_filename} => clip_num=#{clip_num}\n")
+    print(" => clip_num=#{clip_num}\n")
     if processed_clips.include?(clip_num)
-      print("skipping #{clip_num}\n")
+      print("skipping #{clip_num} (#{camera_filename})\n")
       next
     end
 
-    print("for #{camera_filename}... (clip_num=#{clip_num})\n")
-    media_thread_pool.post do
-      print("! for #{camera_filename}... (clip_num=#{clip_num})\n")
-      process_clip(clip_num, camera_filename, options)
-      print("#{camera_filename} (#{clip_num}/#{camera_filenames.length})\n")
-    rescue SystemExit, Interrupt
-    rescue StandardError => e
-      puts e
-    end
+    # print("scheduling #{clip_num} (#{camera_filename})\n")
+    # media_thread_pool.post do
+    print("processing #{clip_num} (#{camera_filename})\n")
+    process_clip(clip_num, camera_filename, options)
+    print("#{camera_filename} (#{clip_num}/#{camera_filenames.length})\n")
+    # rescue SystemExit, Interrupt
+    # rescue StandardError => e
+    #  puts e
+    # end
   end
 
-  media_thread_pool.shutdown
-  media_thread_pool.wait_for_termination
-  STDOUT.flush
+  # media_thread_pool.shutdown
+  # media_thread_pool.wait_for_termination
+  # STDOUT.flush
 
   print("done 🎉\n")
 end
