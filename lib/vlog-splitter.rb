@@ -146,15 +146,15 @@ def main(argv)
 
   camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
   processed_clips = Dir.glob("#{project_dir}#{File::SEPARATOR}0*.mp4").map { |i| filename_to_clip(i) }.to_set
-  print("already processed #{processed_clips.length} inputs (total inputs: #{camera_filenames.length})\n")
-
-  for camera_filename in camera_filenames
+  unprocessed_items = camera_filenames.filter_map do |camera_filename|
     clip_num = File.basename(camera_filename).split('_')[1].to_i
-    if processed_clips.include?(clip_num)
-      print("skipping #{clip_num} (#{camera_filename})\n")
-      next
-    end
+    [clip_num, camera_filename] unless processed_clips.include?(clip_num)
+  end
+  print("wat=#{unprocessed_items}\n\n")
+  print("processing #{unprocessed_items.length} inputs (total inputs: #{camera_filenames.length})\n")
 
+  for i in unprocessed_items
+    clip_num, camera_filename = i
     # print("scheduling #{clip_num} (#{camera_filename})\n")
     # media_thread_pool.post do
     print("processing #{clip_num} (#{camera_filename})\n")
