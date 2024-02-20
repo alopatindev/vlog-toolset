@@ -19,7 +19,7 @@ require 'process_utils'
 require 'fileutils'
 
 FIRST_SEGMENT_CORRECTION = 0.3
-SPEECH_PADDING = 0.1
+SPEECH_PADDING = 0.3
 
 def detect_voice(sound_filename, min_shot_size, min_pause_between_shots, agressiveness)
   script_filename = File.join(__dir__, 'detect_voice.py')

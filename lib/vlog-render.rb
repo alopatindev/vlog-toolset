@@ -269,9 +269,10 @@ def concat_videos(temp_videos, output_filename)
     '-safe', '0',
     '-protocol_whitelist', 'file,pipe',
     '-i', '-',
-    '-af', 'aselect=concatdec_select,aresample=async=1',
-    '-vcodec', 'copy',
-    '-acodec', 'flac',
+    # '-af', 'aselect=concatdec_select,aresample=async=1', # FIXME: adds sound gaps resulting in clicking sounds
+    # '-vcodec', 'copy',
+    # '-acodec', 'flac',
+    '-codec', 'copy',
     '-movflags', 'faststart',
     '-strict', '-2',
     output_filename
@@ -391,6 +392,7 @@ def optimize_for_ios(output_filename, options)
 end
 
 def compute_player_position(segments, options)
+  # FIXME: comment is not line, that might causes incorrect line to time mapping
   segments.filter { |seg| seg[:index] < options[:line_in_file] - 1 }
           .map { |seg| seg[:end_position] - seg[:start_position] }
           .sum / clamp_speed(options[:speed])
