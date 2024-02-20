@@ -26,9 +26,9 @@ MIN_SHOT_SIZE = 1.0
 MPV = ['mpv', '--no-config', '--really-quiet', '--no-resume-playback', '--af=scaletempo2', '--fs']
 
 def get_duration(filename)
-  command = ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1',
-             filename]
-  `#{command.shelljoin_wrapped}`.to_f
+  command = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams', filename]
+  streams = JSON.parse(`#{command.shelljoin_wrapped}`)['streams']
+  streams.map { |i| i['duration'].to_f }.min
 end
 
 def prepare_for_vad(filename)

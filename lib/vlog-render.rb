@@ -285,8 +285,9 @@ end
 def optimize_for_youtube(output_filename, options, temp_dir)
   print("reencoding for youtube\n")
 
+  # TODO: verify that FPS is actually const
   output_basename_no_ext = "#{File.basename(output_filename,
-                                            File.extname(output_filename))}.const_#{options[:fps]}_fps.youtube"
+                                            File.extname(output_filename))}.cfr#{options[:fps]}.youtube"
   temp_youtube_flac_h264_filename = File.join(temp_dir, "#{output_basename_no_ext}.flac.h264.mp4")
   temp_youtube_opus_filename = File.join(temp_dir, "#{output_basename_no_ext}.opus")
   temp_youtube_wav_filename = File.join(temp_dir, "#{output_basename_no_ext}.wav")
@@ -340,6 +341,8 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   ]
   system command.shelljoin_wrapped
 
+  # TODO: check FPS and append vfr30 / cfr30
+
   if options[:cleanup]
     FileUtils.rm_f [temp_youtube_flac_h264_filename, temp_youtube_wav_filename,
                     temp_youtube_opus_filename]
@@ -351,8 +354,9 @@ end
 def optimize_for_ios(output_filename, options)
   print("reencoding for iOS\n")
 
+  # TODO: verify that FPS is actually const
   output_basename_no_ext = "#{File.basename(output_filename,
-                                            File.extname(output_filename))}.const_#{options[:fps]}_fps.ios"
+                                            File.extname(output_filename))}.cfr#{options[:fps]}.ios"
   output_ios_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mov")
 
   video_codec =
@@ -655,6 +659,7 @@ def main(argv)
   end
 
   # TODO: add --gc flag to remove no longer needed tmp/output files
+  # TODO: remove old/unknown "output/*.mp4" files
 end
 
 main(ARGV)
