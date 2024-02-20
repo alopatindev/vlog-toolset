@@ -150,7 +150,7 @@ def main(argv)
     clip_num = File.basename(camera_filename).split('_')[1].to_i
     [clip_num, camera_filename] unless processed_clips.include?(clip_num)
   end
-  print("processing #{unprocessed_items.length} inputs (total inputs: #{camera_filenames.length})\n")
+  print("splitting #{unprocessed_items.length} inputs (total inputs: #{camera_filenames.length})\n")
 
   unprocessed_items.each do |i|
     clip_num, camera_filename = i
@@ -169,7 +169,7 @@ def main(argv)
   media_thread_pool.wait_for_termination
   STDOUT.flush
 
-  print("done 🎉\n")
+  print("splitting is finished 🎉\n")
 end
 
 main(ARGV)

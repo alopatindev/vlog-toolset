@@ -168,7 +168,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
       320
     end
 
-  print("processing video clips\n")
+  print("processing video clips (applying filters, etc.)\n")
 
   fps = options[:fps]
   preview = options[:preview]
@@ -186,6 +186,8 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     }.values.map(&:to_s) + [preview.to_s]).join('_')
     output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
     temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
+
+    # TODO: split using -f segment -segment_time 10 ?
 
     media_thread_pool.post do
       audio_filters = "atempo=#{seg[:speed]}"
@@ -251,19 +253,22 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
 end
 
 def concat_videos(temp_videos, output_filename)
-  print("rendering to #{output_filename}\n")
+  print("concatenate #{output_filename}\n")
 
   parts = temp_videos.map { |f| "file 'file:#{f}'" }
                      .join "\n"
 
-  # TODO: migrate from "-async 1" to "-af aresample=async=1" (+ audio rerendering here)
   command = FFMPEG + [
-    '-async', '1', # TODO: does nothing for ffmpeg 4.4.4? remove?
+    # '-async', '1', # NOTE: does nothing for ffmpeg 4.4.4?
+    '-fflags', '+genpts+igndts',
     '-f', 'concat',
+    '-segment_time_metadata', '1',
     '-safe', '0',
     '-protocol_whitelist', 'file,pipe',
     '-i', '-',
-    '-codec', 'copy',
+    '-af', 'aselect=concatdec_select,aresample=async=1',
+    '-vcodec', 'copy',
+    '-acodec', 'flac',
     '-movflags', 'faststart',
     '-strict', '-2',
     output_filename
@@ -632,7 +637,7 @@ def main(argv)
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
 
-    print("done 🎉\n")
+    print("finished rendering final video 🎉\n")
     print("you can run:\n\n")
     mpv_args = ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs']
     command = mpv_args + [output_filename]
