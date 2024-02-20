@@ -150,10 +150,9 @@ def main(argv)
     clip_num = File.basename(camera_filename).split('_')[1].to_i
     [clip_num, camera_filename] unless processed_clips.include?(clip_num)
   end
-  print("wat=#{unprocessed_items}\n\n")
   print("processing #{unprocessed_items.length} inputs (total inputs: #{camera_filenames.length})\n")
 
-  for i in unprocessed_items
+  unprocessed_items.each do |i|
     clip_num, camera_filename = i
     # print("scheduling #{clip_num} (#{camera_filename})\n")
     # media_thread_pool.post do
