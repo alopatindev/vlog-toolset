@@ -142,7 +142,7 @@ def main(argv)
   min_pause_between_shots = options[:min_pause_between_shots]
   aggressiveness = options[:aggressiveness]
 
-  # media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count) # FIXME
+  media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
   camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
   processed_clips = Dir.glob("#{project_dir}#{File::SEPARATOR}0*.mp4").map { |i| filename_to_clip(i) }.to_set
@@ -154,20 +154,20 @@ def main(argv)
 
   unprocessed_items.each do |i|
     clip_num, camera_filename = i
-    # print("scheduling #{clip_num} (#{camera_filename})\n")
-    # media_thread_pool.post do
-    print("processing #{clip_num} (#{camera_filename})\n")
-    process_clip(clip_num, camera_filename, options)
-    print("#{camera_filename} (#{clip_num}/#{camera_filenames.length})\n")
-    # rescue SystemExit, Interrupt
-    # rescue StandardError => e
-    #  puts e
-    # end
+    print("scheduling #{clip_num} (#{camera_filename})\n")
+    media_thread_pool.post do
+      print("processing #{clip_num} (#{camera_filename})\n")
+      process_clip(clip_num, camera_filename, options)
+      print("#{camera_filename} (#{clip_num}/#{camera_filenames.length})\n")
+    rescue SystemExit, Interrupt
+    rescue StandardError => e
+      puts e
+    end
   end
 
-  # media_thread_pool.shutdown
-  # media_thread_pool.wait_for_termination
-  # STDOUT.flush
+  media_thread_pool.shutdown
+  media_thread_pool.wait_for_termination
+  STDOUT.flush
 
   print("done 🎉\n")
 end
