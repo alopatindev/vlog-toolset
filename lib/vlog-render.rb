@@ -27,6 +27,7 @@ require 'io/console'
 require 'json'
 require 'mkmf'
 require 'optparse'
+require 'parallel'
 
 CONFIG_FILENAME = 'render.conf'.freeze
 RENDER_DEFAULT_SPEED = '1.00'
@@ -72,9 +73,8 @@ def apply_delays(segments)
   start_correction = 0.3
   end_correction = 0.3
 
-  video_durations = {}
-
-  segments
+  segments_and_delays =
+    segments
     .reverse
     .inject([0, []]) do |(delays, acc), seg|
       if seg[:empty] then [delays + 1, acc]
@@ -83,12 +83,13 @@ def apply_delays(segments)
     end[1]
     .reverse
     .reject { |(seg, _delays)| seg[:empty] }
-    .map do |(seg, delays)|
-    if video_durations[seg[:video_filename]].nil?
-      video_durations[seg[:video_filename]] = get_duration seg[:video_filename]
-    end
-    duration = video_durations[seg[:video_filename]]
+    .to_a
 
+  video_filenames = segments_and_delays.map { |(seg, _)| seg[:video_filename] }.to_set
+  video_durations = Parallel.map(video_filenames) { |i| [i, get_duration(i)] }.to_h
+
+  segments_and_delays.map do |(seg, delays)|
+    duration = video_durations[seg[:video_filename]]
     new_start_position = [seg[:start_position] - start_correction, 0.0].max
     new_end_position = [seg[:end_position] + delays * delay_time + end_correction, duration].min
     seg.merge(start_position: new_start_position)
@@ -163,7 +164,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     end
   preview_width =
     if is_nvenc_supported
-      720
+      480
     else
       320
     end

@@ -22,6 +22,7 @@ cd "$(dirname $0)"
 gem install colorize -v 1.1.0
 gem install concurrent-ruby -v 1.2.2
 gem install lru_redux -v 1.1.0
+gem install parallel -v 1.24.0
 
 # TODO: add versions
 
