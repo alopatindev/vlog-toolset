@@ -222,6 +222,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
       command = FFMPEG_NO_OVERWRITE + [
         '-threads', Concurrent.processor_count,
         '-i', temp_cut_output_filename,
+        '-vsync', '1',
         '-vcodec', video_codec,
         '-vf', video_filters,
         '-af', audio_filters,
@@ -255,7 +256,7 @@ def concat_videos(temp_videos, output_filename)
   parts = temp_videos.map { |f| "file 'file:#{f}'" }
                      .join "\n"
 
-  # TODO: migrate async to aresample
+  # TODO: migrate from "-async 1" to "-af aresample=async=1"
   command = FFMPEG + [
     '-async', 1,
     '-f', 'concat',
@@ -296,6 +297,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
     FFMPEG + [
       '-threads', Concurrent.processor_count,
       '-i', output_filename,
+      '-vsync', '1',
       '-vcodec', video_codec,
       '-acodec', 'flac',
       '-pix_fmt', 'yuv420p',
@@ -357,6 +359,7 @@ def optimize_for_ios(output_filename, options)
     FFMPEG + [
       '-threads', Concurrent.processor_count,
       '-i', output_filename,
+      '-vsync', '1',
       '-vcodec', video_codec,
       '-acodec', 'alac',
       '-pix_fmt', 'yuv420p',
@@ -511,7 +514,7 @@ def parse_options!(options, args)
       options[:preview] = p == 'true'
     end
     opts.on('-n', '--tmux-nvim <true|false>',
-            "Auto open render.conf (during preview mode) in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
+            "Auto open render.conf (during preview mode or when render.conf was just generated) in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
       options[:tmux_nvim] = i == 'true'
     end
     opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f.to_i }
@@ -577,7 +580,7 @@ def main(argv)
   tmux_is_active = !ENV['TMUX'].nil?
   nvim_socket = File.join(project_dir, 'nvim.sock')
 
-  if options[:preview] && options[:tmux_nvim] && tmux_is_active && !File.socket?(nvim_socket) && File.file?('/usr/bin/nvim')
+  if (!old_config || options[:preview]) && options[:tmux_nvim] && tmux_is_active && !File.socket?(nvim_socket) && File.file?('/usr/bin/nvim')
     command = ['tmux', 'split-window', '-v', "nvim --listen #{nvim_socket} #{config_filename}"]
     system command.shelljoin_wrapped
   end
