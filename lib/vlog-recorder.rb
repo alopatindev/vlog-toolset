@@ -34,6 +34,7 @@ require 'optparse'
 # possible solution "driver=v4l2:width=720:height=576:norm=PAL:outfmt=uyvy"
 
 # TODO: preserve original files, store as input_*.mp4
+# TODO: don't remove any medias with very-very long duration if something's failed?
 
 # TODO: rename
 class DevicesController

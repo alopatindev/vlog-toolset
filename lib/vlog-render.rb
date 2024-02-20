@@ -224,7 +224,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
       command = FFMPEG_NO_OVERWRITE + [
         '-threads', Concurrent.processor_count,
         '-i', temp_cut_output_filename,
-        '-vsync', '1',
+        '-vsync', 'cfr',
         '-vcodec', video_codec,
         '-vf', video_filters,
         '-af', audio_filters,
@@ -302,7 +302,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
     FFMPEG + [
       '-threads', Concurrent.processor_count,
       '-i', output_filename,
-      '-vsync', '1',
+      '-vsync', 'cfr',
       '-af', 'aresample=async=1',
       '-vcodec', video_codec,
       '-acodec', 'flac',
@@ -355,7 +355,7 @@ end
 
 def optimize_for_ios(output_filename, options)
   output_basename_no_ext = "#{File.basename(output_filename,
-                                            File.extname(output_filename))}.CFR_#{options[:fps].to_f.pretty_fps}FPS.ios"
+                                            File.extname(output_filename))}.CFR_#{options[:fps].to_f.pretty_fps}FPS.iOS"
   output_ios_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mov")
 
   video_codec =
@@ -370,7 +370,7 @@ def optimize_for_ios(output_filename, options)
     FFMPEG + [
       '-threads', Concurrent.processor_count,
       '-i', output_filename,
-      '-vsync', '1',
+      '-vsync', 'cfr',
       '-af', 'aresample=async=1',
       '-vcodec', video_codec,
       '-acodec', 'alac',
