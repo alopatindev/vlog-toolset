@@ -601,7 +601,7 @@ def main(argv)
   nvim_socket = File.join(project_dir, 'nvim.sock')
 
   if (!old_config || options[:preview]) && options[:tmux_nvim] && tmux_is_active && !File.socket?(nvim_socket) && File.file?('/usr/bin/nvim')
-    command = ['tmux', 'split-window', '-v', "nvim --listen #{nvim_socket} #{config_filename}"]
+    command = ['tmux', 'split-window', '-l', '30', '-v', "nvim --listen #{nvim_socket} #{config_filename}"]
     system command.shelljoin_wrapped
   end
 
