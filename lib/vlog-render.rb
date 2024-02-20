@@ -256,11 +256,11 @@ def concat_videos(temp_videos, output_filename)
   parts = temp_videos.map { |f| "file 'file:#{f}'" }
                      .join "\n"
 
-  # TODO: migrate from "-async 1" to "-af aresample=async=1"
+  # TODO: migrate from "-async 1" to "-af aresample=async=1" (+ audio rerendering here)
   command = FFMPEG + [
-    '-async', 1,
+    '-async', '1', # TODO: does nothing for ffmpeg 4.4.4? remove?
     '-f', 'concat',
-    '-safe', 0,
+    '-safe', '0',
     '-protocol_whitelist', 'file,pipe',
     '-i', '-',
     '-codec', 'copy',
@@ -280,7 +280,8 @@ end
 def optimize_for_youtube(output_filename, options, temp_dir)
   print("reencoding for youtube\n")
 
-  output_basename_no_ext = "#{File.basename(output_filename, File.extname(output_filename))}.youtube"
+  output_basename_no_ext = "#{File.basename(output_filename,
+                                            File.extname(output_filename))}.const_#{options[:fps]}_fps.youtube"
   temp_youtube_flac_h264_filename = File.join(temp_dir, "#{output_basename_no_ext}.flac.h264.mp4")
   temp_youtube_opus_filename = File.join(temp_dir, "#{output_basename_no_ext}.opus")
   temp_youtube_wav_filename = File.join(temp_dir, "#{output_basename_no_ext}.wav")
@@ -298,6 +299,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
       '-threads', Concurrent.processor_count,
       '-i', output_filename,
       '-vsync', '1',
+      '-af', 'aresample=async=1',
       '-vcodec', video_codec,
       '-acodec', 'flac',
       '-pix_fmt', 'yuv420p',
@@ -344,7 +346,8 @@ end
 def optimize_for_ios(output_filename, options)
   print("reencoding for iOS\n")
 
-  output_basename_no_ext = "#{File.basename(output_filename, File.extname(output_filename))}.ios"
+  output_basename_no_ext = "#{File.basename(output_filename,
+                                            File.extname(output_filename))}.const_#{options[:fps]}_fps.ios"
   output_ios_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mov")
 
   video_codec =
@@ -354,12 +357,13 @@ def optimize_for_ios(output_filename, options)
       'libx264 -preset ultrafast -crf 18'
     end
 
-  print("producing ios output\n")
+  print("producing iOS output\n")
   command =
     FFMPEG + [
       '-threads', Concurrent.processor_count,
       '-i', output_filename,
       '-vsync', '1',
+      '-af', 'aresample=async=1',
       '-vcodec', video_codec,
       '-acodec', 'alac',
       '-pix_fmt', 'yuv420p',
@@ -634,10 +638,15 @@ def main(argv)
     command = mpv_args + [output_filename]
     print(command.shelljoin_wrapped + "\n\n")
 
-    # TODO: --play? --preview true?
-    # if options[:play]
-    system(command.shelljoin_wrapped)
-    # end
+    if options[:youtube]
+      command = mpv_args + [output_youtube_filename]
+      print(command.shelljoin_wrapped + "\n\n")
+    end
+
+    if options[:ios]
+      command = mpv_args + [output_ios_filename]
+      print(command.shelljoin_wrapped + "\n\n")
+    end
   end
 
   # TODO: add --gc flag to remove no longer needed tmp/output files
