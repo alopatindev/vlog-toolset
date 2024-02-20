@@ -215,9 +215,9 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         '-ss', seg[:start_position],
         '-i', seg[:video_filename],
         '-to', dt,
-        '-strict', '-2',
         '-codec', 'copy',
         '-movflags', 'faststart',
+        '-strict', '-2',
         temp_cut_output_filename
       ]
       remove_file_if_empty(temp_cut_output_filename)
@@ -231,9 +231,9 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         '-vcodec', video_codec,
         '-vf', video_filters,
         '-af', audio_filters,
-        '-strict', '-2',
         '-acodec', 'flac',
         '-movflags', 'faststart',
+        '-strict', '-2',
         output_filename
       ]
       remove_file_if_empty(output_filename)
