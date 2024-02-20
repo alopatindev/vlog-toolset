@@ -210,6 +210,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
       dt = seg[:end_position] - seg[:start_position]
       command = FFMPEG_NO_OVERWRITE + [
         '-threads', Concurrent.processor_count,
+        '-fflags', '+genpts+igndts',
         '-ss', seg[:start_position],
         '-i', seg[:video_filename],
         '-to', dt,
@@ -223,6 +224,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
 
       command = FFMPEG_NO_OVERWRITE + [
         '-threads', Concurrent.processor_count,
+        '-fflags', '+genpts+igndts',
         '-i', temp_cut_output_filename,
         '-vsync', 'cfr',
         '-vcodec', video_codec,
@@ -301,6 +303,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   command =
     FFMPEG + [
       '-threads', Concurrent.processor_count,
+      '-fflags', '+genpts+igndts',
       '-i', output_filename,
       '-vsync', 'cfr',
       '-af', 'aresample=async=1',
@@ -369,6 +372,7 @@ def optimize_for_ios(output_filename, options)
   command =
     FFMPEG + [
       '-threads', Concurrent.processor_count,
+      '-fflags', '+genpts+igndts',
       '-i', output_filename,
       '-vsync', 'cfr',
       '-af', 'aresample=async=1',
