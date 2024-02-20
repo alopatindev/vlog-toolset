@@ -485,6 +485,7 @@ def generate_config(options)
       end
     end
 
+    # TODO: auto comment out hallucinations
     # TODO: jsons and vad.wavs are supposed to be in tmp
     for i, sound_with_single_channel_filename in video_filenames.zip(sound_with_single_channel_filenames)
       FileUtils.rm_f sound_with_single_channel_filename
