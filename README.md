@@ -16,6 +16,7 @@ Currently can keep functioning well even if you experience temporary [USB phone 
 - pip (tested with 23.2.1)
 - ffmpeg (tested with 4.4.4)
 - sox (tested with 14.4.2)
+- mediainfo (tested with 23.04)
 - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
 - alsa-utils (tested with 1.2.9)
 - mpv (tested with 0.36.0)

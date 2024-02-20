@@ -283,11 +283,8 @@ def concat_videos(temp_videos, output_filename)
 end
 
 def optimize_for_youtube(output_filename, options, temp_dir)
-  print("reencoding for youtube\n")
-
-  # TODO: verify that FPS is actually const
   output_basename_no_ext = "#{File.basename(output_filename,
-                                            File.extname(output_filename))}.cfr#{options[:fps]}.youtube"
+                                            File.extname(output_filename))}.CFR_#{options[:fps]}FPS.youtube"
   temp_youtube_flac_h264_filename = File.join(temp_dir, "#{output_basename_no_ext}.flac.h264.mp4")
   temp_youtube_opus_filename = File.join(temp_dir, "#{output_basename_no_ext}.opus")
   temp_youtube_wav_filename = File.join(temp_dir, "#{output_basename_no_ext}.wav")
@@ -300,6 +297,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
       'libx264 -preset ultrafast -crf 18'
     end
 
+  print("reencoding for YouTube\n")
   command =
     FFMPEG + [
       '-threads', Concurrent.processor_count,
@@ -330,7 +328,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
     temp_youtube_opus_filename
   ].shelljoin_wrapped
 
-  print("producing youtube output\n")
+  print("producing YouTube output\n")
   command = FFMPEG + [
     '-an',
     '-i', temp_youtube_flac_h264_filename,
@@ -341,32 +339,33 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   ]
   system command.shelljoin_wrapped
 
-  # TODO: check FPS and append vfr30 / cfr30
-
   if options[:cleanup]
     FileUtils.rm_f [temp_youtube_flac_h264_filename, temp_youtube_wav_filename,
                     temp_youtube_opus_filename]
   end
 
+  verify_constant_framerate(output_youtube_filename, options)
   output_youtube_filename
 end
 
-def optimize_for_ios(output_filename, options)
-  print("reencoding for iOS\n")
+def verify_constant_framerate(filename, _options)
+  framerate = get_framerate(filename)
+  raise "Unexpected framerate mode #{framerate[1]} for #{filename}" unless framerate[1] == 'CFR'
+end
 
-  # TODO: verify that FPS is actually const
+def optimize_for_ios(output_filename, options)
   output_basename_no_ext = "#{File.basename(output_filename,
-                                            File.extname(output_filename))}.cfr#{options[:fps]}.ios"
+                                            File.extname(output_filename))}.CFR_#{options[:fps].to_f.pretty_fps}FPS.ios"
   output_ios_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mov")
 
   video_codec =
     if nvenc_supported?('h264_nvenc')
-      'h264_nvenc -preset slow -cq 18'
+      'h264_nvenc -preset slow -cq 18' # TODO: extract
     else
       'libx264 -preset ultrafast -crf 18'
     end
 
-  print("producing iOS output\n")
+  print("reencoding for iOS\n")
   command =
     FFMPEG + [
       '-threads', Concurrent.processor_count,
@@ -382,6 +381,7 @@ def optimize_for_ios(output_filename, options)
     ]
   system command.shelljoin_wrapped
 
+  verify_constant_framerate(output_ios_filename, options)
   output_ios_filename
 end
 
@@ -530,7 +530,7 @@ def parse_options!(options, args)
             "Auto open render.conf (during preview mode or when render.conf was just generated) in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
       options[:tmux_nvim] = i == 'true'
     end
-    opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f.to_i }
+    opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f }
     opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
     opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}\")") do |v|
       options[:video_filters] = v
@@ -547,7 +547,7 @@ def parse_options!(options, args)
       options[:whisper_cpp_args] += " #{w}"
     end
     opts.on('-y', '--youtube <true|false>',
-            "Additionally optimize for youtube (default: #{options[:youtube]})") do |y|
+            "Additionally optimize for YouTube (default: #{options[:youtube]})") do |y|
       options[:youtube] = y == 'true'
     end
     opts.on('-I', '--ios <true|false>',
@@ -569,7 +569,7 @@ def main(argv)
   test_segments_overlap
 
   options = {
-    fps: 30,
+    fps: '30',
     speed: 1.2,
     video_filters: 'hqdn3d,hflip,vignette',
     preview: true,
@@ -616,8 +616,8 @@ def main(argv)
   temp_dir = File.join project_dir, 'tmp'
   FileUtils.mkdir_p [output_dir, temp_dir]
 
-  temp_videos = process_and_split_videos segments, options, output_dir, temp_dir
-  concat_videos temp_videos, output_filename
+  temp_videos = process_and_split_videos(segments, options, output_dir, temp_dir)
+  concat_videos(temp_videos, output_filename)
 
   words_per_second = segments.map do |seg|
     dt = seg[:end_position] - seg[:start_position]
@@ -641,7 +641,13 @@ def main(argv)
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
 
-    print("finished rendering final video 🎉\n")
+    framerate = get_framerate(output_filename)
+    new_output_filename = "output#{output_postfix}.#{framerate[1]}_#{framerate[0].to_f.pretty_fps}FPS.mp4"
+    File.rename(output_filename, new_output_filename)
+    output_filename = new_output_filename
+
+    print("finished rendering final video 🎉\n\n")
+
     print("you can run:\n\n")
     mpv_args = ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs']
     command = mpv_args + [output_filename]

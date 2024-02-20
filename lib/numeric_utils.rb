@@ -17,4 +17,13 @@ class Numeric
   def with_leading_zeros
     format('0%05d', self)
   end
+
+  def pretty_fps
+    result = format('%.3f', self)
+    if result.to_i.to_f == to_f
+      to_i.to_s
+    else
+      result
+    end
+  end
 end

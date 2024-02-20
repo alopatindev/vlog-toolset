@@ -15,6 +15,8 @@
 
 require 'process_utils'
 
+require 'json'
+
 FFMPEG = ['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error']
 FFMPEG_NO_OVERWRITE = ['ffmpeg', '-n', '-hide_banner', '-loglevel', 'panic']
 
@@ -29,6 +31,15 @@ def get_duration(filename)
   command = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams', filename]
   streams = JSON.parse(`#{command.shelljoin_wrapped}`)['streams']
   streams.map { |i| i['duration'].to_f }.min
+end
+
+def get_framerate(filename)
+  command = ['mediainfo', '--Output=JSON', filename]
+  tracks = JSON.parse(`#{command.shelljoin_wrapped}`)['media']['track'].filter { |i| !i['FrameRate_Mode'].nil? }
+  raise 'Unexpected number of video tracks' unless tracks.length == 1
+
+  track = tracks[0]
+  [track['FrameRate'], track['FrameRate_Mode']]
 end
 
 def prepare_for_vad(filename)
