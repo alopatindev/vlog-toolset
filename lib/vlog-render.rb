@@ -452,6 +452,7 @@ def test_merge_small_pauses
 end
 
 def generate_config(options)
+  banlist = File.readlines('banlist.txt', chomp: true).map { |i| Regexp.new(i) }
   app_version = `git rev-parse HEAD`[..6]
   render_conf_filename = File.join(options[:project_dir], 'render.conf')
   exists = File.exist?(render_conf_filename)
@@ -485,7 +486,6 @@ def generate_config(options)
       end
     end
 
-    # TODO: auto comment out hallucinations
     # TODO: jsons and vad.wavs are supposed to be in tmp
     for i, sound_with_single_channel_filename in video_filenames.zip(sound_with_single_channel_filenames)
       FileUtils.rm_f sound_with_single_channel_filename
@@ -493,12 +493,14 @@ def generate_config(options)
       transcribed_json = "#{sound_with_single_channel_filename}.json"
       for transcription in JSON.parse(File.read(transcribed_json))['transcription']
         offsets = transcription['offsets']
+        text = transcription['text'].strip
+        filename_prefix = banlist.any? { |i| i.match?(text) } ? '#' : '' # FIXME
         line = [
-          File.basename(i),
+          filename_prefix + File.basename(i),
           RENDER_DEFAULT_SPEED,
           ms_to_sec(offsets['from']),
           ms_to_sec(offsets['to']),
-          transcription['text']
+          text
         ]
         write_columns(render_conf_file, line)
       end
