@@ -142,7 +142,7 @@ def main(argv)
   min_pause_between_shots = options[:min_pause_between_shots]
   aggressiveness = options[:aggressiveness]
 
-  # media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
+  # media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count) # FIXME
 
   camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
   processed_clips = Dir.glob("#{project_dir}#{File::SEPARATOR}0*.mp4").map { |i| filename_to_clip(i) }.to_set
@@ -150,7 +150,6 @@ def main(argv)
 
   for camera_filename in camera_filenames
     clip_num = File.basename(camera_filename).split('_')[1].to_i
-    print(" => clip_num=#{clip_num}\n")
     if processed_clips.include?(clip_num)
       print("skipping #{clip_num} (#{camera_filename})\n")
       next
