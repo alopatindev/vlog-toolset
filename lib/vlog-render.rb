@@ -530,10 +530,6 @@ def parse_options!(options, args)
     opts.set_banner('Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]')
     opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
-    opts.on('-L', '--line <num>',
-            "Line in #{CONFIG_FILENAME} file, to play by given render.conf position (default: #{options[:line_in_config]})") do |l|
-      options[:line_in_config] = l.to_i # TODO: remove the argument?
-    end
     opts.on('-P', '--preview <true|false>',
             "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
       options[:preview] = p == 'true'
