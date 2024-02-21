@@ -191,7 +191,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
     # TODO: split using -f segment -segment_time 10 ?
 
     media_thread_pool.post do
-      audio_filters = "atempo=#{seg[:speed]}"
+      audio_filters = "atempo=#{seg[:speed]},asetpts=PTS-STARTPTS"
       video_filters = [
         rotation_filter(basename),
         options[:video_filters],
@@ -308,7 +308,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
       '-fflags', '+genpts+igndts',
       '-i', output_filename,
       '-vsync', 'cfr',
-      '-af', 'aresample=async=1',
+      '-af', 'aresample=async=1,asetpts=PTS-STARTPTS',
       '-vcodec', video_codec,
       '-acodec', 'flac',
       '-pix_fmt', 'yuv420p',
@@ -370,16 +370,18 @@ def optimize_for_ios(output_filename, options)
       'libx264 -preset ultrafast -crf 18'
     end
 
-  print("reencoding for iOS\n")
+  print("reencoding for iOS video editors\n")
   command =
     FFMPEG + [
       '-threads', Concurrent.processor_count,
       '-fflags', '+genpts+igndts',
       '-i', output_filename,
       '-vsync', 'cfr',
-      '-af', 'aresample=async=1',
+      '-af', 'aresample=async=1,asetpts=PTS-STARTPTS',
       '-vcodec', video_codec,
       '-acodec', 'alac',
+      # '-b:v', '5M', # TODO
+      # '-b:a', '256k', # TODO
       '-pix_fmt', 'yuv420p',
       '-movflags', 'faststart',
       '-strict', '-2',
@@ -561,7 +563,7 @@ def parse_options!(options, args)
       options[:youtube] = y == 'true'
     end
     opts.on('-I', '--ios <true|false>',
-            "Additionally optimize for iOS (default: #{options[:ios]})") do |i|
+            "Additionally optimize for iOS video editors (default: #{options[:ios]})") do |i|
       options[:ios] = i == 'true'
     end
   end
