@@ -393,6 +393,8 @@ end
 
 def compute_player_position(segments, options)
   # FIXME: comment is not line, that might causes incorrect line to time mapping
+  # TODO: recompute indexes on every file save (mtime change)?
+  #   key: (filename, any of non-zero start and end)
   segments.filter { |seg| seg[:index] < options[:line_in_file] - 1 }
           .map { |seg| seg[:end_position] - seg[:start_position] }
           .sum / clamp_speed(options[:speed])
@@ -596,7 +598,7 @@ def main(argv)
   project_dir = options[:project_dir]
   config_filename = File.join project_dir, CONFIG_FILENAME
 
-  # TODO: if line_in_file == 1 then get the render.conf line from nvim and put it to --line_in_file
+  # TODO: if line_in_file == 1 (or nil?) then get the render.conf line from nvim and put it to --line_in_file
 
   old_config = generate_config(options)
 
@@ -640,6 +642,7 @@ def main(argv)
   if options[:preview]
     player_position = compute_player_position segments, options
     print("player_position = #{player_position}\n")
+    # TODO: don't hide seek bar
     command = MPV + ["--start=#{player_position}", '--no-fs', '--geometry=30%+0+0', output_filename]
     system command.shelljoin_wrapped
     # TODO: send from mpv lua plugin to nvim (with non-blocking, via neovim lua-client):
