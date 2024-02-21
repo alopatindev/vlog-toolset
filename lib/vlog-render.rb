@@ -601,6 +601,11 @@ end
 def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, output_filename)
   print("run_mpv_loop\n")
 
+  # TODO: I think we need to simplify this (c)
+  # normal mode -> insert mode => pause
+  # insert mode -> normal mode WHEN no changes => fetch line from nvim, seek to time
+  # insert mode -> normal mode WHEN changes => ...
+
   navigating = false
   config_is_dirty = false
   crc32 = checksum(config_filename)
@@ -652,7 +657,6 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
           client.puts('{"command": ["set_property", "pause", false]}')
 
           navigating = false
-          next
         elsif response['mode'] != 'n'
           print("navigating\n")
           navigating = true
@@ -664,7 +668,7 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
       end
     end
 
-    sleep 0.3
+    sleep 0.1
   end
 rescue Errno::ECONNREFUSED
   puts 'connection refused to mpv'
