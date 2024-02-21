@@ -532,7 +532,7 @@ def parse_options!(options, args)
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-L', '--line <num>',
             "Line in #{CONFIG_FILENAME} file, to play by given render.conf position (default: #{options[:line_in_config]})") do |l|
-      options[:line_in_config] = l.to_i
+      options[:line_in_config] = l.to_i # TODO: remove the argument?
     end
     opts.on('-P', '--preview <true|false>',
             "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
@@ -598,16 +598,15 @@ def main(argv)
   project_dir = options[:project_dir]
   config_filename = File.join project_dir, CONFIG_FILENAME
 
-  # TODO: if line_in_config == 1 (or nil?) then get the render.conf line from nvim and put it to --line_in_config
-
   old_config = generate_config(options)
 
   tmux_is_active = !ENV['TMUX'].nil?
   nvim_socket = File.join(project_dir, 'nvim.sock')
 
-  if (!old_config || options[:preview]) && options[:tmux_nvim] && tmux_is_active && !File.socket?(nvim_socket) && File.file?('/usr/bin/nvim')
+  config_in_nvim = (!old_config || options[:preview]) && options[:tmux_nvim] && tmux_is_active && File.file?('/usr/bin/nvim')
+  if config_in_nvim && !File.socket?(nvim_socket)
     command = ['tmux', 'split-window', '-l', '30', '-v', "nvim --listen #{nvim_socket} #{config_filename}"]
-    system command.shelljoin_wrapped
+    system(command.shelljoin_wrapped)
   end
 
   unless old_config
@@ -640,6 +639,16 @@ def main(argv)
   print("average words per second = #{words_per_second}\n")
 
   if options[:preview]
+    if config_in_nvim
+      command = ['nvim', '--headless', '--clean', '--server', File.join(project_dir, 'nvim.sock'), '--remote-expr',
+                 'line(".")']
+      line_in_config = `#{command.shelljoin_wrapped}`.to_i
+      if line_in_config != 0
+        print "current nvim line is #{line_in_config}\n"
+        options[:line_in_config] = line_in_config
+      end
+    end
+
     player_position = compute_player_position segments, options
     print("player_position = #{player_position}\n")
     command = MPV + ["--start=#{player_position}", '--no-fs', '--title=vlog-preview',
