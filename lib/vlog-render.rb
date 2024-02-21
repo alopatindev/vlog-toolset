@@ -180,7 +180,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
   temp_videos = segments.map.with_index do |seg, index|
     # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
     ext = '.mp4'
-    line_in_config = seg[:line_in_config] + 1
+    line_in_config = seg[:line_in_config]
     basename = File.basename seg[:video_filename]
 
     base_output_filename = (seg.reject { |key|
@@ -202,8 +202,8 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
       if preview
         video_filters = [
           "scale=#{preview_width}:-1",
-          "#{video_filters}",
-          "drawtext=fontcolor=white:fontsize=#{preview_width / 24}:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
+          "#{video_filters}"
+          # "drawtext=fontcolor=white:fontsize=#{preview_width / 24}:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
         ].join(',')
       end
 
@@ -637,11 +637,12 @@ def main(argv)
   if options[:preview]
     if config_in_nvim && File.socket?(nvim_socket)
       nvim_expr = 'json_encode({"file": resolve(expand("%p")), "line":line(".")})'
-      response = JSON.parse(`nvim --headless --clean --server #{nvim_socket} --remote-expr '#{nvim_expr}'`)
+      command = ['nvim', '--headless', '--clean', '--server', nvim_socket, '--remote-expr']
+      response = JSON.parse(`#{command.shelljoin_wrapped} '#{nvim_expr}'`)
       line_in_config = response['line']
       if line_in_config != 0 && response['file'] == config_filename
         print "current nvim line is #{line_in_config}\n"
-        options[:line_in_config] = line_in_config
+        options[:line_in_config] = [segments[0][:line_in_config], line_in_config - 1].max
       end
     end
 
