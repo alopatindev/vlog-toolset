@@ -642,8 +642,8 @@ def main(argv)
   if options[:preview]
     player_position = compute_player_position segments, options
     print("player_position = #{player_position}\n")
-    # TODO: don't hide seek bar
-    command = MPV + ["--start=#{player_position}", '--no-fs', '--geometry=30%+0+0', output_filename]
+    command = MPV + ["--start=#{player_position}", '--no-fs', '--title=vlog-preview',
+                     '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', output_filename]
     system command.shelljoin_wrapped
     # TODO: send from mpv lua plugin to nvim (with non-blocking, via neovim lua-client):
     #         go to line if
@@ -662,17 +662,16 @@ def main(argv)
     print("finished rendering final video 🎉\n\n")
 
     print("you can run:\n\n")
-    mpv_args = ['mpv', '--no-resume-playback', '--af=scaletempo2', '--speed=1', '--fs']
-    command = mpv_args + [output_filename]
+    command = MPV + [output_filename]
     print(command.shelljoin_wrapped + "\n\n")
 
     if options[:youtube]
-      command = mpv_args + [output_youtube_filename]
+      command = MPV + [output_youtube_filename]
       print(command.shelljoin_wrapped + "\n\n")
     end
 
     if options[:ios]
-      command = mpv_args + [output_ios_filename]
+      command = MPV + [output_ios_filename]
       print(command.shelljoin_wrapped + "\n\n")
     end
   end
