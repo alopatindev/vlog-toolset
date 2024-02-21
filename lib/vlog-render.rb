@@ -34,11 +34,12 @@ RENDER_DEFAULT_SPEED = '1.00'
 
 def parse(filename, options)
   File.open filename do |f|
-    f.reject { |line| line.start_with? '#' }
-     .map { |line| line.split("\t") }
-     .map
-     .with_index do |cols, index|
-      if cols[0] == "\n" then { index: index, empty: true }
+    f.map
+     .with_index { |line, index| [line, index + 1] }
+     .reject { |line, _line_in_config| line.start_with? '#' }
+     .map { |line, line_in_config| [line.split("\t"), line_in_config] }
+     .map do |cols, line_in_config|
+      if cols[0] == "\n" then { line_in_config: line_in_config, empty: true }
       else
         video_filename, speed, start_position, end_position, text = cols
         text = text.sub(/#.*$/, '')
@@ -52,7 +53,7 @@ def parse(filename, options)
         end
 
         {
-          index: index,
+          line_in_config: line_in_config,
           video_filename: video_filename,
           speed: final_speed,
           start_position: start_position.to_f,
@@ -179,11 +180,11 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
   temp_videos = segments.map.with_index do |seg, index|
     # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
     ext = '.mp4'
-    line_in_config = seg[:index] + 1
+    line_in_config = seg[:line_in_config] + 1
     basename = File.basename seg[:video_filename]
 
     base_output_filename = (seg.reject { |key|
-      key == :index
+      key == :line_in_config
     }.values.map(&:to_s) + [preview.to_s]).join('_')
     output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
     temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
@@ -392,10 +393,9 @@ def optimize_for_ios(output_filename, options)
 end
 
 def compute_player_position(segments, options)
-  # FIXME: comment is not line, that might causes incorrect line to time mapping
   # TODO: recompute indexes on every file save (mtime change)?
   #   key: (filename, any of non-zero start and end)
-  segments.filter { |seg| seg[:index] < options[:line_in_file] - 1 }
+  segments.filter { |seg| seg[:line_in_config] < options[:line_in_config] }
           .map { |seg| seg[:end_position] - seg[:start_position] }
           .sum / clamp_speed(options[:speed])
 end
@@ -437,19 +437,19 @@ def test_merge_small_pauses
   min_pause_between_shots = 2.0
 
   segments = [
-    { index: 0, video_filename: 'a.mp4', start_position: 0.0, end_position: 5.0, speed: 1.0 },
-    { index: 1, video_filename: 'a.mp4', start_position: 5.5, end_position: 10.0, speed: 1.5 },
-    { index: 2, video_filename: 'b.mp4', start_position: 1.0, end_position: 3.0, speed: 1.0 },
-    { index: 3, video_filename: 'b.mp4', start_position: 10.0, end_position: 20.0, speed: 1.0 },
-    { index: 3, video_filename: 'b.mp4', start_position: 19.0, end_position: 22.0, speed: 1.8 },
-    { index: 4, video_filename: 'b.mp4', start_position: 6.0, end_position: 8.0, speed: 1.0 },
-    { index: 4, video_filename: 'b.mp4', start_position: 3.0, end_position: 7.0, speed: 1.0 }
+    { line_in_config: 0, video_filename: 'a.mp4', start_position: 0.0, end_position: 5.0, speed: 1.0 },
+    { line_in_config: 1, video_filename: 'a.mp4', start_position: 5.5, end_position: 10.0, speed: 1.5 },
+    { line_in_config: 2, video_filename: 'b.mp4', start_position: 1.0, end_position: 3.0, speed: 1.0 },
+    { line_in_config: 3, video_filename: 'b.mp4', start_position: 10.0, end_position: 20.0, speed: 1.0 },
+    { line_in_config: 3, video_filename: 'b.mp4', start_position: 19.0, end_position: 22.0, speed: 1.8 },
+    { line_in_config: 4, video_filename: 'b.mp4', start_position: 6.0, end_position: 8.0, speed: 1.0 },
+    { line_in_config: 4, video_filename: 'b.mp4', start_position: 3.0, end_position: 7.0, speed: 1.0 }
   ]
 
   expected = [
-    { index: 0, video_filename: 'a.mp4', start_position: 0.0, end_position: 10.0, speed: 1.5 },
-    { index: 2, video_filename: 'b.mp4', start_position: 1.0, end_position: 3.0, speed: 1.0 },
-    { index: 3, video_filename: 'b.mp4', start_position: 3.0, end_position: 22.0, speed: 1.8 }
+    { line_in_config: 0, video_filename: 'a.mp4', start_position: 0.0, end_position: 10.0, speed: 1.5 },
+    { line_in_config: 2, video_filename: 'b.mp4', start_position: 1.0, end_position: 3.0, speed: 1.0 },
+    { line_in_config: 3, video_filename: 'b.mp4', start_position: 3.0, end_position: 22.0, speed: 1.8 }
   ]
 
   result = merge_small_pauses(segments, min_pause_between_shots)
@@ -531,8 +531,8 @@ def parse_options!(options, args)
     opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-L', '--line <num>',
-            "Line in #{CONFIG_FILENAME} file, to play by given position (default: #{options[:line_in_file]})") do |l|
-      options[:line_in_file] = l
+            "Line in #{CONFIG_FILENAME} file, to play by given render.conf position (default: #{options[:line_in_config]})") do |l|
+      options[:line_in_config] = l.to_i
     end
     opts.on('-P', '--preview <true|false>',
             "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
@@ -585,7 +585,7 @@ def main(argv)
     speed: 1.2,
     video_filters: 'hqdn3d,hflip,vignette',
     preview: true,
-    line_in_file: 1,
+    line_in_config: 1,
     tmux_nvim: true,
     cleanup: false,
     whisper_cpp_args: '--model models/ggml-base.bin --language auto',
@@ -598,7 +598,7 @@ def main(argv)
   project_dir = options[:project_dir]
   config_filename = File.join project_dir, CONFIG_FILENAME
 
-  # TODO: if line_in_file == 1 (or nil?) then get the render.conf line from nvim and put it to --line_in_file
+  # TODO: if line_in_config == 1 (or nil?) then get the render.conf line from nvim and put it to --line_in_config
 
   old_config = generate_config(options)
 
