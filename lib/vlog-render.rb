@@ -28,6 +28,7 @@ require 'json'
 require 'mkmf'
 require 'optparse'
 require 'parallel'
+require 'socket'
 
 CONFIG_FILENAME = 'render.conf'.freeze
 RENDER_DEFAULT_SPEED = '1.00'
@@ -400,6 +401,18 @@ def compute_player_position(segments, options)
           .sum / clamp_speed(options[:speed])
 end
 
+def compute_line_in_config(player_position, segments, options)
+  player_position_spedup = player_position * clamp_speed(options[:speed]) # TODO: correct?
+  position = 0.0
+  for seg in segments
+    dt = seg[:end_position] - seg[:start_position]
+    return seg[:line_in_config] if player_position_spedup >= position && player_position_spedup <= position + dt
+
+    position += dt
+  end
+  nil
+end
+
 def nvidia_cuda_ready?
   if (find_executable 'nvcc').nil?
     print("nvidia-cuda-toolkit is not installed\n")
@@ -572,6 +585,41 @@ def parse_options!(options, args)
   exit 1
 end
 
+def mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename)
+  client = UNIXSocket.new(mpv_socket)
+  loop do
+    # TODO: if conf file has changed then break
+
+    client.puts('{"command": ["get_property", "time-pos"]}')
+    response = JSON.parse(client.gets)
+    position = response['data']
+    unless position.nil?
+      print("mpv pos = #{position}\n")
+      line_in_config = compute_line_in_config(position.to_f, segments, options)
+      print("line_in_config = #{line_in_config}\n")
+
+      nvim_expr = 'json_encode({"file": resolve(expand("%p")), "line":line("."), "mode": mode()})'
+      command = ['nvim', '--headless', '--clean', '--server', nvim_socket, '--remote-expr']
+      response = JSON.parse(`#{command.shelljoin_wrapped} '#{nvim_expr}'`)
+
+      if response['file'] == config_filename && response['mode'] == 'n'
+        # TODO: we're no on that line yet, file is not overwritten, buffer is unchanged
+        nvim_expr = "cursor(#{line_in_config}, 0)"
+        command = ['nvim', '--headless', '--clean', '--server', nvim_socket, '--remote-expr']
+        response = JSON.parse(`#{command.shelljoin_wrapped} '#{nvim_expr}'`)
+      end
+    end
+
+    sleep 0.5
+  end
+rescue Errno::ECONNREFUSED
+  puts 'disconnected from mpv'
+rescue StandardError => e
+  puts "disconnected from mpv: #{e.message}"
+ensure
+  client.close if client
+end
+
 def main(argv)
   test_merge_small_pauses
   test_segments_overlap
@@ -642,20 +690,32 @@ def main(argv)
       line_in_config = response['line']
       if line_in_config != 0 && response['file'] == config_filename
         print "current nvim line is #{line_in_config}\n"
-        options[:line_in_config] = [segments[0][:line_in_config], line_in_config - 1].max
+        options[:line_in_config] = [segments.first[:line_in_config], line_in_config - 1].max
       end
     end
 
-    player_position = compute_player_position segments, options
+    player_position = compute_player_position(segments, options)
     print("player_position = #{player_position}\n")
-    command = MPV + ["--start=#{player_position}", '--no-fs', '--title=vlog-preview',
+
+    mpv_socket = File.join(project_dir, 'mpv.sock')
+    command = MPV + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
                      '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', output_filename]
-    system command.shelljoin_wrapped
+    system command.shelljoin_wrapped + ' &'
+    sleep 0.5
+
+    if config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
+      mpv_loop(mpv_socket, nvim_socket, segments, options,
+               config_filename)
+    end
     # TODO: send from mpv lua plugin to nvim (with non-blocking, via neovim lua-client):
     #         go to line if
     #           current file is render.conf
     #           and current mode is normal
     #           (and file is saved?)
+    #       or: detach mpv from terminal
+    #         poll mpv position via ipc
+    #         if nvim in normal mode, render.conf is open, render.conf is unchanged, file in nvim is unchanged
+    #           go to corresponding line
   else
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
