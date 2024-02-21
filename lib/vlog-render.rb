@@ -22,6 +22,7 @@ require 'phone'
 require 'process_utils'
 
 require 'concurrent'
+require 'digest/crc32'
 require 'fileutils'
 require 'io/console'
 require 'json'
@@ -395,10 +396,10 @@ def optimize_for_ios(output_filename, options)
   output_ios_filename
 end
 
-def compute_player_position(segments, options)
+def compute_player_position(line_in_config, segments, options)
   # TODO: recompute indexes on every file save (mtime change)?
   #   key: (filename, any of non-zero start and end)
-  segments.filter { |seg| seg[:line_in_config] < options[:line_in_config] }
+  segments.filter { |seg| seg[:line_in_config] < line_in_config }
           .map { |seg| seg[:end_position] - seg[:start_position] }
           .sum / clamp_speed(options[:speed])
 end
@@ -593,22 +594,36 @@ def send_to_nvim(expr, nvim_socket)
   `#{command.shelljoin_wrapped} '#{expr}'`
 end
 
+def checksum(filename)
+  Digest::CRC32.file(filename).hexdigest
+end
+
 def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, output_filename)
   print("run_mpv_loop\n")
+
+  navigating = false
   config_is_dirty = false
+  crc32 = checksum(config_filename)
+
   client = UNIXSocket.new(mpv_socket)
   loop do
     if config_is_dirty && send_to_nvim('empty(getbufinfo({"bufmodified": 1}))', nvim_socket) == '1'
-      print("saved file\n")
+      if checksum(config_filename) == crc32
+        print("no new changes, resuming playback\n")
+        client.puts('{"command": ["set_property", "pause", false]}')
+        config_is_dirty = false
+      else
+        print("rewritten config with new changes\n")
 
-      # TODO: if there were no changes (checksum change?) => player_position = compute_player_position(segments, options) => play
-      new_output_filename, segments = render(options, config_filename, rerender = true)
-      client.puts('{"command": ["quit"]}')
-      client.close
-      client = nil
+        new_output_filename, segments = render(options, config_filename, rerender = true)
+        print("restarting player\n")
+        client.puts('{"command": ["quit"]}')
+        client.close
+        client = nil
 
-      File.rename(new_output_filename, output_filename)
-      return [true, segments]
+        File.rename(new_output_filename, output_filename)
+        return [true, segments]
+      end
     end
 
     client.puts('{"command": ["get_property", "time-pos"]}')
@@ -624,10 +639,25 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
       )
 
       if response['file'] == config_filename
-        if response['line'] != line_in_config && response['mode'] == 'n'
+        # TODO: refactor
+        if response['line'] != line_in_config && response['mode'] == 'n' && !navigating
           print("jump to #{line_in_config}\n")
-          _response = send_to_nvim("cursor(#{line_in_config}, 0)", nvim_socket)
+          _response = send_to_nvim("cursor(#{line_in_config}, 1)", nvim_socket)
+        elsif response['mode'] == 'n' && navigating
+          player_position = compute_player_position(response['line'], segments, options)
+          print("seek and continue to #{response['line']} => #{player_position}\n")
+
+          client.puts('{"command": ["set_property", "pause", true]}')
+          client.puts('{"command": ["seek",' + player_position.to_s + ', "absolute"]}')
+          client.puts('{"command": ["set_property", "pause", false]}')
+
+          navigating = false
+          next
+        elsif response['mode'] != 'n'
+          print("navigating\n")
+          navigating = true
         elsif response['modified'] == 1
+          print("modified\n")
           config_is_dirty = true
           client.puts('{"command": ["set_property", "pause", true]}')
         end
@@ -659,7 +689,7 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
       end
     end
 
-    player_position = compute_player_position(segments, options)
+    player_position = compute_player_position(options[:line_in_config], segments, options)
     print("player_position = #{player_position}\n")
 
     mpv_socket = File.join(options[:project_dir], 'mpv.sock')
