@@ -88,8 +88,10 @@ def apply_delays(segments)
     .to_a
 
   video_filenames = segments_and_delays.map { |(seg, _)| seg[:video_filename] }.to_set
-  video_durations = Parallel.map(video_filenames) { |i| [i, get_duration(i)] }.to_h # TODO: cache
-
+  video_durations = # TODO: cache? drop cache if start/end changed
+    Parallel.map(video_filenames) do |i|
+      [i, get_duration(i)]
+    end.to_h
   segments_and_delays.map do |(seg, delays)|
     duration = video_durations[seg[:video_filename]]
     new_start_position = [seg[:start_position] - start_correction, 0.0].max
@@ -591,9 +593,24 @@ def send_to_nvim(expr, nvim_socket)
   `#{command.shelljoin_wrapped} '#{expr}'`
 end
 
-def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename)
+def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, output_filename)
+  print("run_mpv_loop\n")
+  config_is_dirty = false
   client = UNIXSocket.new(mpv_socket)
   loop do
+    if config_is_dirty && send_to_nvim('empty(getbufinfo({"bufmodified": 1}))', nvim_socket) == '1'
+      print("saved file\n")
+
+      # TODO: if there were no changes => player_position = compute_player_position(segments, options) => play
+      new_output_filename, segments = render(options, config_filename, rerender = true)
+      client.puts('{"command": ["quit"]}')
+      client.close
+      client = nil
+
+      File.rename(new_output_filename, output_filename)
+      return [true, segments]
+    end
+
     client.puts('{"command": ["get_property", "time-pos"]}')
     response = JSON.parse(client.gets)
 
@@ -605,25 +622,29 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename)
           'json_encode({"file": resolve(expand("%p")), "line":line("."), "mode": mode(), "modified": &modified})', nvim_socket
         )
       )
-      if response['file'] == config_filename && response['line'] != line_in_config && response['mode'] == 'n'
-        if response['modified'] == 1
-          # TODO: check whether file is not overwritten since we started the script
-          # and reread config + recompute segments? rerender preview and restart mpv?
-          break
-        end
 
-        print("jump to #{line_in_config}\n")
-        _response = send_to_nvim("cursor(#{line_in_config}, 0)", nvim_socket)
+      if response['file'] == config_filename
+        if response['line'] != line_in_config && response['mode'] == 'n'
+          print("jump to #{line_in_config}\n")
+          _response = send_to_nvim("cursor(#{line_in_config}, 0)", nvim_socket)
+        elsif response['modified'] == 1
+          config_is_dirty = true
+          client.puts('{"command": ["set_property", "pause", true]}')
+        end
       end
     end
 
     sleep 0.3
   end
 rescue Errno::ECONNREFUSED
-  puts 'disconnected from mpv'
+  puts 'connection refused to mpv'
+  [false, []]
 rescue StandardError => e
   puts "disconnected from mpv: #{e.message}"
+  puts e
+  [false, []]
 ensure
+  puts 'ensure section'
   client.close if client
 end
 
@@ -647,28 +668,19 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     system command.shelljoin_wrapped + ' &'
     sleep 0.5
 
-    if config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
-      _restart_mpv = run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename)
-      print('TODO')
-      # if restart_mpv
-      #  rerender
-      #  kill mpv
-      #  replace rendered file
-      # else
-      #  break
-      # end
-      # else
-      #  break
-    end
+    break unless config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
 
-    break # TODO
+    restart_mpv, segments = run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, output_filename)
+    break unless restart_mpv
   end
 end
 
-def render(options, config_filename)
+def render(options, config_filename, rerender = false)
+  print("rendering\n")
   project_dir = options[:project_dir]
   output_postfix = options[:preview] ? '_preview' : ''
-  output_filename = File.join(project_dir, "output#{output_postfix}.mp4")
+  rerender_postfix = rerender ? '_rerender' : ''
+  output_filename = File.join(project_dir, "output#{output_postfix}#{rerender_postfix}.mp4")
 
   min_pause_between_shots = 0.1 # FIXME: should be in options, but -P is already used?
   segments = merge_small_pauses(apply_delays(parse_config(config_filename, options)), min_pause_between_shots)
@@ -688,6 +700,7 @@ def render(options, config_filename)
     seg[:words] / duration
   end.sum / segments.length
 
+  print("finished rendering\n")
   print("average words per second = #{words_per_second}\n")
 
   [output_filename, segments]
