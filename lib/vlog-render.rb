@@ -33,7 +33,7 @@ require 'socket'
 CONFIG_FILENAME = 'render.conf'.freeze
 RENDER_DEFAULT_SPEED = '1.00'
 
-def parse(filename, options)
+def parse_config(filename, options)
   File.open filename do |f|
     f.map
      .with_index { |line, index| [line, index + 1] }
@@ -88,7 +88,7 @@ def apply_delays(segments)
     .to_a
 
   video_filenames = segments_and_delays.map { |(seg, _)| seg[:video_filename] }.to_set
-  video_durations = Parallel.map(video_filenames) { |i| [i, get_duration(i)] }.to_h
+  video_durations = Parallel.map(video_filenames) { |i| [i, get_duration(i)] }.to_h # TODO: cache
 
   segments_and_delays.map do |(seg, delays)|
     duration = video_durations[seg[:video_filename]]
@@ -410,7 +410,8 @@ def compute_line_in_config(player_position, segments, options)
 
     position += dt
   end
-  nil
+
+  segments.last[:line_in_config]
 end
 
 def nvidia_cuda_ready?
@@ -585,32 +586,37 @@ def parse_options!(options, args)
   exit 1
 end
 
+def send_to_nvim(expr, nvim_socket)
+  command = ['nvim', '--headless', '--clean', '--server', nvim_socket, '--remote-expr']
+  `#{command.shelljoin_wrapped} '#{expr}'`
+end
+
 def mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename)
   client = UNIXSocket.new(mpv_socket)
   loop do
-    # TODO: if conf file has changed then break
-
     client.puts('{"command": ["get_property", "time-pos"]}')
     response = JSON.parse(client.gets)
+
     position = response['data']
     unless position.nil?
-      print("mpv pos = #{position}\n")
       line_in_config = compute_line_in_config(position.to_f, segments, options)
-      print("line_in_config = #{line_in_config}\n")
+      response = JSON.parse(
+        send_to_nvim(
+          'json_encode({"file": resolve(expand("%p")), "line":line("."), "mode": mode(), "modified": &modified})', nvim_socket
+        )
+      )
+      if response['file'] == config_filename && response['line'] != line_in_config && response['mode'] == 'n'
+        if response['modified'] == 1
+          # TODO: check whether file is not overwritten since we started the script
+          break
+        end
 
-      nvim_expr = 'json_encode({"file": resolve(expand("%p")), "line":line("."), "mode": mode()})'
-      command = ['nvim', '--headless', '--clean', '--server', nvim_socket, '--remote-expr']
-      response = JSON.parse(`#{command.shelljoin_wrapped} '#{nvim_expr}'`)
-
-      if response['file'] == config_filename && response['mode'] == 'n'
-        # TODO: we're no on that line yet, file is not overwritten, buffer is unchanged
-        nvim_expr = "cursor(#{line_in_config}, 0)"
-        command = ['nvim', '--headless', '--clean', '--server', nvim_socket, '--remote-expr']
-        response = JSON.parse(`#{command.shelljoin_wrapped} '#{nvim_expr}'`)
+        print("jump to #{line_in_config}\n")
+        _response = send_to_nvim("cursor(#{line_in_config}, 0)", nvim_socket)
       end
     end
 
-    sleep 0.5
+    sleep 0.3
   end
 rescue Errno::ECONNREFUSED
   puts 'disconnected from mpv'
@@ -665,7 +671,12 @@ def main(argv)
   Dir.chdir project_dir
 
   min_pause_between_shots = 0.1 # FIXME: should be in options, but -P is already used?
-  segments = merge_small_pauses apply_delays(parse(config_filename, options)), min_pause_between_shots
+  segments = merge_small_pauses apply_delays(parse_config(config_filename, options)), min_pause_between_shots
+
+  if segments.empty?
+    print("empty video?\n")
+    exit 0
+  end
 
   output_dir = File.join project_dir, 'output'
   temp_dir = File.join project_dir, 'tmp'
@@ -684,9 +695,7 @@ def main(argv)
 
   if options[:preview]
     if config_in_nvim && File.socket?(nvim_socket)
-      nvim_expr = 'json_encode({"file": resolve(expand("%p")), "line":line(".")})'
-      command = ['nvim', '--headless', '--clean', '--server', nvim_socket, '--remote-expr']
-      response = JSON.parse(`#{command.shelljoin_wrapped} '#{nvim_expr}'`)
+      response = JSON.parse(send_to_nvim('json_encode({"file": resolve(expand("%p")), "line":line(".")})', nvim_socket))
       line_in_config = response['line']
       if line_in_config != 0 && response['file'] == config_filename
         print "current nvim line is #{line_in_config}\n"
@@ -707,15 +716,6 @@ def main(argv)
       mpv_loop(mpv_socket, nvim_socket, segments, options,
                config_filename)
     end
-    # TODO: send from mpv lua plugin to nvim (with non-blocking, via neovim lua-client):
-    #         go to line if
-    #           current file is render.conf
-    #           and current mode is normal
-    #           (and file is saved?)
-    #       or: detach mpv from terminal
-    #         poll mpv position via ipc
-    #         if nvim in normal mode, render.conf is open, render.conf is unchanged, file in nvim is unchanged
-    #           go to corresponding line
   else
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
