@@ -592,7 +592,7 @@ def main(argv)
   parse_options!(options, argv)
 
   project_dir = options[:project_dir]
-  config_filename = File.join project_dir, CONFIG_FILENAME
+  config_filename = File.realpath(File.join(project_dir, CONFIG_FILENAME))
 
   old_config = generate_config(options)
 
@@ -635,11 +635,11 @@ def main(argv)
   print("average words per second = #{words_per_second}\n")
 
   if options[:preview]
-    if config_in_nvim
-      command = ['nvim', '--headless', '--clean', '--server', File.join(project_dir, 'nvim.sock'), '--remote-expr',
-                 'line(".")']
-      line_in_config = `#{command.shelljoin_wrapped}`.to_i
-      if line_in_config != 0
+    if config_in_nvim && File.socket?(nvim_socket)
+      nvim_expr = 'json_encode({"file": resolve(expand("%p")), "line":line(".")})'
+      response = JSON.parse(`nvim --headless --clean --server #{nvim_socket} --remote-expr '#{nvim_expr}'`)
+      line_in_config = response['line']
+      if line_in_config != 0 && response['file'] == config_filename
         print "current nvim line is #{line_in_config}\n"
         options[:line_in_config] = line_in_config
       end
