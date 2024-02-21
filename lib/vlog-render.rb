@@ -37,7 +37,7 @@ def parse_config(filename, options)
   File.open filename do |f|
     f.map
      .with_index { |line, index| [line, index + 1] }
-     .reject { |line, _line_in_config| line.start_with? '#' }
+     .reject { |line, _line_in_config| line.start_with?('#') || line.strip.empty? }
      .map { |line, line_in_config| [line.split("\t"), line_in_config] }
      .map do |cols, line_in_config|
       if cols[0] == "\n" then { line_in_config: line_in_config, empty: true }
@@ -601,7 +601,7 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
     if config_is_dirty && send_to_nvim('empty(getbufinfo({"bufmodified": 1}))', nvim_socket) == '1'
       print("saved file\n")
 
-      # TODO: if there were no changes => player_position = compute_player_position(segments, options) => play
+      # TODO: if there were no changes (checksum change?) => player_position = compute_player_position(segments, options) => play
       new_output_filename, segments = render(options, config_filename, rerender = true)
       client.puts('{"command": ["quit"]}')
       client.close
