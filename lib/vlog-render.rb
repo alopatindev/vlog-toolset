@@ -591,7 +591,7 @@ def send_to_nvim(expr, nvim_socket)
   `#{command.shelljoin_wrapped} '#{expr}'`
 end
 
-def mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename)
+def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename)
   client = UNIXSocket.new(mpv_socket)
   loop do
     client.puts('{"command": ["get_property", "time-pos"]}')
@@ -608,6 +608,7 @@ def mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename)
       if response['file'] == config_filename && response['line'] != line_in_config && response['mode'] == 'n'
         if response['modified'] == 1
           # TODO: check whether file is not overwritten since we started the script
+          # and reread config + recompute segments? rerender preview and restart mpv?
           break
         end
 
@@ -624,6 +625,72 @@ rescue StandardError => e
   puts "disconnected from mpv: #{e.message}"
 ensure
   client.close if client
+end
+
+def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options)
+  loop do
+    if config_in_nvim && File.socket?(nvim_socket)
+      response = JSON.parse(send_to_nvim('json_encode({"file": resolve(expand("%p")), "line":line(".")})', nvim_socket))
+      line_in_config = response['line']
+      if line_in_config != 0 && response['file'] == config_filename
+        print "current nvim line is #{line_in_config}\n"
+        options[:line_in_config] = [segments.first[:line_in_config], line_in_config - 1].max
+      end
+    end
+
+    player_position = compute_player_position(segments, options)
+    print("player_position = #{player_position}\n")
+
+    mpv_socket = File.join(options[:project_dir], 'mpv.sock')
+    command = MPV + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
+                     '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', output_filename]
+    system command.shelljoin_wrapped + ' &'
+    sleep 0.5
+
+    if config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
+      _restart_mpv = run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename)
+      print('TODO')
+      # if restart_mpv
+      #  rerender
+      #  kill mpv
+      #  replace rendered file
+      # else
+      #  break
+      # end
+      # else
+      #  break
+    end
+
+    break # TODO
+  end
+end
+
+def render(options, config_filename)
+  project_dir = options[:project_dir]
+  output_postfix = options[:preview] ? '_preview' : ''
+  output_filename = File.join(project_dir, "output#{output_postfix}.mp4")
+
+  min_pause_between_shots = 0.1 # FIXME: should be in options, but -P is already used?
+  segments = merge_small_pauses(apply_delays(parse_config(config_filename, options)), min_pause_between_shots)
+
+  raise 'Empty video?' if segments.empty?
+
+  output_dir = File.join(project_dir, 'output')
+  temp_dir = File.join(project_dir, 'tmp')
+  FileUtils.mkdir_p [output_dir, temp_dir]
+
+  temp_videos = process_and_split_videos(segments, options, output_dir, temp_dir)
+  concat_videos(temp_videos, output_filename)
+
+  words_per_second = segments.map do |seg|
+    dt = seg[:end_position] - seg[:start_position]
+    duration = dt / seg[:speed]
+    seg[:words] / duration
+  end.sum / segments.length
+
+  print("average words per second = #{words_per_second}\n")
+
+  [output_filename, segments]
 end
 
 def main(argv)
@@ -665,57 +732,12 @@ def main(argv)
     exit 0
   end
 
-  output_postfix = options[:preview] ? '_preview' : ''
-  output_filename = File.join project_dir, "output#{output_postfix}.mp4"
-
   Dir.chdir project_dir
 
-  min_pause_between_shots = 0.1 # FIXME: should be in options, but -P is already used?
-  segments = merge_small_pauses apply_delays(parse_config(config_filename, options)), min_pause_between_shots
-
-  if segments.empty?
-    print("empty video?\n")
-    exit 0
-  end
-
-  output_dir = File.join project_dir, 'output'
-  temp_dir = File.join project_dir, 'tmp'
-  FileUtils.mkdir_p [output_dir, temp_dir]
-
-  temp_videos = process_and_split_videos(segments, options, output_dir, temp_dir)
-  concat_videos(temp_videos, output_filename)
-
-  words_per_second = segments.map do |seg|
-    dt = seg[:end_position] - seg[:start_position]
-    duration = dt / seg[:speed]
-    seg[:words] / duration
-  end.sum / segments.length
-
-  print("average words per second = #{words_per_second}\n")
+  output_filename, segments = render(options, config_filename)
 
   if options[:preview]
-    if config_in_nvim && File.socket?(nvim_socket)
-      response = JSON.parse(send_to_nvim('json_encode({"file": resolve(expand("%p")), "line":line(".")})', nvim_socket))
-      line_in_config = response['line']
-      if line_in_config != 0 && response['file'] == config_filename
-        print "current nvim line is #{line_in_config}\n"
-        options[:line_in_config] = [segments.first[:line_in_config], line_in_config - 1].max
-      end
-    end
-
-    player_position = compute_player_position(segments, options)
-    print("player_position = #{player_position}\n")
-
-    mpv_socket = File.join(project_dir, 'mpv.sock')
-    command = MPV + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
-                     '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', output_filename]
-    system command.shelljoin_wrapped + ' &'
-    sleep 0.5
-
-    if config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
-      mpv_loop(mpv_socket, nvim_socket, segments, options,
-               config_filename)
-    end
+    run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options)
   else
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
