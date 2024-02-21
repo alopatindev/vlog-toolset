@@ -355,7 +355,7 @@ end
 
 def verify_constant_framerate(filename, _options)
   framerate = get_framerate(filename)
-  raise "Unexpected framerate mode #{framerate[1]} for #{filename}" unless framerate[1] == 'CFR'
+  raise "Unexpected framerate mode #{framerate[:mode]} for #{filename}" unless framerate[:mode] == 'CFR'
 end
 
 def optimize_for_ios(output_filename, options)
@@ -380,8 +380,6 @@ def optimize_for_ios(output_filename, options)
       '-af', 'aresample=async=1,asetpts=PTS-STARTPTS',
       '-vcodec', video_codec,
       '-acodec', 'alac',
-      # '-b:v', '5M', # TODO
-      # '-b:a', '256k', # TODO
       '-pix_fmt', 'yuv420p',
       '-movflags', 'faststart',
       '-strict', '-2',
@@ -654,7 +652,7 @@ def main(argv)
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
 
     framerate = get_framerate(output_filename)
-    new_output_filename = "output#{output_postfix}.#{framerate[1]}_#{framerate[0].to_f.pretty_fps}FPS.mp4"
+    new_output_filename = "output#{output_postfix}.#{framerate[:mode]}_#{framerate[:fps].to_f.pretty_fps}FPS.mp4"
     File.rename(output_filename, new_output_filename)
     output_filename = new_output_filename
 

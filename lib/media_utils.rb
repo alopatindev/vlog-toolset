@@ -35,11 +35,13 @@ end
 
 def get_framerate(filename)
   command = ['mediainfo', '--Output=JSON', filename]
-  tracks = JSON.parse(`#{command.shelljoin_wrapped}`)['media']['track'].filter { |i| !i['FrameRate_Mode'].nil? }
+  tracks = JSON.parse(`#{command.shelljoin_wrapped}`)['media']['track'].filter do |i|
+    i['@type'] == 'Video' && !i['FrameRate_Mode'].nil?
+  end
   raise 'Unexpected number of video tracks' unless tracks.length == 1
 
   track = tracks[0]
-  [track['FrameRate'], track['FrameRate_Mode']]
+  { fps: track['FrameRate'], mode: track['FrameRate_Mode'] }
 end
 
 def prepare_for_vad(filename)
