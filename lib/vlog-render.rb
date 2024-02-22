@@ -646,10 +646,13 @@ end
 def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options)
   if config_in_nvim
     nvim = Neovim.attach_unix(nvim_socket)
+    toggle_playback = ':let g:allow_playback = !g:allow_playback<Enter>'
+    nvim.command("nnoremap <Esc> #{toggle_playback}")
+    nvim.command("nnoremap <Space> #{toggle_playback}")
+    nvim.command("nnoremap <A-p> #{toggle_playback}")
+    nvim.command("inoremap <A-p> #{toggle_playback}")
+    nvim.command("vnoremap <A-p> #{toggle_playback}")
     nvim.command('let g:allow_playback = v:true')
-    nvim.command('nnoremap <A-p> <esc>:let g:allow_playback = !g:allow_playback<Enter>')
-    nvim.command('inoremap <A-p> <esc>:let g:allow_playback = !g:allow_playback<Enter>')
-    nvim.command('vnoremap <A-p> <esc>:let g:allow_playback = !g:allow_playback<Enter>')
   end
 
   loop do
