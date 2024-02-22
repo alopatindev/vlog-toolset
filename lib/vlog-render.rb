@@ -602,12 +602,12 @@ end
 # TODO: rename?
 def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, output_filename)
   print("run_mpv_loop\n")
-  crc32 = checksum(config_filename)
-
-  mpv = MPV::Client.new(mpv_socket)
-  nvim = Neovim.attach_unix(nvim_socket)
-
   begin
+    crc32 = checksum(config_filename)
+
+    mpv = MPV::Client.new(mpv_socket)
+    nvim = Neovim.attach_unix(nvim_socket)
+
     loop do
       break unless mpv.alive?
 
@@ -626,7 +626,7 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
           if mpv.get_property('pause')
             mpv.command('seek', compute_player_position(buffer.line_number, segments, options), 'absolute')
           else
-            window.cursor = [compute_line_in_config(mpv.get_property('time-pos'), segments, options), 1]
+            window.cursor = [compute_line_in_config(mpv.get_property('time-pos'), segments, options), 0]
           end
           mpv.set_property('pause', false)
         end
