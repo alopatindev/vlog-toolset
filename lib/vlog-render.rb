@@ -605,21 +605,14 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
       break unless mpv.alive?
 
       rewritten_config = checksum(config_filename) != crc32
-      unsaved_config_changes = nvim.eval('&modified || empty(getbufinfo({"bufmodified": 1})) == 0') == 1
+      allow_playback = nvim.eval('mode() == "n" && !&modified && empty(getbufinfo({"bufmodified": 1})) != 0 && g:allow_playback') == 1
 
-      # TODO: put all events to vimscript buffer and fetch the buffer? due to https://github.com/neovim/neovim-ruby/issues/102
-      #       allow_playback = nvim.eval('mode == 'n' && !&modified && empty(getbufinfo({"bufmodified": 1})) != 0 && !g:key_pressed_in_normal_mode') == 1
-      #       hjkl/etc. => g:key_pressed_pressed_in_normal_mode = true
-      #       esc/i/R/v/V => g:key_pressed_in_normal_mode = false
-
-      mode = nvim.get_mode['mode']
       nvim_context = nvim.current
       window = nvim_context.window
       buffer = nvim_context.buffer
 
-      case mode
-      when 'n'
-        if !unsaved_config_changes && !rewritten_config && buffer.get_name == config_filename
+      if allow_playback
+        if !rewritten_config && buffer.get_name == config_filename
           if mpv.get_property('pause')
             mpv.command('seek', compute_player_position(buffer.line_number, segments, options), 'absolute')
           else
@@ -651,13 +644,20 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
 end
 
 def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options)
-  nvim = Neovim.attach_unix(nvim_socket) if config_in_nvim
+  if config_in_nvim
+    nvim = Neovim.attach_unix(nvim_socket)
+    nvim.command('let g:allow_playback = v:true')
+    nvim.command('nnoremap <A-p> <esc>:let g:allow_playback = !g:allow_playback<Enter>')
+    nvim.command('inoremap <A-p> <esc>:let g:allow_playback = !g:allow_playback<Enter>')
+    nvim.command('vnoremap <A-p> <esc>:let g:allow_playback = !g:allow_playback<Enter>')
+  end
+
   loop do
     if config_in_nvim
       buffer = nvim.current.buffer
       line_in_config = buffer.line_number
-      if line_in_config != 0 && buffer.get_name == config_filename
-        print "current nvim line is #{line_in_config}\n"
+      if buffer.get_name == config_filename
+        print("current nvim line is #{line_in_config}\n")
         options[:line_in_config] = [segments.first[:line_in_config], line_in_config - 1].max
       end
     end
