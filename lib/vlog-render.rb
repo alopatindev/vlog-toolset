@@ -609,7 +609,6 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
 
   begin
     loop do
-      print("mpv alive = #{mpv.alive?}\n")
       break unless mpv.alive?
 
       rewritten_config = checksum(config_filename) != crc32
@@ -621,47 +620,31 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
       window = nvim_context.window
       buffer = nvim_context.buffer
 
-      print("rewritten_config=#{rewritten_config} unsaved_config_changes=#{unsaved_config_changes} mode=#{mode}\n")
-
       case mode
       when 'n'
-        print("loop 1\n")
         if !unsaved_config_changes && !rewritten_config && buffer.get_name == config_filename
           if mpv.get_property('pause')
-            print("loop 2\n")
             mpv.command('seek', compute_player_position(buffer.line_number, segments, options), 'absolute')
-            print("loop 3\n")
           else
-            print("loop 4\n")
             window.cursor = [compute_line_in_config(mpv.get_property('time-pos'), segments, options), 1]
-            print("loop 5\n")
           end
-          print("loop 5\n")
           mpv.set_property('pause', false)
-          print("loop 6\n")
         end
       else
-        print("loop 7\n")
         mpv.set_property('pause', true)
-        print("loop 8\n")
       end
 
-      print("loop 9\n")
       if rewritten_config
-        print("loop 10\n")
         new_output_filename, new_segments = render(options, config_filename, rerender = true)
         print("restarting player\n")
         mpv.quit!
         File.rename(new_output_filename, output_filename)
-        print("loop 11\n")
         return [true, new_segments]
       else
-        print("loop 12\n")
         sleep 0.1
       end
     end
   rescue StandardError => e
-    print("loop 13 err\n")
     puts e
   ensure
     print("closing player\n")
