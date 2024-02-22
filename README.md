@@ -7,6 +7,10 @@ I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automat
 
 Currently can keep functioning well even if you experience temporary [USB phone connection failure](https://android.stackexchange.com/questions/193637/how-can-i-adb-pull-a-large-file-when-the-usb-connection-breaks-continuously).
 
+Two possible pipelines:
+- record with `vlog-recorder`, apply `vlog-render`
+- record normally, without any additional software, apply `vlog-splitter` and `vlog-render`
+
 ## Installation
 
 ### GNU/Linux
@@ -100,15 +104,16 @@ Shift + R - (RE)START SILENCE recording attempt
 ```
 Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]
   -p, --project <dir>              Project directory
-  -L, --line <num>                 Line in render.conf file, to play by given position (default: 1)
   -P, --preview <true|false>       Preview mode. It will also start a video player by a given position (default: true)
+  -n, --tmux-nvim <true|false>     Plain text video editing: open render.conf (during preview mode or when render.conf was just generated) in Neovim via Tmux if they are available (default: true)
   -f, --fps <num>                  Constant frame rate (default: 30)
   -S, --speed <num>                Speed factor (default: 1.2)
   -V, --video-filters <filters>    ffmpeg video filters (default: "hqdn3d,hflip,vignette")
   -c, --cleanup <true|false>       Remove temporary files, instead of reusing them in future (default: false)
   -w, --whisper-cpp-dir <dir>      whisper.cpp directory
   -W, --whisper-cpp-args <dir>     Additional whisper.cpp arguments (default: "--model models/ggml-base.bin --language auto")
-  -y, --youtube <true|false>       Additionally optimize for youtube (default: false)
+  -y, --youtube <true|false>       Additionally optimize for YouTube (default: false)
+  -I, --ios <true|false>           Additionally optimize for iOS video editors (default: false)
 
 ./bin/vlog-render -p ~/video/new-cool-video-project --preview false --whisper-cpp-dir path/to/whisper-cpp-dir
 ```
@@ -127,11 +132,20 @@ Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]
         - recognized text (to figure out which clips can be removed / reordered)
     - you can edit the config
         - put `#` in the beginning of line you want to ignore (or just remove the entire line)
-        - add empty newlines to increase delay *after* clip
         - change speed of individual clips
 
 ```
 vi ~/video/new-cool-video-project/render.conf
+```
+
+## vlog-splitter
+```
+Usage: vlog-splitter -p project_dir/ [other options]
+Project directory must contain input_000001.mp4, input_000002.mp4 ... as input files (also optionally input_000001.wav, input_000002.wav ...)
+  -p, --project <dir>              Project directory
+  -P <seconds>,                    Minimum pause between shots for auto trimming (default: 2.0)
+      --pause-between-shots
+  -a, --aggressiveness <0..1>      How aggressively to filter out non-speech (default: 0.4)
 ```
 
 ## Known issues/limitations

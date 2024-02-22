@@ -553,7 +553,7 @@ def parse_options!(options, args)
       options[:preview] = p == 'true'
     end
     opts.on('-n', '--tmux-nvim <true|false>',
-            "Auto open render.conf (during preview mode or when render.conf was just generated) in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
+            "Plain text video editing: open render.conf (during preview mode or when render.conf was just generated) in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
       options[:tmux_nvim] = i == 'true'
     end
     opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f }
