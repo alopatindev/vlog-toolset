@@ -607,6 +607,8 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
       rewritten_config = checksum(config_filename) != crc32
       allow_playback = nvim.eval('mode() == "n" && !&modified && empty(getbufinfo({"bufmodified": 1})) != 0 && g:allow_playback') == 1
 
+      # TODO: change some mpv property (or send message) when "space"/"p" is pressed in mpv and control "g:allow_playback" from mpv as well?
+
       nvim_context = nvim.current
       window = nvim_context.window
       buffer = nvim_context.buffer
