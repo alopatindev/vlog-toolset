@@ -598,16 +598,22 @@ end
 def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename)
   print("run_mpv_loop\n")
   begin
-    crc32 = checksum(config_filename)
+    config_crc32 = checksum(config_filename)
+    config_mtime = File.mtime(config_filename)
+
     mpv = MPV::Client.new(mpv_socket)
 
     loop do
       break unless mpv.alive?
 
-      rewritten_config = checksum(config_filename) != crc32
+      rewritten_config = File.mtime(config_filename) != config_mtime && checksum(config_filename) != config_crc32
       allow_playback = nvim.eval('mode() == "n" && !&modified && empty(getbufinfo({"bufmodified": 1})) != 0 && g:allow_playback') == 1
 
       # TODO: change some mpv property (or send message) when "space"/"p" is pressed in mpv and control "g:allow_playback" from mpv as well?
+      #       key binding (via mpv lua scripting) that sends event + subscribe on event from ruby?
+      #       mp.register_event
+      #       MPV::Client#callbacks
+      #       mp.add_key_binding
 
       nvim_context = nvim.current
       window = nvim_context.window
