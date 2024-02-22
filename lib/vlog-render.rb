@@ -590,23 +590,16 @@ def parse_options!(options, args)
   exit 1
 end
 
-def send_to_nvim(expr, nvim_socket)
-  command = ['nvim', '--headless', '--clean', '--server', nvim_socket, '--remote-expr']
-  `#{command.shelljoin_wrapped} '#{expr}'`
-end
-
 def checksum(filename)
   Digest::CRC32.file(filename).hexdigest
 end
 
 # TODO: rename?
-def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, output_filename)
+def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename)
   print("run_mpv_loop\n")
   begin
     crc32 = checksum(config_filename)
-
     mpv = MPV::Client.new(mpv_socket)
-    nvim = Neovim.attach_unix(nvim_socket)
 
     loop do
       break unless mpv.alive?
@@ -615,6 +608,7 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
       unsaved_config_changes = nvim.eval('&modified || empty(getbufinfo({"bufmodified": 1})) == 0') == 1
 
       # TODO: put all events to vimscript buffer and fetch the buffer? due to https://github.com/neovim/neovim-ruby/issues/102
+      # TODO: react to navigation during normal mode
       mode = nvim.get_mode['mode']
       nvim_context = nvim.current
       window = nvim_context.window
@@ -622,7 +616,7 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
 
       case mode
       when 'n'
-        if !unsaved_config_changes && !rewritten_config && buffer.get_name == config_filename
+        if !unsaved_config_changes && !rewritten_config && buffer.get_name == config_filename # && key_pressed
           if mpv.get_property('pause')
             mpv.command('seek', compute_player_position(buffer.line_number, segments, options), 'absolute')
           else
@@ -654,11 +648,12 @@ def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, ou
 end
 
 def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options)
+  nvim = Neovim.attach_unix(nvim_socket) if config_in_nvim
   loop do
-    if config_in_nvim && File.socket?(nvim_socket)
-      response = JSON.parse(send_to_nvim('json_encode({"file": resolve(expand("%p")), "line":line(".")})', nvim_socket))
-      line_in_config = response['line']
-      if line_in_config != 0 && response['file'] == config_filename
+    if config_in_nvim
+      buffer = nvim.current.buffer
+      line_in_config = buffer.line_number
+      if line_in_config != 0 && buffer.get_name == config_filename
         print "current nvim line is #{line_in_config}\n"
         options[:line_in_config] = [segments.first[:line_in_config], line_in_config - 1].max
       end
@@ -675,7 +670,7 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
 
     break unless config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
 
-    restart_mpv, segments = run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, output_filename)
+    restart_mpv, segments = run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename)
     break unless restart_mpv
   end
 end
