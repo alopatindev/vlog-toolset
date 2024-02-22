@@ -608,7 +608,10 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
       unsaved_config_changes = nvim.eval('&modified || empty(getbufinfo({"bufmodified": 1})) == 0') == 1
 
       # TODO: put all events to vimscript buffer and fetch the buffer? due to https://github.com/neovim/neovim-ruby/issues/102
-      # TODO: react to navigation during normal mode
+      #       allow_playback = nvim.eval('mode == 'n' && !&modified && empty(getbufinfo({"bufmodified": 1})) != 0 && !g:key_pressed_in_normal_mode') == 1
+      #       hjkl/etc. => g:key_pressed_pressed_in_normal_mode = true
+      #       esc/i/R/v/V => g:key_pressed_in_normal_mode = false
+
       mode = nvim.get_mode['mode']
       nvim_context = nvim.current
       window = nvim_context.window
@@ -616,7 +619,7 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
 
       case mode
       when 'n'
-        if !unsaved_config_changes && !rewritten_config && buffer.get_name == config_filename # && key_pressed
+        if !unsaved_config_changes && !rewritten_config && buffer.get_name == config_filename
           if mpv.get_property('pause')
             mpv.command('seek', compute_player_position(buffer.line_number, segments, options), 'absolute')
           else
