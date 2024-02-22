@@ -23,6 +23,8 @@ gem install colorize -v 1.1.0
 gem install concurrent-ruby -v 1.2.2
 gem install digest-crc -v 0.6.5
 gem install lru_redux -v 1.1.0
+gem install mpv -v 3.0.1
+gem install neovim -v 0.9.1
 gem install parallel -v 1.24.0
 
 # TODO: add versions

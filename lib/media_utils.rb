@@ -25,7 +25,8 @@ VAD_SAMPLING_RATE = 16_000
 
 MIN_SHOT_SIZE = 1.0
 
-MPV = ['mpv', '--really-quiet', '--no-resume-playback', '--af=scaletempo2', '--fs', '--speed=1', '--volume-max=300']
+MPV_COMMAND = ['mpv', '--really-quiet', '--no-resume-playback', '--af=scaletempo2', '--fs', '--speed=1',
+               '--volume-max=300']
 
 def get_duration(filename)
   command = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams', filename]

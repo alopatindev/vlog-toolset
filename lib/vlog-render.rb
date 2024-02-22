@@ -27,9 +27,10 @@ require 'fileutils'
 require 'io/console'
 require 'json'
 require 'mkmf'
+require 'mpv'
+require 'neovim'
 require 'optparse'
 require 'parallel'
-require 'socket'
 
 CONFIG_FILENAME = 'render.conf'.freeze
 RENDER_DEFAULT_SPEED = '1.00'
@@ -598,88 +599,75 @@ def checksum(filename)
   Digest::CRC32.file(filename).hexdigest
 end
 
+# TODO: rename?
 def run_mpv_loop(mpv_socket, nvim_socket, segments, options, config_filename, output_filename)
   print("run_mpv_loop\n")
-
-  # TODO: I think we need to simplify this (c)
-  # normal mode -> insert mode => pause
-  # insert mode -> normal mode WHEN no changes => fetch line from nvim, seek to time
-  # insert mode -> normal mode WHEN changes => ...
-
-  navigating = false
-  config_is_dirty = false
   crc32 = checksum(config_filename)
 
-  client = UNIXSocket.new(mpv_socket)
-  loop do
-    if config_is_dirty && send_to_nvim('empty(getbufinfo({"bufmodified": 1}))', nvim_socket) == '1'
-      if checksum(config_filename) == crc32
-        print("no new changes, resuming playback\n")
-        client.puts('{"command": ["set_property", "pause", false]}')
-        config_is_dirty = false
-      else
-        print("rewritten config with new changes\n")
+  mpv = MPV::Client.new(mpv_socket)
+  nvim = Neovim.attach_unix(nvim_socket)
 
-        new_output_filename, segments = render(options, config_filename, rerender = true)
-        print("restarting player\n")
-        client.puts('{"command": ["quit"]}')
-        client.close
-        client = nil
+  begin
+    loop do
+      print("mpv alive = #{mpv.alive?}\n")
+      break unless mpv.alive?
 
-        File.rename(new_output_filename, output_filename)
-        return [true, segments]
-      end
-    end
+      rewritten_config = checksum(config_filename) != crc32
+      unsaved_config_changes = nvim.eval('&modified || empty(getbufinfo({"bufmodified": 1})) == 0') == 1
 
-    client.puts('{"command": ["get_property", "time-pos"]}')
-    response = JSON.parse(client.gets)
+      # TODO: put all events to vimscript buffer and fetch the buffer? due to https://github.com/neovim/neovim-ruby/issues/102
+      mode = nvim.get_mode['mode']
+      nvim_context = nvim.current
+      window = nvim_context.window
+      buffer = nvim_context.buffer
 
-    position = response['data']
-    unless position.nil?
-      line_in_config = compute_line_in_config(position.to_f, segments, options)
-      response = JSON.parse(
-        send_to_nvim(
-          'json_encode({"file": resolve(expand("%p")), "line":line("."), "mode": mode(), "modified": &modified})', nvim_socket
-        )
-      )
+      print("rewritten_config=#{rewritten_config} unsaved_config_changes=#{unsaved_config_changes} mode=#{mode}\n")
 
-      if response['file'] == config_filename
-        # TODO: refactor
-        if response['line'] != line_in_config && response['mode'] == 'n' && !navigating
-          print("jump to #{line_in_config}\n")
-          _response = send_to_nvim("cursor(#{line_in_config}, 1)", nvim_socket)
-        elsif response['mode'] == 'n' && navigating
-          player_position = compute_player_position(response['line'], segments, options)
-          print("seek and continue to #{response['line']} => #{player_position}\n")
-
-          client.puts('{"command": ["set_property", "pause", true]}')
-          client.puts('{"command": ["seek",' + player_position.to_s + ', "absolute"]}')
-          client.puts('{"command": ["set_property", "pause", false]}')
-
-          navigating = false
-        elsif response['mode'] != 'n'
-          print("navigating\n")
-          navigating = true
-        elsif response['modified'] == 1
-          print("modified\n")
-          config_is_dirty = true
-          client.puts('{"command": ["set_property", "pause", true]}')
+      case mode
+      when 'n'
+        print("loop 1\n")
+        if !unsaved_config_changes && !rewritten_config && buffer.get_name == config_filename
+          if mpv.get_property('pause')
+            print("loop 2\n")
+            mpv.command('seek', compute_player_position(buffer.line_number, segments, options), 'absolute')
+            print("loop 3\n")
+          else
+            print("loop 4\n")
+            window.cursor = [compute_line_in_config(mpv.get_property('time-pos'), segments, options), 1]
+            print("loop 5\n")
+          end
+          print("loop 5\n")
+          mpv.set_property('pause', false)
+          print("loop 6\n")
         end
+      else
+        print("loop 7\n")
+        mpv.set_property('pause', true)
+        print("loop 8\n")
+      end
+
+      print("loop 9\n")
+      if rewritten_config
+        print("loop 10\n")
+        new_output_filename, new_segments = render(options, config_filename, rerender = true)
+        print("restarting player\n")
+        mpv.quit!
+        File.rename(new_output_filename, output_filename)
+        print("loop 11\n")
+        return [true, new_segments]
+      else
+        print("loop 12\n")
+        sleep 0.1
       end
     end
-
-    sleep 0.1
+  rescue StandardError => e
+    print("loop 13 err\n")
+    puts e
+  ensure
+    print("closing player\n")
+    mpv.quit!
+    [false, []]
   end
-rescue Errno::ECONNREFUSED
-  puts 'connection refused to mpv'
-  [false, []]
-rescue StandardError => e
-  puts "disconnected from mpv: #{e.message}"
-  puts e
-  [false, []]
-ensure
-  puts 'ensure section'
-  client.close if client
 end
 
 def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options)
@@ -697,8 +685,8 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     print("player_position = #{player_position}\n")
 
     mpv_socket = File.join(options[:project_dir], 'mpv.sock')
-    command = MPV + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
-                     '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', output_filename]
+    command = MPV_COMMAND + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
+                             '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', output_filename]
     system command.shelljoin_wrapped + ' &'
     sleep 0.5
 
@@ -797,16 +785,16 @@ def main(argv)
     print("finished rendering final video 🎉\n\n")
 
     print("you can run:\n\n")
-    command = MPV + [output_filename]
+    command = MPV_COMMAND + [output_filename]
     print(command.shelljoin_wrapped + "\n\n")
 
     if options[:youtube]
-      command = MPV + [output_youtube_filename]
+      command = MPV_COMMAND + [output_youtube_filename]
       print(command.shelljoin_wrapped + "\n\n")
     end
 
     if options[:ios]
-      command = MPV + [output_ios_filename]
+      command = MPV_COMMAND + [output_ios_filename]
       print(command.shelljoin_wrapped + "\n\n")
     end
   end

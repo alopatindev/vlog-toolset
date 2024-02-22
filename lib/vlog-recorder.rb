@@ -496,7 +496,7 @@ class DevicesController
     mpv_args = @mpv_args.shellsplit + ["--video-rotate=#{restored_rotation}",
                                        "--playlist-start=#{position_in_playlist}"] + clips
 
-    command = MPV + mpv_args
+    command = MPV_COMMAND + mpv_args
     @logger.debug command
     system command.shelljoin_wrapped
   end
