@@ -24,9 +24,9 @@ require 'lru_redux'
 class Mic
   CONNECTION_RECHECK_SECS = 15
 
-  def initialize(temp_dir, arecord_args, logger)
+  def initialize(project_dir, arecord_args, logger)
     @logger = logger
-    @temp_dir = temp_dir
+    @project_dir = project_dir
 
     @arecord_command = ['exec', 'arecord', '--quiet', '--nonblock'] + arecord_args.shellsplit
     @arecord_pipe = nil
@@ -68,7 +68,7 @@ class Mic
   end
 
   def unchecked_filename(clip_num)
-    File.join @temp_dir, clip_num.with_leading_zeros + '.wav'
+    File.join(@project_dir, 'input_' + clip_num.with_leading_zeros + '.wav')
   end
 
   def recording?

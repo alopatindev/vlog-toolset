@@ -32,8 +32,8 @@ class Phone
 
   attr_reader :rotation
 
-  def initialize(temp_dir, options, logger)
-    @temp_dir = temp_dir
+  def initialize(project_dir, options, logger)
+    @project_dir = project_dir
 
     @change_brightness = options[:change_brightness] # TODO: remove option?
 
@@ -73,7 +73,7 @@ class Phone
   end
 
   def move_to_host(phone_filename, clip_num)
-    local_filename = File.join @temp_dir, clip_num.with_leading_zeros + '.mp4'
+    local_filename = File.join(@project_dir, 'input_' + clip_num.with_leading_zeros + '.mp4')
     @logger.debug "move_to_host #{phone_filename} => #{local_filename}"
 
     script_filename = File.join(__dir__, 'adb_repull.py')
@@ -211,7 +211,8 @@ class Phone
   end
 
   def opencamera_running?
-    adb_shell('dumpsys window windows').match?(/(mCurrentFocus|mHoldScreenWindow)=Window\{[0-9a-f]* u0 #{MAIN_ACTIVITY}/)
+    dumpsys = adb_shell('dumpsys window windows')
+    dumpsys.match?(/((mCurrentFocus|mHoldScreenWindow)=|(imeLayeringTarget|imeInputTarget|imeControlTarget) in display# [0-9]* )Window\{[0-9a-f]* u0 #{MAIN_ACTIVITY}/)
   end
 
   def run_opencamera

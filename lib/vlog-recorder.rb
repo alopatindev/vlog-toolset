@@ -81,7 +81,7 @@ class DevicesController
         if silence_recorded?
           stop_recording
           show_status nil
-          delete_unsaved_clip
+          # delete_unsaved_clip # FIXME: wat
           start_recording
         else
           show_status 'You need to record SILENCE first, press "Shift + R"'
@@ -111,6 +111,7 @@ class DevicesController
     @temp_dir = temp_dir
     @trim_duration = options[:trim_duration]
     @min_pause_between_shots = options[:min_pause_between_shots]
+    @keep_originals = options[:keep_originals]
     @aggressiveness = options[:aggressiveness]
     @mpv_args = options[:mpv_args]
     @logger = logger
@@ -125,9 +126,9 @@ class DevicesController
     @recording = false
 
     arecord_args = options[:arecord_args]
-    @mic = Mic.new(temp_dir, arecord_args, logger)
+    @mic = Mic.new(@project_dir, arecord_args, logger)
 
-    @phone = Phone.new(temp_dir, options, logger)
+    @phone = Phone.new(@project_dir, options, logger)
     @phone.set_brightness(0)
 
     logger.info('initialized')
@@ -362,8 +363,13 @@ class DevicesController
         processed_video_filenames = process_video(camera_filename, segments)
         output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation,
                                        @project_dir)
-        remove_files [camera_filename, sound_filename,
-                      sync_sound_filename] + processed_sound_filenames + processed_video_filenames
+        remove_files (if @keep_originals
+                        []
+                      else
+                        [camera_filename,
+                         sound_filename]
+                      end) + [sync_sound_filename] + processed_sound_filenames + processed_video_filenames
+
         @logger.info "save_clip: #{clip_num} as #{output_filenames} ok"
 
         @status_mutex.synchronize do
@@ -476,12 +482,10 @@ class DevicesController
   end
 
   def play
-    # TODO: don't play silence wav?
-
-    clips = get_clips [@project_dir]
+    clips = (get_clips [@project_dir]).reject { |i| i.include?('_silence.wav') }
     return if clips.empty?
 
-    last_clip_num = parse_clip_num clips.last
+    last_clip_num = parse_clip_num clips.last # TODO: will match with silence clip number? is it ok?
     @logger.debug "play clip: #{last_clip_num}"
 
     last_clip_filename = File.basename(get_output_filename(last_clip_num, subclip_num = 0, rotation = nil,
@@ -542,6 +546,10 @@ def parse_options!(options, args)
             "Open Camera directory path on Android device (default: \"#{options[:opencamera_dir]}\")") do |o|
       options[:opencamera_dir] = o
     end
+    opts.on('-k', '--keep_originals <true|false>',
+            "Keep original uncut and unsynchronized recordings (default: #{options[:keep_originals]})") do |d|
+      options[:keep_originals] = d == 'true'
+    end
     opts.on('-b', '--change-brightness <true|false>',
             "Set lowest brightness to save device power (default: #{options[:change_brightness]})") do |b|
       options[:change_brightness] = b == 'true'
@@ -588,6 +596,7 @@ def main(argv)
     arecord_args: '--device=default --format=dat',
     android_id: '',
     opencamera_dir: '/storage/emulated/0/DCIM/OpenCamera',
+    keep_originals: true,
     change_brightness: false,
     mpv_args: '--vf=hflip --volume-max=300 --volume=130 --speed=1.2',
     min_pause_between_shots: 2.0,

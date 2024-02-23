@@ -593,11 +593,12 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
       end
 
       if rewritten_config
-        new_output_filename, new_segments = render(options, config_filename, video_durations, rerender = true)
+        new_output_filename, new_segments, new_video_durations = render(options, config_filename, video_durations,
+                                                                        rerender = true)
         print("restarting player\n")
         mpv.quit!
         File.rename(new_output_filename, output_filename)
-        return [true, new_segments]
+        return [true, new_segments, new_video_durations]
       else
         sleep 0.1
       end
@@ -607,7 +608,7 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
   ensure
     print("closing player\n")
     mpv.quit!
-    [false, []]
+    [false, [], {}]
   end
 end
 
@@ -644,8 +645,9 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
 
     break unless config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
 
-    restart_mpv, segments = run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename,
-                                         video_durations)
+    restart_mpv, segments, new_video_durations = run_mpv_loop(mpv_socket, nvim, segments, options, config_filename,
+                                                              output_filename, video_durations)
+    video_durations = new_video_durations
     break unless restart_mpv
   end
 end
@@ -653,9 +655,8 @@ end
 def render(options, config_filename, video_durations, rerender = false)
   print("rendering\n")
   project_dir = options[:project_dir]
-  output_postfix = options[:preview] ? '_preview' : ''
   rerender_postfix = rerender ? '_rerender' : ''
-  output_filename = File.join(project_dir, "output#{output_postfix}#{rerender_postfix}.mp4")
+  output_filename = File.join(project_dir, "output#{output_postfix(options)}#{rerender_postfix}.mp4")
 
   min_pause_between_shots = 0.1 # FIXME: should be in options, but -P is already used?
   segments, new_video_durations = apply_delays(parse_config(config_filename, options), video_durations)
@@ -663,9 +664,7 @@ def render(options, config_filename, video_durations, rerender = false)
 
   raise 'Empty video?' if segments.empty?
 
-  output_dir = File.join(project_dir, 'output')
-  temp_dir = File.join(project_dir, 'tmp')
-  FileUtils.mkdir_p [output_dir, temp_dir]
+  output_dir, temp_dir = dirs(options)
 
   temp_videos = process_and_split_videos(new_segments, options, output_dir, temp_dir)
   concat_videos(temp_videos, output_filename)
@@ -680,6 +679,16 @@ def render(options, config_filename, video_durations, rerender = false)
   print("average words per second = #{words_per_second}\n")
 
   [output_filename, new_segments, new_video_durations]
+end
+
+def output_postfix(options)
+  options[:preview] ? '_preview' : ''
+end
+
+def dirs(options)
+  output_dir = File.join(options[:project_dir], 'output')
+  temp_dir = File.join(options[:project_dir], 'tmp')
+  [output_dir, temp_dir]
 end
 
 def parse_options!(options, args)
@@ -746,10 +755,12 @@ def main(argv)
     ios: false
   }
 
+  # TODO: option to render all sound channels?
+
   parse_options!(options, argv)
 
   project_dir = options[:project_dir]
-  config_filename = File.realpath(File.join(project_dir, CONFIG_FILENAME))
+  config_filename = File.join(File.realpath(project_dir), CONFIG_FILENAME)
 
   old_config = generate_config(options)
 
@@ -770,6 +781,9 @@ def main(argv)
 
   Dir.chdir project_dir
 
+  output_dir, temp_dir = dirs(options)
+  FileUtils.mkdir_p [output_dir, temp_dir]
+
   output_filename, segments, video_durations = render(options, config_filename, video_durations = {})
 
   if options[:preview]
@@ -779,7 +793,7 @@ def main(argv)
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
 
     framerate = get_framerate(output_filename)
-    new_output_filename = "output#{output_postfix}.#{framerate[:mode]}_#{framerate[:fps].to_f.pretty_fps}FPS.mp4"
+    new_output_filename = "output#{output_postfix(options)}.#{framerate[:mode]}_#{framerate[:fps].to_f.pretty_fps}FPS.mp4"
     File.rename(output_filename, new_output_filename)
     output_filename = new_output_filename
 
