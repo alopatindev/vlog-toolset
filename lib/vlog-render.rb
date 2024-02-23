@@ -32,7 +32,7 @@ require 'neovim'
 require 'optparse'
 require 'parallel'
 
-CONFIG_FILENAME = 'render.conf'.freeze
+CONFIG_FILENAME = 'render.conf'
 RENDER_DEFAULT_SPEED = '1.00'
 
 def parse_config(filename, options)
@@ -405,8 +405,6 @@ def optimize_for_ios(output_filename, options)
 end
 
 def compute_player_position(line_in_config, segments, options)
-  # TODO: recompute indexes on every file save (mtime change)?
-  #   key: (filename, any of non-zero start and end)
   segments.filter { |seg| seg[:line_in_config] < line_in_config }
           .map { |seg| seg[:end_position] - seg[:start_position] }
           .sum / clamp_speed(options[:speed])
@@ -484,7 +482,7 @@ end
 def generate_config(options)
   banlist = File.readlines('banlist.txt', chomp: true).map { |i| Regexp.new(i) }
   app_version = `git rev-parse HEAD`[..6]
-  render_conf_filename = File.join(options[:project_dir], 'render.conf')
+  render_conf_filename = File.join(options[:project_dir], CONFIG_FILENAME)
   exists = File.exist?(render_conf_filename)
   File.open(render_conf_filename, exists ? 'r+' : 'w') do |render_conf_file|
     video_filenames = Dir.glob("#{options[:project_dir]}#{File::SEPARATOR}0*.mp4").sort
@@ -701,7 +699,7 @@ def parse_options!(options, args)
       options[:preview] = p == 'true'
     end
     opts.on('-n', '--tmux-nvim <true|false>',
-            "Plain text video editing: open render.conf (during preview mode or when render.conf was just generated) in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
+            "Plain text video editing: (during preview mode or when #{CONFIG_FILENAME} was just generated) open #{CONFIG_FILENAME} in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
       options[:tmux_nvim] = i == 'true'
     end
     opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f }

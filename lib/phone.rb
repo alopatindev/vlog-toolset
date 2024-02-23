@@ -20,8 +20,8 @@ require 'numeric_utils'
 require 'os_utils'
 
 class Phone
-  APP_ID = 'net.sourceforge.opencamera'.freeze
-  MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity".freeze
+  APP_ID = 'net.sourceforge.opencamera'
+  MAIN_ACTIVITY = "#{APP_ID}/#{APP_ID}.MainActivity"
   POLL_WAIT_TIME = 0.3
   CAMERA_INITIALIZATION_TIME = 3.0
 
