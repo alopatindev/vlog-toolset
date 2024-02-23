@@ -200,60 +200,63 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
 
     # TODO: split using -f segment -segment_time 10 ?
 
-    media_thread_pool.post do
-      audio_filters = "atempo=#{seg[:speed]},asetpts=PTS-STARTPTS"
-      video_filters = [
-        rotation_filter(basename),
-        options[:video_filters],
-        "fps=#{fps}",
-        "setpts=(1/#{seg[:speed]})*PTS" # TODO: is it correct?
-      ].reject { |i| i.empty? }.join(',')
-      if preview
+    remove_file_if_empty(temp_cut_output_filename)
+    remove_file_if_empty(output_filename)
+
+    unless File.exist?(output_filename)
+      media_thread_pool.post do
+        audio_filters = "atempo=#{seg[:speed]},asetpts=PTS-STARTPTS"
         video_filters = [
-          "scale=#{preview_width}:-1",
-          "#{video_filters}"
-          # "drawtext=fontcolor=white:fontsize=#{preview_width / 24}:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
-        ].join(',')
+          rotation_filter(basename),
+          options[:video_filters],
+          "fps=#{fps}",
+          "setpts=(1/#{seg[:speed]})*PTS" # TODO: is it correct?
+        ].reject { |i| i.empty? }.join(',')
+        if preview
+          video_filters = [
+            "scale=#{preview_width}:-1",
+            "#{video_filters}"
+            # "drawtext=fontcolor=white:fontsize=#{preview_width / 24}:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
+          ].join(',')
+        end
+
+        # might be uneeded step anymore,
+        # but still might be useful for NLE video editors
+        dt = seg[:end_position] - seg[:start_position]
+        command = FFMPEG_NO_OVERWRITE + [
+          '-threads', Concurrent.processor_count,
+          '-fflags', '+genpts+igndts',
+          '-ss', seg[:start_position],
+          '-i', seg[:video_filename],
+          '-to', dt,
+          '-codec', 'copy',
+          '-movflags', 'faststart',
+          '-strict', '-2',
+          temp_cut_output_filename
+        ]
+        system command.shelljoin_wrapped
+
+        command = FFMPEG_NO_OVERWRITE + [
+          '-threads', Concurrent.processor_count,
+          '-fflags', '+genpts+igndts',
+          '-i', temp_cut_output_filename,
+          '-vsync', 'cfr',
+          '-vcodec', video_codec,
+          '-vf', video_filters,
+          '-af', audio_filters,
+          '-acodec', 'flac',
+          '-movflags', 'faststart',
+          '-strict', '-2',
+          output_filename
+        ]
+        system command.shelljoin_wrapped
+
+        print("#{basename} (#{index + 1}/#{segments.length})\n")
+
+        FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
+      rescue StandardError => e
+        print("exception for segment #{seg}: #{e} #{e.backtrace}\n")
       end
-
-      # might be uneeded step anymore,
-      # but still might be useful for NLE video editors
-      dt = seg[:end_position] - seg[:start_position]
-      command = FFMPEG_NO_OVERWRITE + [
-        '-threads', Concurrent.processor_count,
-        '-fflags', '+genpts+igndts',
-        '-ss', seg[:start_position],
-        '-i', seg[:video_filename],
-        '-to', dt,
-        '-codec', 'copy',
-        '-movflags', 'faststart',
-        '-strict', '-2',
-        temp_cut_output_filename
-      ]
-      remove_file_if_empty(temp_cut_output_filename)
-      system command.shelljoin_wrapped
-
-      command = FFMPEG_NO_OVERWRITE + [
-        '-threads', Concurrent.processor_count,
-        '-fflags', '+genpts+igndts',
-        '-i', temp_cut_output_filename,
-        '-vsync', 'cfr',
-        '-vcodec', video_codec,
-        '-vf', video_filters,
-        '-af', audio_filters,
-        '-acodec', 'flac',
-        '-movflags', 'faststart',
-        '-strict', '-2',
-        output_filename
-      ]
-      remove_file_if_empty(output_filename)
-      system command.shelljoin_wrapped
-
-      print("#{basename} (#{index + 1}/#{segments.length})\n")
-
-      FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
-    rescue StandardError => e
-      print("exception for segment #{seg}: #{e} #{e.backtrace}\n")
     end
 
     output_filename
