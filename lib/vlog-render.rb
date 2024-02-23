@@ -550,53 +550,6 @@ def ms_to_sec(ms)
   ms.to_f / 1000.0
 end
 
-def parse_options!(options, args)
-  parser = OptionParser.new do |opts|
-    opts.set_banner('Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]')
-    opts.set_summary_indent('  ')
-    opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
-    opts.on('-P', '--preview <true|false>',
-            "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
-      options[:preview] = p == 'true'
-    end
-    opts.on('-n', '--tmux-nvim <true|false>',
-            "Plain text video editing: open render.conf (during preview mode or when render.conf was just generated) in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
-      options[:tmux_nvim] = i == 'true'
-    end
-    opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f }
-    opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
-    opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}\")") do |v|
-      options[:video_filters] = v
-    end
-    opts.on('-c', '--cleanup <true|false>',
-            "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
-      options[:cleanup] = c == 'true'
-    end
-    opts.on('-w', '--whisper-cpp-dir <dir>', 'whisper.cpp directory') do |w|
-      options[:whisper_cpp_dir] = w
-    end
-    opts.on('-W', '--whisper-cpp-args <dir>',
-            "Additional whisper.cpp arguments (default: \"#{options[:whisper_cpp_args]}\")") do |w|
-      options[:whisper_cpp_args] += " #{w}"
-    end
-    opts.on('-y', '--youtube <true|false>',
-            "Additionally optimize for YouTube (default: #{options[:youtube]})") do |y|
-      options[:youtube] = y == 'true'
-    end
-    opts.on('-I', '--ios <true|false>',
-            "Additionally optimize for iOS video editors (default: #{options[:ios]})") do |i|
-      options[:ios] = i == 'true'
-    end
-  end
-
-  parser.parse!(args)
-
-  return unless options[:project_dir].nil?
-
-  print(parser.help)
-  exit 1
-end
-
 def checksum(filename)
   Digest::CRC32.file(filename).hexdigest
 end
@@ -727,6 +680,53 @@ def render(options, config_filename, video_durations, rerender = false)
   print("average words per second = #{words_per_second}\n")
 
   [output_filename, new_segments, new_video_durations]
+end
+
+def parse_options!(options, args)
+  parser = OptionParser.new do |opts|
+    opts.set_banner('Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]')
+    opts.set_summary_indent('  ')
+    opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
+    opts.on('-P', '--preview <true|false>',
+            "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
+      options[:preview] = p == 'true'
+    end
+    opts.on('-n', '--tmux-nvim <true|false>',
+            "Plain text video editing: open render.conf (during preview mode or when render.conf was just generated) in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
+      options[:tmux_nvim] = i == 'true'
+    end
+    opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f }
+    opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
+    opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}\")") do |v|
+      options[:video_filters] = v
+    end
+    opts.on('-c', '--cleanup <true|false>',
+            "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
+      options[:cleanup] = c == 'true'
+    end
+    opts.on('-w', '--whisper-cpp-dir <dir>', 'whisper.cpp directory') do |w|
+      options[:whisper_cpp_dir] = w
+    end
+    opts.on('-W', '--whisper-cpp-args <dir>',
+            "Additional whisper.cpp arguments (default: \"#{options[:whisper_cpp_args]}\")") do |w|
+      options[:whisper_cpp_args] += " #{w}"
+    end
+    opts.on('-y', '--youtube <true|false>',
+            "Additionally optimize for YouTube (default: #{options[:youtube]})") do |y|
+      options[:youtube] = y == 'true'
+    end
+    opts.on('-I', '--ios <true|false>',
+            "Additionally optimize for iOS video editors (default: #{options[:ios]})") do |i|
+      options[:ios] = i == 'true'
+    end
+  end
+
+  parser.parse!(args)
+
+  return unless options[:project_dir].nil?
+
+  print(parser.help)
+  exit 1
 end
 
 def main(argv)
