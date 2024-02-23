@@ -69,7 +69,7 @@ def parse_config(filename, options)
   end
 end
 
-def apply_delays(segments)
+def apply_delays(segments, video_durations)
   print("computing delays\n")
 
   delay_time = 1.0
@@ -90,17 +90,21 @@ def apply_delays(segments)
     .to_a
 
   video_filenames = segments_and_delays.map { |(seg, _)| seg[:video_filename] }.to_set
-  video_durations = # TODO: cache? drop cache if start/end changed
-    Parallel.map(video_filenames) do |i|
+  new_video_durations = video_durations.merge(
+    Parallel.map(video_filenames.reject { |i| video_durations.include?(i) }) do |i|
       [i, get_duration(i)]
     end.to_h
-  segments_and_delays.map do |(seg, delays)|
-    duration = video_durations[seg[:video_filename]]
+  )
+
+  new_segments = segments_and_delays.map do |(seg, delays)|
+    duration = new_video_durations[seg[:video_filename]]
     new_start_position = [seg[:start_position] - start_correction, 0.0].max
     new_end_position = [seg[:end_position] + delays * delay_time + end_correction, duration].min
     seg.merge(start_position: new_start_position)
     seg.merge(end_position: new_end_position)
   end
+
+  [new_segments, new_video_durations]
 end
 
 def in_segment?(position, segment)
@@ -595,7 +599,7 @@ def checksum(filename)
 end
 
 # TODO: rename?
-def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename)
+def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename, video_durations)
   print("run_mpv_loop\n")
   begin
     config_crc32 = checksum(config_filename)
@@ -633,7 +637,7 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
       end
 
       if rewritten_config
-        new_output_filename, new_segments = render(options, config_filename, rerender = true)
+        new_output_filename, new_segments = render(options, config_filename, video_durations, rerender = true)
         print("restarting player\n")
         mpv.quit!
         File.rename(new_output_filename, output_filename)
@@ -651,7 +655,7 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
   end
 end
 
-def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options)
+def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations)
   if config_in_nvim
     nvim = Neovim.attach_unix(nvim_socket)
     toggle_playback = ':let g:allow_playback = !g:allow_playback<Enter>'
@@ -684,12 +688,13 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
 
     break unless config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
 
-    restart_mpv, segments = run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename)
+    restart_mpv, segments = run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename,
+                                         video_durations)
     break unless restart_mpv
   end
 end
 
-def render(options, config_filename, rerender = false)
+def render(options, config_filename, video_durations, rerender = false)
   print("rendering\n")
   project_dir = options[:project_dir]
   output_postfix = options[:preview] ? '_preview' : ''
@@ -697,7 +702,8 @@ def render(options, config_filename, rerender = false)
   output_filename = File.join(project_dir, "output#{output_postfix}#{rerender_postfix}.mp4")
 
   min_pause_between_shots = 0.1 # FIXME: should be in options, but -P is already used?
-  segments = merge_small_pauses(apply_delays(parse_config(config_filename, options)), min_pause_between_shots)
+  segments, new_video_durations = apply_delays(parse_config(config_filename, options), video_durations)
+  new_segments = merge_small_pauses(segments, min_pause_between_shots)
 
   raise 'Empty video?' if segments.empty?
 
@@ -705,19 +711,19 @@ def render(options, config_filename, rerender = false)
   temp_dir = File.join(project_dir, 'tmp')
   FileUtils.mkdir_p [output_dir, temp_dir]
 
-  temp_videos = process_and_split_videos(segments, options, output_dir, temp_dir)
+  temp_videos = process_and_split_videos(new_segments, options, output_dir, temp_dir)
   concat_videos(temp_videos, output_filename)
 
-  words_per_second = segments.map do |seg|
+  words_per_second = new_segments.map do |seg|
     dt = seg[:end_position] - seg[:start_position]
     duration = dt / seg[:speed]
     seg[:words] / duration
-  end.sum / segments.length
+  end.sum / new_segments.length
 
   print("finished rendering\n")
   print("average words per second = #{words_per_second}\n")
 
-  [output_filename, segments]
+  [output_filename, new_segments, new_video_durations]
 end
 
 def main(argv)
@@ -761,10 +767,10 @@ def main(argv)
 
   Dir.chdir project_dir
 
-  output_filename, segments = render(options, config_filename)
+  output_filename, segments, video_durations = render(options, config_filename, video_durations = {})
 
   if options[:preview]
-    run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options)
+    run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations)
   else
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
