@@ -87,6 +87,7 @@ def synchronize_sound(camera_filename, sound_filename)
 end
 
 def process_sound(sync_sound_filename, segments)
+  # TODO: do second audio sync for individually cut fragments to avoid audio drift?
   audio_filters = [EXTRACT_LEFT_CHANNEL_FILTER]
 
   segments.each_with_index.map do |seg, subclip_num|

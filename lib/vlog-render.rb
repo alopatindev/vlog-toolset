@@ -220,6 +220,8 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
           ].join(',')
         end
 
+        # TODO: do second audio sync for individually cut fragments to avoid audio drift? best moment for that
+
         # might be uneeded step anymore,
         # but still might be useful for NLE video editors
         dt = seg[:end_position] - seg[:start_position]
