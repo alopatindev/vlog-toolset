@@ -220,6 +220,8 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
           ].join(',')
         end
 
+        # -filter_complex '[0:a]showvolume=rate=60:p=1,scale=1920/5:1080/36[vv];[0:v][vv]overlay=x=(W-w)/2:y=h/2[v]' -map '[v]' -map '0:a'
+
         # TODO: do second audio sync for individually cut fragments to avoid audio drift? best moment for that
 
         # might be uneeded step anymore,
@@ -637,9 +639,11 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     player_position = compute_player_position(options[:line_in_config], segments, options)
     print("player_position = #{player_position}\n")
 
+    amplitude_meter = '--lavfi-complex=[aid1]asplit[ao][a];[a]showvolume=rate=30:p=1:w=100:h=18:t=0:m=p:f=0:dm=0:dmc=yellow:v=0:ds=log:b=5:p=0.5:s=1,scale=iw/3:-1[vv];[vid1][vv]overlay=x=(W-w)/2:y=(H-h)*0.88[vo]'
+
     mpv_socket = File.join(options[:project_dir], 'mpv.sock')
     command = MPV_COMMAND + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
-                             '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', output_filename]
+                             '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130'] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
     system command.shelljoin_wrapped + ' &'
     sleep 0.5
 
