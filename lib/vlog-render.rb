@@ -434,7 +434,7 @@ def compute_player_position(line_in_config, segments, options)
 end
 
 def compute_line_in_config(player_position, segments, options)
-  player_position_spedup = player_position * clamp_speed(options[:speed]) # TODO: correct?
+  player_position_spedup = player_position * clamp_speed(options[:speed])
   position = 0.0
   for seg in segments
     dt = seg[:end_position] - seg[:start_position]
@@ -575,8 +575,39 @@ def checksum(filename)
   Digest::CRC32.file(filename).hexdigest
 end
 
+def update_mpv_playback(mpv, nvim, terminal_window_id, config_filename, rewritten_config, segments, options)
+  nvim_context = nvim.current
+  window = nvim_context.window
+  buffer = nvim_context.buffer
+
+  new_nvim_cursor_position = [compute_line_in_config(mpv.get_property('time-pos'), segments, options), 0]
+
+  unless get_current_window_id == terminal_window_id
+    is_playing = !mpv.get_property('pause')
+    nvim.command("let g:allow_playback = v:#{is_playing}")
+    window.cursor = new_nvim_cursor_position
+    return
+  end
+
+  allow_playback = nvim.eval('mode() == "n" && !&modified && empty(getbufinfo({"bufmodified": 1})) != 0 && g:allow_playback') == 1
+  if allow_playback
+    if !rewritten_config && buffer.get_name == config_filename
+      if mpv.get_property('pause')
+        mpv.command('seek', compute_player_position(buffer.line_number, segments, options), 'absolute')
+      else
+        window.cursor = new_nvim_cursor_position
+      end
+      mpv.set_property('pause', false)
+    end
+  else
+    mpv.set_property('pause', true)
+  end
+end
+
 # TODO: rename?
-def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename, video_durations)
+# TODO: refactor by introducing Preview class
+def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_filename, video_durations,
+                 terminal_window_id)
   print("run_mpv_loop\n")
   begin
     config_crc32 = checksum(config_filename)
@@ -590,7 +621,6 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
       break unless mpv.alive?
 
       rewritten_config = File.mtime(config_filename) != config_mtime && checksum(config_filename) != config_crc32
-      allow_playback = nvim.eval('mode() == "n" && !&modified && empty(getbufinfo({"bufmodified": 1})) != 0 && g:allow_playback') == 1
 
       # TODO: change some mpv property (or send message) when "space"/"p" is pressed in mpv and control "g:allow_playback" from mpv as well?
       #       key binding (via mpv lua scripting) that sends event + subscribe on event from ruby?
@@ -598,22 +628,8 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
       #       MPV::Client#callbacks
       #       mp.add_key_binding
 
-      nvim_context = nvim.current
-      window = nvim_context.window
-      buffer = nvim_context.buffer
-
-      if allow_playback
-        if !rewritten_config && buffer.get_name == config_filename
-          if mpv.get_property('pause')
-            mpv.command('seek', compute_player_position(buffer.line_number, segments, options), 'absolute')
-          else
-            window.cursor = [compute_line_in_config(mpv.get_property('time-pos'), segments, options), 0]
-          end
-          mpv.set_property('pause', false)
-        end
-      else
-        mpv.set_property('pause', true)
-      end
+      update_mpv_playback(mpv, nvim, terminal_window_id, config_filename, rewritten_config, segments,
+                          options)
 
       if rewritten_config
         new_output_filename, new_segments, new_video_durations = render(options, config_filename, video_durations,
@@ -644,7 +660,8 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
   [false, mpv_speed, [], {}]
 end
 
-def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations)
+def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations,
+                     terminal_window_id)
   mpv_socket = File.join(options[:project_dir], 'mpv.sock')
 
   if config_in_nvim
@@ -664,10 +681,6 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
 
   restart_mpv = true
   mpv_speed = 1.0
-
-  raise 'unsupported window system' unless ENV.include?('DISPLAY')
-
-  window_id = `xdotool getactivewindow`
 
   loop do
     if config_in_nvim
@@ -703,15 +716,12 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
 
     sleep 0.5
 
-    if restart_mpv
-      command = ['xdotool', 'windowfocus', window_id]
-      system command.shelljoin_wrapped
-    end
+    switch_to_window(terminal_window_id) if restart_mpv
 
     break unless config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
 
     restart_mpv, mpv_speed, segments, video_durations = run_mpv_loop(mpv_socket, nvim, segments, options,
-                                                                     config_filename, output_filename, video_durations)
+                                                                     config_filename, output_filename, video_durations, terminal_window_id)
     break if segments.empty?
   end
 end
@@ -802,7 +812,30 @@ def parse_options!(options, args)
   exit 1
 end
 
+def get_current_window_id
+  `xdotool getactivewindow`
+end
+
+def switch_to_window(window_id)
+  command = ['xdotool', 'windowfocus', window_id]
+  system command.shelljoin_wrapped
+end
+
+def verify_terminal(window_id)
+  command = "xdotool getwindowname #{window_id}"
+  window_name = `#{command}`.strip
+  # print("window_name='#{window_name}'")
+  return if window_name == command || window_name == 'wezterm'
+
+  raise "please run #{$PROGRAM_NAME} when its terminal window focused"
+end
+
 def main(argv)
+  raise 'unsupported window system' unless ENV.include?('DISPLAY')
+
+  terminal_window_id = get_current_window_id
+  verify_terminal(terminal_window_id)
+
   test_merge_small_pauses
   test_segments_overlap
 
@@ -851,7 +884,8 @@ def main(argv)
   output_filename, segments, video_durations = render(options, config_filename, video_durations = {})
 
   if options[:preview]
-    run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations)
+    run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations,
+                     terminal_window_id)
   else
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
