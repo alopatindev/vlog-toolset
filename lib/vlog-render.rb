@@ -675,18 +675,15 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     toggle_fullscreen = ":!echo '{\"command\": [\"cycle\", \"fullscreen\"]}'#{send_to_mpv}"
     quit_mpv = ":!echo '{\"command\": [\"quit\"]}'#{send_to_mpv}"
     pause_mpv = ":!echo '{\"command\": [\"set_property\", \"pause\", true]}'#{send_to_mpv}"
-
-    new_player_position = compute_player_position(buffer.line_number, segments, options)
-    update_mpv_position = "#{pause_mpv}:!echo '{\"command\": [\"seek\", #{new_player_position}, \"absolute\"]}'#{send_to_mpv}"
-    update_mpv_position_and_toggle_playback = "#{update_mpv_position}:let g:allow_playback = !g:allow_playback<Enter>"
+    pause_mpv_and_update_toggle_playback_flag = "#{pause_mpv}:let g:allow_playback = !g:allow_playback<Enter>"
 
     nvim.command("nnoremap f #{toggle_fullscreen}")
     nvim.command("nnoremap q #{quit_mpv}")
-    nvim.command("nnoremap <Esc> #{update_mpv_position_and_toggle_playback}")
-    nvim.command("nnoremap <Space> #{update_mpv_position_and_toggle_playback}")
+    nvim.command("nnoremap <Esc> #{pause_mpv_and_update_toggle_playback_flag}")
+    nvim.command("nnoremap <Space> #{pause_mpv_and_update_toggle_playback_flag}")
     nvim.command('let g:allow_playback = v:true')
     for i in 'hjkl'.each_char
-      nvim.command("nnoremap #{i} #{update_mpv_position}:let g:allow_playback = v:false<Enter>#{i}")
+      nvim.command("nnoremap #{i} #{pause_mpv}:let g:allow_playback = v:false<Enter>#{i}")
     end
   end
 
