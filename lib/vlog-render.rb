@@ -658,6 +658,11 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
 
   restart_mpv = true
   mpv_speed = 1.0
+
+  raise 'unsupported window system' unless ENV.include?('DISPLAY')
+
+  window_id = `xdotool getactivewindow`
+
   loop do
     if config_in_nvim
       buffer = nvim.current.buffer
@@ -677,11 +682,16 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
 
     if restart_mpv
       command = MPV_COMMAND + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
-                               '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', "--speed=#{mpv_speed}"] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
+                               '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--input-vo-keyboard=no', '--volume=130', "--speed=#{mpv_speed}"] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
       system command.shelljoin_wrapped + ' &'
     end
 
     sleep 0.5
+
+    if restart_mpv
+      command = ['xdotool', 'windowfocus', window_id]
+      system command.shelljoin_wrapped
+    end
 
     break unless config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
 

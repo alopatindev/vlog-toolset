@@ -6,7 +6,7 @@
 ADB_REPULL_COMMIT="f253e1a27be58a457ed02bb116788c43f9e37798"
 
 echo "Checking installed dependencies..."
-for i in ruby python3 pip3 ffmpeg sync-audio-tracks.sh arecord mpv adb; do
+for i in ruby python3 pip3 ffmpeg sync-audio-tracks.sh arecord mpv adb xdotool; do
     if ! [ -x "$(command -v $i)" ] ; then
         echo "Fail: $i was not found"
         exit 1
