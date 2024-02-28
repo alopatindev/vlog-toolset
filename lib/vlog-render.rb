@@ -672,11 +672,14 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     toggle_playback = ':let g:allow_playback = !g:allow_playback<Enter>'
 
     nvim = Neovim.attach_unix(nvim_socket)
-    nvim.command("nnoremap f <Esc>#{toggle_fullscreen}")
-    nvim.command("nnoremap q <Esc>#{quit_mpv}")
+    nvim.command("nnoremap f #{toggle_fullscreen}")
+    nvim.command("nnoremap q #{quit_mpv}")
     nvim.command("nnoremap <Esc> #{toggle_playback}")
     nvim.command("nnoremap <Space> #{toggle_playback}")
     nvim.command('let g:allow_playback = v:true')
+    for i in 'hjkl'.each_char
+      nvim.command("nnoremap #{i} :let g:allow_playback = v:false<Enter>#{i}")
+    end
   end
 
   restart_mpv = true
@@ -705,9 +708,9 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
         "--speed=#{mpv_speed}",
         '--volume=130',
         '--no-fs',
+        '--geometry=30%+0+0',
         '--title=vlog-preview',
         '--script-opts-append=osc-visibility=always',
-        '--geometry=30%+0+0',
         '--no-terminal'
       ] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
       system command.shelljoin_wrapped + ' &'
