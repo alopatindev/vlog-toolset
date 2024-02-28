@@ -591,6 +591,7 @@ def update_mpv_playback(mpv, nvim, terminal_window_id, config_filename, rewritte
     return
   end
 
+  # TODO: do all mpv commands from Neovim/vimscript (since some of them should be done from Neovim/vimscript unavoidably)?
   allow_playback = nvim.eval('mode() == "n" && !&modified && empty(getbufinfo({"bufmodified": 1})) != 0 && g:allow_playback') == 1
   if allow_playback
     if !rewritten_config && buffer.get_name == config_filename
