@@ -35,6 +35,8 @@ require 'parallel'
 CONFIG_FILENAME = 'render.conf'
 RENDER_DEFAULT_SPEED = '1.00'
 
+AMPLITUDE_METER = '--lavfi-complex=[aid1]asplit[ao][a];[a]showvolume=rate=30:p=1:w=100:h=18:t=0:m=p:f=0:dm=0:dmc=yellow:v=0:ds=log:b=5:p=0.5:s=1,scale=iw/3:-1[vv];[vid1][vv]overlay=x=(W-w)/2:y=(H-h)*0.88[vo]'
+
 def parse_config(filename, options)
   File.open filename do |f|
     f.map
@@ -672,9 +674,10 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     send_to_mpv = "\\| socat - #{mpv_socket} >> /dev/null<Enter><Enter>"
     toggle_fullscreen = ":!echo '{\"command\": [\"cycle\", \"fullscreen\"]}'#{send_to_mpv}"
     quit_mpv = ":!echo '{\"command\": [\"quit\"]}'#{send_to_mpv}"
+    pause_mpv = ":!echo '{\"command\": [\"set_property\", \"pause\", true]}'#{send_to_mpv}"
 
     new_player_position = compute_player_position(buffer.line_number, segments, options)
-    update_mpv_position = ":!echo '{\"command\": [\"seek\", #{new_player_position}, \"absolute\"]}'#{send_to_mpv}"
+    update_mpv_position = "#{pause_mpv}:!echo '{\"command\": [\"seek\", #{new_player_position}, \"absolute\"]}'#{send_to_mpv}"
     update_mpv_position_and_toggle_playback = "#{update_mpv_position}:let g:allow_playback = !g:allow_playback<Enter>"
 
     nvim.command("nnoremap f #{toggle_fullscreen}")
@@ -701,8 +704,6 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     player_position = compute_player_position(options[:line_in_config], segments, options)
     print("player_position = #{player_position}\n")
 
-    amplitude_meter = '--lavfi-complex=[aid1]asplit[ao][a];[a]showvolume=rate=30:p=1:w=100:h=18:t=0:m=p:f=0:dm=0:dmc=yellow:v=0:ds=log:b=5:p=0.5:s=1,scale=iw/3:-1[vv];[vid1][vv]overlay=x=(W-w)/2:y=(H-h)*0.88[vo]'
-
     if restart_mpv
       command = MPV_COMMAND + [
         '--pause',
@@ -715,7 +716,7 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
         '--title=vlog-preview',
         '--script-opts-append=osc-visibility=always',
         '--no-terminal'
-      ] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
+      ] + (options[:preview] ? [AMPLITUDE_METER] : []) + [output_filename]
       system command.shelljoin_wrapped + ' &'
     end
 
