@@ -24,6 +24,7 @@ Two possible pipelines:
 - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
 - alsa-utils (tested with 1.2.9)
 - xdotool (tested with 3.20211022.1)
+- socat (tested with 1.7.4.4)
 - mpv (tested with 0.36.0)
 - whisper.cpp (tested with `641f2f4`)
     - build for

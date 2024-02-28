@@ -645,9 +645,12 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
 end
 
 def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations)
+  mpv_socket = File.join(options[:project_dir], 'mpv.sock')
+
   if config_in_nvim
     nvim = Neovim.attach_unix(nvim_socket)
     toggle_playback = ':let g:allow_playback = !g:allow_playback<Enter>'
+    nvim.command("nnoremap q <Esc>:!echo '{ \"command\": [\"quit\"] }' \\| socat - #{mpv_socket} >> /dev/null<Enter><Enter>")
     nvim.command("nnoremap <Esc> #{toggle_playback}")
     nvim.command("nnoremap <Space> #{toggle_playback}")
     nvim.command("nnoremap <A-p> #{toggle_playback}")
@@ -677,8 +680,6 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     print("player_position = #{player_position}\n")
 
     amplitude_meter = '--lavfi-complex=[aid1]asplit[ao][a];[a]showvolume=rate=30:p=1:w=100:h=18:t=0:m=p:f=0:dm=0:dmc=yellow:v=0:ds=log:b=5:p=0.5:s=1,scale=iw/3:-1[vv];[vid1][vv]overlay=x=(W-w)/2:y=(H-h)*0.88[vo]'
-
-    mpv_socket = File.join(options[:project_dir], 'mpv.sock')
 
     if restart_mpv
       command = MPV_COMMAND + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
