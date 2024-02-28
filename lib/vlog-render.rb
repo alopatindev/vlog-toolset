@@ -184,9 +184,12 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
   fps = options[:fps]
   preview = options[:preview]
 
+  processed_segments = 0
+  processed_segments_mutex = Mutex.new
+
   media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
-  temp_videos = segments.map.with_index do |seg, index|
+  temp_videos = segments.map do |seg|
     # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
     ext = '.mp4'
     line_in_config = seg[:line_in_config]
@@ -255,9 +258,13 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
         ]
         system command.shelljoin_wrapped
 
-        print("#{basename} (#{index + 1}/#{segments.length})\n")
-
         FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
+
+        processed_segments_value = processed_segments_mutex.synchronize do
+          processed_segments += 1
+          processed_segments
+        end
+        print("#{basename} (#{processed_segments_value}/#{segments.length})\n")
       rescue StandardError => e
         print("exception for segment #{seg}: #{e} #{e.backtrace}\n")
       end
@@ -620,7 +627,7 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
     puts e
     print("closing player due to error\n")
     mpv_speed = 1.0
-    mpv.quit!
+    mpv.quit! unless mpv.nil?
   end
   [false, mpv_speed, [], {}]
 end
