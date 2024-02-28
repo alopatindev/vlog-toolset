@@ -667,10 +667,9 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     nvim = Neovim.attach_unix(nvim_socket)
     buffer = nvim.current.buffer
 
-    send_to_mpv = "\\| socat - #{mpv_socket} >> /dev/null<Enter><Enter>"
-    toggle_fullscreen = ":!echo '{\"command\": [\"cycle\", \"fullscreen\"]}'#{send_to_mpv}"
-    quit_mpv = ":!echo '{\"command\": [\"quit\"]}'#{send_to_mpv}"
-    pause_mpv = ":!echo '{\"command\": [\"set_property\", \"pause\", true]}'#{send_to_mpv}"
+    toggle_fullscreen = prepare_mpv_command(%w[cycle fullscreen], mpv_socket)
+    quit_mpv = prepare_mpv_command(['quit'], mpv_socket)
+    pause_mpv = prepare_mpv_command(['set_property', 'pause', true], mpv_socket)
     pause_mpv_and_update_toggle_playback_flag = "#{pause_mpv}:let g:allow_playback = !g:allow_playback<Enter>"
 
     nvim.command("nnoremap f #{toggle_fullscreen}")
@@ -723,6 +722,12 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
                                                                      config_filename, output_filename, video_durations, terminal_window_id)
     break if segments.empty?
   end
+end
+
+def prepare_mpv_command(command, mpv_socket)
+  send_to_mpv = "\\| socat - #{mpv_socket} >> /dev/null<Enter><Enter>"
+  json = { "command": command }.to_json
+  ":!echo '#{json}'#{send_to_mpv}"
 end
 
 def render(options, config_filename, video_durations, rerender = false)
