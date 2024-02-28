@@ -708,7 +708,6 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
         '--title=vlog-preview',
         '--script-opts-append=osc-visibility=always',
         '--geometry=30%+0+0',
-        '--input-vo-keyboard=no',
         '--no-terminal'
       ] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
       system command.shelljoin_wrapped + ' &'
