@@ -648,9 +648,11 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
   mpv_socket = File.join(options[:project_dir], 'mpv.sock')
 
   if config_in_nvim
-    nvim = Neovim.attach_unix(nvim_socket)
+    quit_mpv = ":!echo '{ \"command\": [\"quit\"] }' \\| socat - #{mpv_socket} >> /dev/null<Enter><Enter>"
     toggle_playback = ':let g:allow_playback = !g:allow_playback<Enter>'
-    nvim.command("nnoremap q <Esc>:!echo '{ \"command\": [\"quit\"] }' \\| socat - #{mpv_socket} >> /dev/null<Enter><Enter>")
+
+    nvim = Neovim.attach_unix(nvim_socket)
+    nvim.command("nnoremap q <Esc>#{quit_mpv}")
     nvim.command("nnoremap <Esc> #{toggle_playback}")
     nvim.command("nnoremap <Space> #{toggle_playback}")
     nvim.command("nnoremap <A-p> #{toggle_playback}")
