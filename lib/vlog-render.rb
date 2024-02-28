@@ -648,16 +648,17 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
   mpv_socket = File.join(options[:project_dir], 'mpv.sock')
 
   if config_in_nvim
-    quit_mpv = ":!echo '{ \"command\": [\"quit\"] }' \\| socat - #{mpv_socket} >> /dev/null<Enter><Enter>"
+    send_to_mpv = "\\| socat - #{mpv_socket} >> /dev/null<Enter><Enter>"
+    toggle_fullscreen = ":!echo '{\"command\": [\"cycle\", \"fullscreen\"]}'#{send_to_mpv}"
+    quit_mpv = ":!echo '{ \"command\": [\"quit\"] }'#{send_to_mpv}"
+
     toggle_playback = ':let g:allow_playback = !g:allow_playback<Enter>'
 
     nvim = Neovim.attach_unix(nvim_socket)
+    nvim.command("nnoremap f <Esc>#{toggle_fullscreen}")
     nvim.command("nnoremap q <Esc>#{quit_mpv}")
     nvim.command("nnoremap <Esc> #{toggle_playback}")
     nvim.command("nnoremap <Space> #{toggle_playback}")
-    nvim.command("nnoremap <A-p> #{toggle_playback}")
-    nvim.command("inoremap <A-p> #{toggle_playback}")
-    nvim.command("vnoremap <A-p> #{toggle_playback}")
     nvim.command('let g:allow_playback = v:true')
   end
 
@@ -684,8 +685,19 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     amplitude_meter = '--lavfi-complex=[aid1]asplit[ao][a];[a]showvolume=rate=30:p=1:w=100:h=18:t=0:m=p:f=0:dm=0:dmc=yellow:v=0:ds=log:b=5:p=0.5:s=1,scale=iw/3:-1[vv];[vid1][vv]overlay=x=(W-w)/2:y=(H-h)*0.88[vo]'
 
     if restart_mpv
-      command = MPV_COMMAND + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
-                               '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--input-vo-keyboard=no', '--volume=130', "--speed=#{mpv_speed}"] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
+      command = MPV_COMMAND + [
+        '--pause',
+        "--start=#{player_position}",
+        "--input-ipc-server=#{mpv_socket}",
+        "--speed=#{mpv_speed}",
+        '--volume=130',
+        '--no-fs',
+        '--title=vlog-preview',
+        '--script-opts-append=osc-visibility=always',
+        '--geometry=30%+0+0',
+        '--input-vo-keyboard=no',
+        '--no-terminal'
+      ] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
       system command.shelljoin_wrapped + ' &'
     end
 
