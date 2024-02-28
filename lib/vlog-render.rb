@@ -624,12 +624,6 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
 
       rewritten_config = File.mtime(config_filename) != config_mtime && checksum(config_filename) != config_crc32
 
-      # TODO: change some mpv property (or send message) when "space"/"p" is pressed in mpv and control "g:allow_playback" from mpv as well?
-      #       key binding (via mpv lua scripting) that sends event + subscribe on event from ruby?
-      #       mp.register_event
-      #       MPV::Client#callbacks
-      #       mp.add_key_binding
-
       update_mpv_playback(mpv, nvim, terminal_window_id, config_filename, rewritten_config, segments,
                           options)
 
@@ -638,17 +632,19 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
                                                                         rerender = true)
         new_mpv_speed = mpv.get_property('speed')
         print("mpv speed was #{new_mpv_speed}\n")
-        if checksum(new_output_filename) == output_crc32
-          print("no changes in the rendered output, skipping\n")
-          FileUtils.rm_f new_output_filename
-          nvim.command('let g:allow_playback = v:true')
-          return [false, new_mpv_speed, new_segments, new_video_durations]
-        else
-          print("restarting player\n")
-          mpv.quit!
-          File.rename(new_output_filename, output_filename)
-          return [true, new_mpv_speed, new_segments, new_video_durations]
-        end
+        restart_mpv =
+          if checksum(new_output_filename) == output_crc32
+            print("no changes in the rendered output, skipping\n")
+            FileUtils.rm_f new_output_filename
+            nvim.command('let g:allow_playback = v:true')
+            false
+          else
+            print("restarting player\n")
+            mpv.quit!
+            File.rename(new_output_filename, output_filename)
+            true
+          end
+        return [restart_mpv, new_mpv_speed, new_segments, new_video_durations]
       else
         sleep 0.1
       end
