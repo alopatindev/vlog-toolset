@@ -264,7 +264,7 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
           processed_segments += 1
           processed_segments
         end
-        print("#{basename} (#{processed_segments_value}/#{segments.length})\n")
+        print("#{basename} (#{((processed_segments_value / segments.length) * 100.0).round(1)}%})\n")
       rescue StandardError => e
         print("exception for segment #{seg}: #{e} #{e.backtrace}\n")
       end
@@ -275,6 +275,17 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
 
   media_thread_pool.shutdown
   media_thread_pool.wait_for_termination
+
+  unless preview
+    outdated_temp_files = (Dir.glob("#{output_dir}#{File::SEPARATOR}0*.mp4").to_set - temp_videos.to_set).to_a
+    print("#{outdated_temp_files.length} outdated_temp_files: #{outdated_temp_files}\n")
+    if options[:cleanup]
+      print("removing them\n")
+      FileUtils.rm_f outdated_temp_files
+    else
+      print("skipping removal\n")
+    end
+  end
 
   temp_videos
 end
