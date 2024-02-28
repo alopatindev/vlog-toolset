@@ -597,10 +597,13 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
       if rewritten_config
         new_output_filename, new_segments, new_video_durations = render(options, config_filename, video_durations,
                                                                         rerender = true)
+        # TODO: if new output filename check sum is thesame - don't restart mpv; instead remove the new file and write to log
+        mpv_speed = mpv.get_property('speed')
+        print("mpv speed was #{mpv_speed}\n")
         print("restarting player\n")
         mpv.quit!
         File.rename(new_output_filename, output_filename)
-        return [true, new_segments, new_video_durations]
+        return [true, mpv_speed, new_segments, new_video_durations]
       else
         sleep 0.1
       end
@@ -609,8 +612,9 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
     puts e
   ensure
     print("closing player\n")
+    mpv_speed = 1.0
     mpv.quit!
-    [false, [], {}]
+    [false, mpv_speed, [], {}]
   end
 end
 
@@ -626,6 +630,7 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     nvim.command('let g:allow_playback = v:true')
   end
 
+  mpv_speed = 1.0
   loop do
     if config_in_nvim
       buffer = nvim.current.buffer
@@ -643,14 +648,14 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
 
     mpv_socket = File.join(options[:project_dir], 'mpv.sock')
     command = MPV_COMMAND + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
-                             '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130'] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
+                             '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', "--speed=#{mpv_speed}"] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
     system command.shelljoin_wrapped + ' &'
     sleep 0.5
 
     break unless config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
 
-    restart_mpv, segments, new_video_durations = run_mpv_loop(mpv_socket, nvim, segments, options, config_filename,
-                                                              output_filename, video_durations)
+    restart_mpv, mpv_speed, segments, new_video_durations = run_mpv_loop(mpv_socket, nvim, segments, options, config_filename,
+                                                                         output_filename, video_durations)
     video_durations = new_video_durations
     break unless restart_mpv
   end
