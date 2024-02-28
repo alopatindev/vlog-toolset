@@ -789,7 +789,7 @@ def main(argv)
 
   config_in_nvim = (!old_config || options[:preview]) && options[:tmux_nvim] && tmux_is_active && File.file?('/usr/bin/nvim')
   if config_in_nvim && !File.socket?(nvim_socket)
-    command = ['tmux', 'split-window', '-l', '30', '-v', "nvim --listen #{nvim_socket} #{config_filename}"]
+    command = ['tmux', 'split-window', '-b', '-l', '30', '-v', "nvim --listen #{nvim_socket} #{config_filename}"]
     system(command.shelljoin_wrapped)
   end
 
