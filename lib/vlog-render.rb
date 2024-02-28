@@ -563,6 +563,8 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
     config_crc32 = checksum(config_filename)
     config_mtime = File.mtime(config_filename)
 
+    output_crc32 = File.exist?(output_filename) ? checksum(output_filename) : ''
+
     mpv = MPV::Client.new(mpv_socket)
 
     loop do
@@ -597,25 +599,30 @@ def run_mpv_loop(mpv_socket, nvim, segments, options, config_filename, output_fi
       if rewritten_config
         new_output_filename, new_segments, new_video_durations = render(options, config_filename, video_durations,
                                                                         rerender = true)
-        # TODO: if new output filename check sum is thesame - don't restart mpv; instead remove the new file and write to log
-        mpv_speed = mpv.get_property('speed')
-        print("mpv speed was #{mpv_speed}\n")
-        print("restarting player\n")
-        mpv.quit!
-        File.rename(new_output_filename, output_filename)
-        return [true, mpv_speed, new_segments, new_video_durations]
+        new_mpv_speed = mpv.get_property('speed')
+        print("mpv speed was #{new_mpv_speed}\n")
+        if checksum(new_output_filename) == output_crc32
+          print("no changes in the rendered output, skipping\n")
+          FileUtils.rm_f new_output_filename
+          nvim.command('let g:allow_playback = v:true')
+          return [false, new_mpv_speed, new_segments, new_video_durations]
+        else
+          print("restarting player\n")
+          mpv.quit!
+          File.rename(new_output_filename, output_filename)
+          return [true, new_mpv_speed, new_segments, new_video_durations]
+        end
       else
         sleep 0.1
       end
     end
   rescue StandardError => e
     puts e
-  ensure
-    print("closing player\n")
+    print("closing player due to error\n")
     mpv_speed = 1.0
     mpv.quit!
-    [false, mpv_speed, [], {}]
   end
+  [false, mpv_speed, [], {}]
 end
 
 def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations)
@@ -630,6 +637,7 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     nvim.command('let g:allow_playback = v:true')
   end
 
+  restart_mpv = true
   mpv_speed = 1.0
   loop do
     if config_in_nvim
@@ -647,17 +655,20 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
     amplitude_meter = '--lavfi-complex=[aid1]asplit[ao][a];[a]showvolume=rate=30:p=1:w=100:h=18:t=0:m=p:f=0:dm=0:dmc=yellow:v=0:ds=log:b=5:p=0.5:s=1,scale=iw/3:-1[vv];[vid1][vv]overlay=x=(W-w)/2:y=(H-h)*0.88[vo]'
 
     mpv_socket = File.join(options[:project_dir], 'mpv.sock')
-    command = MPV_COMMAND + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
-                             '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', "--speed=#{mpv_speed}"] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
-    system command.shelljoin_wrapped + ' &'
+
+    if restart_mpv
+      command = MPV_COMMAND + ["--start=#{player_position}", "--input-ipc-server=#{mpv_socket}", '--no-fs', '--title=vlog-preview',
+                               '--script-opts-append=osc-visibility=always', '--geometry=30%+0+0', '--volume=130', "--speed=#{mpv_speed}"] + (options[:preview] ? [amplitude_meter] : []) + [output_filename]
+      system command.shelljoin_wrapped + ' &'
+    end
+
     sleep 0.5
 
     break unless config_in_nvim && File.socket?(nvim_socket) && File.socket?(mpv_socket)
 
-    restart_mpv, mpv_speed, segments, new_video_durations = run_mpv_loop(mpv_socket, nvim, segments, options, config_filename,
-                                                                         output_filename, video_durations)
-    video_durations = new_video_durations
-    break unless restart_mpv
+    restart_mpv, mpv_speed, segments, video_durations = run_mpv_loop(mpv_socket, nvim, segments, options,
+                                                                     config_filename, output_filename, video_durations)
+    break if segments.empty?
   end
 end
 
