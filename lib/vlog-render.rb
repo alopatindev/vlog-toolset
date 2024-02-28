@@ -664,30 +664,33 @@ def run_preview_loop(config_filename, output_filename, config_in_nvim, nvim_sock
                      terminal_window_id)
   mpv_socket = File.join(options[:project_dir], 'mpv.sock')
 
+  nvim = nil
   if config_in_nvim
+    nvim = Neovim.attach_unix(nvim_socket)
+    buffer = nvim.current.buffer
+
     send_to_mpv = "\\| socat - #{mpv_socket} >> /dev/null<Enter><Enter>"
     toggle_fullscreen = ":!echo '{\"command\": [\"cycle\", \"fullscreen\"]}'#{send_to_mpv}"
-    quit_mpv = ":!echo '{ \"command\": [\"quit\"] }'#{send_to_mpv}"
+    quit_mpv = ":!echo '{\"command\": [\"quit\"]}'#{send_to_mpv}"
 
-    toggle_playback = ':let g:allow_playback = !g:allow_playback<Enter>'
+    new_player_position = compute_player_position(buffer.line_number, segments, options)
+    update_mpv_position = ":!echo '{\"command\": [\"seek\", #{new_player_position}, \"absolute\"]}'#{send_to_mpv}"
+    update_mpv_position_and_toggle_playback = "#{update_mpv_position}:let g:allow_playback = !g:allow_playback<Enter>"
 
-    nvim = Neovim.attach_unix(nvim_socket)
     nvim.command("nnoremap f #{toggle_fullscreen}")
     nvim.command("nnoremap q #{quit_mpv}")
-    nvim.command("nnoremap <Esc> #{toggle_playback}")
-    nvim.command("nnoremap <Space> #{toggle_playback}")
+    nvim.command("nnoremap <Esc> #{update_mpv_position_and_toggle_playback}")
+    nvim.command("nnoremap <Space> #{update_mpv_position_and_toggle_playback}")
     nvim.command('let g:allow_playback = v:true')
     for i in 'hjkl'.each_char
-      nvim.command("nnoremap #{i} :let g:allow_playback = v:false<Enter>#{i}")
+      nvim.command("nnoremap #{i} #{update_mpv_position}:let g:allow_playback = v:false<Enter>#{i}")
     end
   end
 
   restart_mpv = true
   mpv_speed = 1.0
-
   loop do
     if config_in_nvim
-      buffer = nvim.current.buffer
       line_in_config = buffer.line_number
       if buffer.get_name == config_filename
         print("current nvim line is #{line_in_config}\n")
