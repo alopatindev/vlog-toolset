@@ -264,7 +264,8 @@ def process_and_split_videos(segments, options, output_dir, temp_dir)
           processed_segments += 1
           processed_segments
         end
-        print("#{basename} (#{((processed_segments_value / segments.length) * 100.0).round(1)}%})\n")
+        progress = ((processed_segments_value.to_f / segments.length.to_f) * 100.0).round(1)
+        print("#{basename} (#{progress}%)\n")
       rescue StandardError => e
         print("exception for segment #{seg}: #{e} #{e.backtrace}\n")
       end

@@ -33,8 +33,6 @@ require 'optparse'
 # TODO: `mpv -v av://v4l2:/dev/video0` says "[ffmpeg/demuxer] video4linux2,v4l2: The V4L2 driver changed the video from 1920x1080 to 640x480"
 # possible solution "driver=v4l2:width=720:height=576:norm=PAL:outfmt=uyvy"
 
-# TODO: don't remove any medias with very-very long duration if something's failed?
-
 # TODO: rename
 class DevicesController
   MIN_SILENCE_SIZE = 10.0
