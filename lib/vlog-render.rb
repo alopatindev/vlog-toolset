@@ -37,407 +37,6 @@ RENDER_DEFAULT_SPEED = '1.00'
 
 AMPLITUDE_METER = '--lavfi-complex=[aid1]asplit[ao][a];[a]showvolume=rate=30:p=1:w=100:h=18:t=0:m=p:f=0:dm=0:dmc=yellow:v=0:ds=log:b=5:p=0.5:s=1,scale=iw/3:-1[vv];[vid1][vv]overlay=x=(W-w)/2:y=(H-h)*0.88[vo]'
 
-def parse_config(filename, options)
-  File.open filename do |f|
-    f.map
-     .with_index { |line, index| [line, index + 1] }
-     .reject { |line, _line_in_config| line.start_with?('#') || line.strip.empty? }
-     .map { |line, line_in_config| [line.split("\t"), line_in_config] }
-     .map do |cols, line_in_config|
-      if cols[0] == "\n" then { line_in_config: line_in_config, empty: true }
-      else
-        video_filename, speed, start_position, end_position, text = cols
-        text = text.sub(/#.*$/, '')
-        words = text.split(' ').length
-
-        final_speed = clamp_speed(speed.to_f * options[:speed])
-        min_speed = 1.0 # FIXME: set min speed to 44.1/48?
-        if final_speed < min_speed
-          print("segment #{video_filename} has speed #{final_speed} < 1; forcing speed #{min_speed}\n")
-          final_speed = min_speed
-        end
-
-        {
-          line_in_config: line_in_config,
-          video_filename: video_filename,
-          speed: final_speed,
-          start_position: start_position.to_f,
-          end_position: end_position.to_f,
-          words: words,
-          empty: false
-        }
-      end
-    end
-  end
-end
-
-def in_segment?(position, segment)
-  (segment[:start_position]..segment[:end_position]).cover? position
-end
-
-def segments_overlap?(a, b)
-  in_segment?(a[:start_position], b) || in_segment?(a[:end_position], b)
-end
-
-def merge_small_pauses(segments, min_pause_between_shots)
-  segments.inject([]) do |acc, seg|
-    if acc.empty?
-      acc.append(seg.clone)
-    else
-      prev = acc.last
-      dt = seg[:start_position] - prev[:end_position]
-      has_overlap = segments_overlap?(seg, prev)
-      is_successor = (seg[:video_filename] == prev[:video_filename]) && (dt < min_pause_between_shots || has_overlap)
-      if is_successor
-        prev[:start_position] = [seg[:start_position], prev[:start_position]].min
-        prev[:start_position] = 0.0 if prev[:start_position] < 0.2
-        prev[:end_position] = [seg[:end_position], prev[:end_position]].max
-        prev[:speed] = [seg[:speed], prev[:speed]].max
-      else
-        acc.append(seg.clone)
-      end
-      acc
-    end
-  end
-end
-
-def rotation_filter(basename)
-  rotation = basename.split('_')[2]
-  rotation =
-    if rotation.nil?
-      Phone::LANDSCAPE_FRONT_CAMERA_ON_LEFT
-    else
-      rotation.split('.')[0].to_i
-    end
-  if rotation == Phone::PORTRAIT
-    'transpose=dir=cclock'
-  elsif rotation == Phone::REVERSED_PORTRAIT
-    'transpose=dir=clock'
-  elsif rotation == Phone::LANDSCAPE_FRONT_CAMERA_ON_LEFT
-    ''
-  elsif rotation == Phone::LANDSCAPE_FRONT_CAMERA_ON_RIGHT
-    'transpose=dir=clock,transpose=dir=clock'
-  else
-    raise 'unexpected rotation'
-  end
-end
-
-def remove_file_if_empty(filename)
-  return unless File.exist?(filename) && File.size(filename) == 0
-
-  File.delete(filename)
-end
-
-def optimize_for_youtube(output_filename, options, temp_dir)
-  output_basename_no_ext = "#{File.basename(output_filename,
-                                            File.extname(output_filename))}.CFR_#{options[:fps]}FPS.youtube"
-  temp_youtube_flac_h264_filename = File.join(temp_dir, "#{output_basename_no_ext}.flac.h264.mp4")
-  temp_youtube_opus_filename = File.join(temp_dir, "#{output_basename_no_ext}.opus")
-  temp_youtube_wav_filename = File.join(temp_dir, "#{output_basename_no_ext}.wav")
-  output_youtube_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mp4")
-
-  video_codec =
-    if nvenc_supported?('h264_nvenc')
-      'h264_nvenc -preset slow -cq 18'
-    else
-      'libx264 -preset ultrafast -crf 18'
-    end
-
-  print("reencoding for YouTube\n")
-  command =
-    FFMPEG + [
-      '-threads', Concurrent.processor_count,
-      '-fflags', '+genpts+igndts',
-      '-i', output_filename,
-      '-vsync', 'cfr',
-      '-af', 'aresample=async=1,asetpts=PTS-STARTPTS',
-      '-vcodec', video_codec,
-      '-acodec', 'flac',
-      '-pix_fmt', 'yuv420p',
-      '-movflags', 'faststart',
-      '-strict', '-2',
-      temp_youtube_flac_h264_filename
-    ]
-  system command.shelljoin_wrapped
-
-  command = FFMPEG + [
-    '-i', temp_youtube_flac_h264_filename,
-    temp_youtube_wav_filename
-  ]
-  system command.shelljoin_wrapped
-
-  print("encoding to opus\n")
-  system [
-    'opusenc',
-    '--quiet',
-    '--bitrate', 510,
-    temp_youtube_wav_filename,
-    temp_youtube_opus_filename
-  ].shelljoin_wrapped
-
-  print("producing YouTube output\n")
-  command = FFMPEG + [
-    '-an',
-    '-i', temp_youtube_flac_h264_filename,
-    '-i', temp_youtube_opus_filename,
-    '-c', 'copy',
-    '-strict', '-2',
-    output_youtube_filename
-  ]
-  system command.shelljoin_wrapped
-
-  if options[:cleanup]
-    FileUtils.rm_f [temp_youtube_flac_h264_filename, temp_youtube_wav_filename,
-                    temp_youtube_opus_filename]
-  end
-
-  verify_constant_framerate(output_youtube_filename, options)
-  output_youtube_filename
-end
-
-def verify_constant_framerate(filename, _options)
-  framerate = get_framerate(filename)
-  raise "Unexpected framerate mode #{framerate[:mode]} for #{filename}" unless framerate[:mode] == 'CFR'
-end
-
-def optimize_for_ios(output_filename, options)
-  output_basename_no_ext = "#{File.basename(output_filename,
-                                            File.extname(output_filename))}.CFR_#{options[:fps].to_f.pretty_fps}FPS.iOS"
-  output_ios_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mov")
-
-  video_codec =
-    if nvenc_supported?('h264_nvenc')
-      'h264_nvenc -preset slow -cq 18' # TODO: extract
-    else
-      'libx264 -preset ultrafast -crf 18'
-    end
-
-  print("reencoding for iOS video editors\n")
-  command =
-    FFMPEG + [
-      '-threads', Concurrent.processor_count,
-      '-fflags', '+genpts+igndts',
-      '-i', output_filename,
-      '-vsync', 'cfr',
-      '-af', 'aresample=async=1,asetpts=PTS-STARTPTS',
-      '-vcodec', video_codec,
-      '-acodec', 'alac',
-      '-pix_fmt', 'yuv420p',
-      '-movflags', 'faststart',
-      '-strict', '-2',
-      output_ios_filename
-    ]
-  system command.shelljoin_wrapped
-
-  verify_constant_framerate(output_ios_filename, options)
-  output_ios_filename
-end
-
-def nvidia_cuda_ready?
-  if (find_executable 'nvcc').nil?
-    print("nvidia-cuda-toolkit is not installed\n")
-    false
-  elsif !File.exist?('/dev/nvidia0')
-    print("nvidia module is not loaded\n")
-    false
-  else
-    true
-  end
-end
-
-def nvenc_supported?(encoder)
-  command = FFMPEG + ['--help', "encoder=#{encoder}"]
-  if `#{command.shelljoin_wrapped}`.include?('is not recognized')
-    print("ffmpeg was built without #{encoder} support\n")
-    false
-  else
-    nvidia_cuda_ready?
-  end
-end
-
-# FIXME: move tests to some proper place
-def test_segments_overlap
-  raise unless segments_overlap?({ start_position: 0.0, end_position: 5.0 }, start_position: 4.0, end_position: 6.0)
-  raise unless segments_overlap?({ start_position: 0.0, end_position: 5.0 }, start_position: 5.0, end_position: 6.0)
-  raise if segments_overlap?({ start_position: 0.0, end_position: 5.0 }, start_position: 6.0, end_position: 7.0)
-
-  raise unless segments_overlap?({ start_position: 4.0, end_position: 6.0 }, start_position: 0.0, end_position: 5.0)
-  raise unless segments_overlap?({ start_position: 5.0, end_position: 6.0 }, start_position: 0.0, end_position: 5.0)
-  raise if segments_overlap?({ start_position: 6.0, end_position: 7.0 }, start_position: 0.0, end_position: 5.0)
-end
-
-def test_merge_small_pauses
-  min_pause_between_shots = 2.0
-
-  segments = [
-    { line_in_config: 0, video_filename: 'a.mp4', start_position: 0.0, end_position: 5.0, speed: 1.0 },
-    { line_in_config: 1, video_filename: 'a.mp4', start_position: 5.5, end_position: 10.0, speed: 1.5 },
-    { line_in_config: 2, video_filename: 'b.mp4', start_position: 1.0, end_position: 3.0, speed: 1.0 },
-    { line_in_config: 3, video_filename: 'b.mp4', start_position: 10.0, end_position: 20.0, speed: 1.0 },
-    { line_in_config: 3, video_filename: 'b.mp4', start_position: 19.0, end_position: 22.0, speed: 1.8 },
-    { line_in_config: 4, video_filename: 'b.mp4', start_position: 6.0, end_position: 8.0, speed: 1.0 },
-    { line_in_config: 4, video_filename: 'b.mp4', start_position: 3.0, end_position: 7.0, speed: 1.0 }
-  ]
-
-  expected = [
-    { line_in_config: 0, video_filename: 'a.mp4', start_position: 0.0, end_position: 10.0, speed: 1.5 },
-    { line_in_config: 2, video_filename: 'b.mp4', start_position: 1.0, end_position: 3.0, speed: 1.0 },
-    { line_in_config: 3, video_filename: 'b.mp4', start_position: 3.0, end_position: 22.0, speed: 1.8 }
-  ]
-
-  result = merge_small_pauses(segments, min_pause_between_shots)
-  raise unless result == expected
-end
-
-def generate_config(options)
-  banlist = File.readlines('banlist.txt', chomp: true).map { |i| Regexp.new(i) }
-  app_version = `git rev-parse HEAD`[..6]
-  render_conf_filename = File.join(options[:project_dir], CONFIG_FILENAME)
-  exists = File.exist?(render_conf_filename)
-  File.open(render_conf_filename, exists ? 'r+' : 'w') do |render_conf_file|
-    video_filenames = Dir.glob("#{options[:project_dir]}#{File::SEPARATOR}0*.mp4").sort
-    if exists
-      # skip all clips listed in the config (including commented ones),
-      # don't write already removed subclips
-      last_line = render_conf_file.readlines.last
-      first_column = last_line.split("\t")[0]
-      last_recorded_filename = first_column.split('#').last.strip
-      last_recorded_clip = filename_to_clip(last_recorded_filename)
-      print("last_recorded_clip = #{last_recorded_clip}\n")
-      skip_clips = video_filenames.filter { |i| filename_to_clip(i) <= last_recorded_clip }.length
-      video_filenames = video_filenames.drop(skip_clips)
-    else
-      write_columns(render_conf_file, ["#(vlog-toolset-#{app_version})filename", 'speed', 'start', 'end', 'text'])
-    end
-
-    sound_with_single_channel_filenames = video_filenames.map { |i| prepare_for_vad(i) }
-    if sound_with_single_channel_filenames.empty?
-      print("nothing to transcribe\n")
-    else
-      command = [
-        './main',
-        '--output-json'
-      ] + [options[:whisper_cpp_args]] + sound_with_single_channel_filenames
-      Dir.chdir options[:whisper_cpp_dir] do
-        print("#{command}\n")
-        system command.shelljoin_wrapped
-      end
-    end
-
-    # TODO: jsons and vad.wavs are supposed to be in tmp
-    for i, sound_with_single_channel_filename in video_filenames.zip(sound_with_single_channel_filenames)
-      FileUtils.rm_f sound_with_single_channel_filename
-
-      transcribed_json = "#{sound_with_single_channel_filename}.json"
-      for transcription in JSON.parse(File.read(transcribed_json))['transcription']
-        offsets = transcription['offsets']
-        text = transcription['text'].strip
-        filename_prefix = banlist.any? { |i| i.match?(text) } ? '#' : '' # FIXME
-        line = [
-          filename_prefix + File.basename(i),
-          RENDER_DEFAULT_SPEED,
-          ms_to_sec(offsets['from']),
-          ms_to_sec(offsets['to']),
-          text
-        ]
-        write_columns(render_conf_file, line)
-      end
-
-      FileUtils.rm_f transcribed_json
-    end
-  end
-
-  exists
-end
-
-def write_columns(file, columns)
-  file.write(columns.join("\t") + "\n")
-end
-
-def ms_to_sec(ms)
-  ms.to_f / 1000.0
-end
-
-def checksum(filename)
-  Digest::CRC32.file(filename).hexdigest
-end
-
-def output_postfix(options)
-  options[:preview] ? '_preview' : ''
-end
-
-def dirs(options)
-  output_dir = File.join(options[:project_dir], 'output')
-  temp_dir = File.join(options[:project_dir], 'tmp')
-  [output_dir, temp_dir]
-end
-
-def parse_options!(options, args)
-  parser = OptionParser.new do |opts|
-    opts.set_banner('Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]')
-    opts.set_summary_indent('  ')
-    opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
-    opts.on('-P', '--preview <true|false>',
-            "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
-      options[:preview] = p == 'true'
-    end
-    opts.on('-n', '--tmux-nvim <true|false>',
-            "Plain text video editing: (during preview mode or when #{CONFIG_FILENAME} was just generated) open #{CONFIG_FILENAME} in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
-      options[:tmux_nvim] = i == 'true'
-    end
-    opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f }
-    opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
-    opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}\")") do |v|
-      options[:video_filters] = v
-    end
-    opts.on('-c', '--cleanup <true|false>',
-            "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
-      options[:cleanup] = c == 'true'
-    end
-    opts.on('-w', '--whisper-cpp-dir <dir>', 'whisper.cpp directory') do |w|
-      options[:whisper_cpp_dir] = w
-    end
-    opts.on('-W', '--whisper-cpp-args <dir>',
-            "Additional whisper.cpp arguments (default: \"#{options[:whisper_cpp_args]}\")") do |w|
-      options[:whisper_cpp_args] += " #{w}"
-    end
-    opts.on('-y', '--youtube <true|false>',
-            "Additionally optimize for YouTube (default: #{options[:youtube]})") do |y|
-      options[:youtube] = y == 'true'
-    end
-    opts.on('-I', '--ios <true|false>',
-            "Additionally optimize for iOS video editors (default: #{options[:ios]})") do |i|
-      options[:ios] = i == 'true'
-    end
-  end
-
-  parser.parse!(args)
-
-  return unless options[:project_dir].nil?
-
-  print(parser.help)
-  exit 1
-end
-
-def get_current_window_id
-  `xdotool getactivewindow`
-end
-
-def switch_to_window(window_id)
-  command = ['xdotool', 'windowfocus', window_id]
-  system command.shelljoin_wrapped
-end
-
-def verify_terminal(window_id)
-  command = "xdotool getwindowname #{window_id}"
-  window_name = `#{command}`.strip
-  # print("window_name='#{window_name}'")
-  return if window_name == command || window_name == 'wezterm'
-
-  raise "please run #{$PROGRAM_NAME} when its terminal window focused"
-end
-
-# TODO: move to module
 class Renderer
   def initialize(config_filename, config_in_nvim, nvim_socket, options, terminal_window_id)
     @config_filename = config_filename
@@ -842,6 +441,406 @@ class Renderer
       mpv.set_property('pause', true)
     end
   end
+end
+
+def parse_config(filename, options)
+  File.open filename do |f|
+    f.map
+     .with_index { |line, index| [line, index + 1] }
+     .reject { |line, _line_in_config| line.start_with?('#') || line.strip.empty? }
+     .map { |line, line_in_config| [line.split("\t"), line_in_config] }
+     .map do |cols, line_in_config|
+      if cols[0] == "\n" then { line_in_config: line_in_config, empty: true }
+      else
+        video_filename, speed, start_position, end_position, text = cols
+        text = text.sub(/#.*$/, '')
+        words = text.split(' ').length
+
+        final_speed = clamp_speed(speed.to_f * options[:speed])
+        min_speed = 1.0 # FIXME: set min speed to 44.1/48?
+        if final_speed < min_speed
+          print("segment #{video_filename} has speed #{final_speed} < 1; forcing speed #{min_speed}\n")
+          final_speed = min_speed
+        end
+
+        {
+          line_in_config: line_in_config,
+          video_filename: video_filename,
+          speed: final_speed,
+          start_position: start_position.to_f,
+          end_position: end_position.to_f,
+          words: words,
+          empty: false
+        }
+      end
+    end
+  end
+end
+
+def in_segment?(position, segment)
+  (segment[:start_position]..segment[:end_position]).cover? position
+end
+
+def segments_overlap?(a, b)
+  in_segment?(a[:start_position], b) || in_segment?(a[:end_position], b)
+end
+
+def merge_small_pauses(segments, min_pause_between_shots)
+  segments.inject([]) do |acc, seg|
+    if acc.empty?
+      acc.append(seg.clone)
+    else
+      prev = acc.last
+      dt = seg[:start_position] - prev[:end_position]
+      has_overlap = segments_overlap?(seg, prev)
+      is_successor = (seg[:video_filename] == prev[:video_filename]) && (dt < min_pause_between_shots || has_overlap)
+      if is_successor
+        prev[:start_position] = [seg[:start_position], prev[:start_position]].min
+        prev[:start_position] = 0.0 if prev[:start_position] < 0.2
+        prev[:end_position] = [seg[:end_position], prev[:end_position]].max
+        prev[:speed] = [seg[:speed], prev[:speed]].max
+      else
+        acc.append(seg.clone)
+      end
+      acc
+    end
+  end
+end
+
+def rotation_filter(basename)
+  rotation = basename.split('_')[2]
+  rotation =
+    if rotation.nil?
+      Phone::LANDSCAPE_FRONT_CAMERA_ON_LEFT
+    else
+      rotation.split('.')[0].to_i
+    end
+  if rotation == Phone::PORTRAIT
+    'transpose=dir=cclock'
+  elsif rotation == Phone::REVERSED_PORTRAIT
+    'transpose=dir=clock'
+  elsif rotation == Phone::LANDSCAPE_FRONT_CAMERA_ON_LEFT
+    ''
+  elsif rotation == Phone::LANDSCAPE_FRONT_CAMERA_ON_RIGHT
+    'transpose=dir=clock,transpose=dir=clock'
+  else
+    raise 'unexpected rotation'
+  end
+end
+
+def remove_file_if_empty(filename)
+  return unless File.exist?(filename) && File.size(filename) == 0
+
+  File.delete(filename)
+end
+
+def optimize_for_youtube(output_filename, options, temp_dir)
+  output_basename_no_ext = "#{File.basename(output_filename,
+                                            File.extname(output_filename))}.CFR_#{options[:fps]}FPS.youtube"
+  temp_youtube_flac_h264_filename = File.join(temp_dir, "#{output_basename_no_ext}.flac.h264.mp4")
+  temp_youtube_opus_filename = File.join(temp_dir, "#{output_basename_no_ext}.opus")
+  temp_youtube_wav_filename = File.join(temp_dir, "#{output_basename_no_ext}.wav")
+  output_youtube_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mp4")
+
+  video_codec =
+    if nvenc_supported?('h264_nvenc')
+      'h264_nvenc -preset slow -cq 18'
+    else
+      'libx264 -preset ultrafast -crf 18'
+    end
+
+  print("reencoding for YouTube\n")
+  command =
+    FFMPEG + [
+      '-threads', Concurrent.processor_count,
+      '-fflags', '+genpts+igndts',
+      '-i', output_filename,
+      '-vsync', 'cfr',
+      '-af', 'aresample=async=1,asetpts=PTS-STARTPTS',
+      '-vcodec', video_codec,
+      '-acodec', 'flac',
+      '-pix_fmt', 'yuv420p',
+      '-movflags', 'faststart',
+      '-strict', '-2',
+      temp_youtube_flac_h264_filename
+    ]
+  system command.shelljoin_wrapped
+
+  command = FFMPEG + [
+    '-i', temp_youtube_flac_h264_filename,
+    temp_youtube_wav_filename
+  ]
+  system command.shelljoin_wrapped
+
+  print("encoding to opus\n")
+  system [
+    'opusenc',
+    '--quiet',
+    '--bitrate', 510,
+    temp_youtube_wav_filename,
+    temp_youtube_opus_filename
+  ].shelljoin_wrapped
+
+  print("producing YouTube output\n")
+  command = FFMPEG + [
+    '-an',
+    '-i', temp_youtube_flac_h264_filename,
+    '-i', temp_youtube_opus_filename,
+    '-c', 'copy',
+    '-strict', '-2',
+    output_youtube_filename
+  ]
+  system command.shelljoin_wrapped
+
+  if options[:cleanup]
+    FileUtils.rm_f [temp_youtube_flac_h264_filename, temp_youtube_wav_filename,
+                    temp_youtube_opus_filename]
+  end
+
+  verify_constant_framerate(output_youtube_filename, options)
+  output_youtube_filename
+end
+
+def verify_constant_framerate(filename, _options)
+  framerate = get_framerate(filename)
+  raise "Unexpected framerate mode #{framerate[:mode]} for #{filename}" unless framerate[:mode] == 'CFR'
+end
+
+def optimize_for_ios(output_filename, options)
+  output_basename_no_ext = "#{File.basename(output_filename,
+                                            File.extname(output_filename))}.CFR_#{options[:fps].to_f.pretty_fps}FPS.iOS"
+  output_ios_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mov")
+
+  video_codec =
+    if nvenc_supported?('h264_nvenc')
+      'h264_nvenc -preset slow -cq 18' # TODO: extract
+    else
+      'libx264 -preset ultrafast -crf 18'
+    end
+
+  print("reencoding for iOS video editors\n")
+  command =
+    FFMPEG + [
+      '-threads', Concurrent.processor_count,
+      '-fflags', '+genpts+igndts',
+      '-i', output_filename,
+      '-vsync', 'cfr',
+      '-af', 'aresample=async=1,asetpts=PTS-STARTPTS',
+      '-vcodec', video_codec,
+      '-acodec', 'alac',
+      '-pix_fmt', 'yuv420p',
+      '-movflags', 'faststart',
+      '-strict', '-2',
+      output_ios_filename
+    ]
+  system command.shelljoin_wrapped
+
+  verify_constant_framerate(output_ios_filename, options)
+  output_ios_filename
+end
+
+def nvidia_cuda_ready?
+  if (find_executable 'nvcc').nil?
+    print("nvidia-cuda-toolkit is not installed\n")
+    false
+  elsif !File.exist?('/dev/nvidia0')
+    print("nvidia module is not loaded\n")
+    false
+  else
+    true
+  end
+end
+
+def nvenc_supported?(encoder)
+  command = FFMPEG + ['--help', "encoder=#{encoder}"]
+  if `#{command.shelljoin_wrapped}`.include?('is not recognized')
+    print("ffmpeg was built without #{encoder} support\n")
+    false
+  else
+    nvidia_cuda_ready?
+  end
+end
+
+# FIXME: move tests to some proper place
+def test_segments_overlap
+  raise unless segments_overlap?({ start_position: 0.0, end_position: 5.0 }, start_position: 4.0, end_position: 6.0)
+  raise unless segments_overlap?({ start_position: 0.0, end_position: 5.0 }, start_position: 5.0, end_position: 6.0)
+  raise if segments_overlap?({ start_position: 0.0, end_position: 5.0 }, start_position: 6.0, end_position: 7.0)
+
+  raise unless segments_overlap?({ start_position: 4.0, end_position: 6.0 }, start_position: 0.0, end_position: 5.0)
+  raise unless segments_overlap?({ start_position: 5.0, end_position: 6.0 }, start_position: 0.0, end_position: 5.0)
+  raise if segments_overlap?({ start_position: 6.0, end_position: 7.0 }, start_position: 0.0, end_position: 5.0)
+end
+
+def test_merge_small_pauses
+  min_pause_between_shots = 2.0
+
+  segments = [
+    { line_in_config: 0, video_filename: 'a.mp4', start_position: 0.0, end_position: 5.0, speed: 1.0 },
+    { line_in_config: 1, video_filename: 'a.mp4', start_position: 5.5, end_position: 10.0, speed: 1.5 },
+    { line_in_config: 2, video_filename: 'b.mp4', start_position: 1.0, end_position: 3.0, speed: 1.0 },
+    { line_in_config: 3, video_filename: 'b.mp4', start_position: 10.0, end_position: 20.0, speed: 1.0 },
+    { line_in_config: 3, video_filename: 'b.mp4', start_position: 19.0, end_position: 22.0, speed: 1.8 },
+    { line_in_config: 4, video_filename: 'b.mp4', start_position: 6.0, end_position: 8.0, speed: 1.0 },
+    { line_in_config: 4, video_filename: 'b.mp4', start_position: 3.0, end_position: 7.0, speed: 1.0 }
+  ]
+
+  expected = [
+    { line_in_config: 0, video_filename: 'a.mp4', start_position: 0.0, end_position: 10.0, speed: 1.5 },
+    { line_in_config: 2, video_filename: 'b.mp4', start_position: 1.0, end_position: 3.0, speed: 1.0 },
+    { line_in_config: 3, video_filename: 'b.mp4', start_position: 3.0, end_position: 22.0, speed: 1.8 }
+  ]
+
+  result = merge_small_pauses(segments, min_pause_between_shots)
+  raise unless result == expected
+end
+
+def generate_config(options)
+  banlist = File.readlines('banlist.txt', chomp: true).map { |i| Regexp.new(i) }
+  app_version = `git rev-parse HEAD`[..6]
+  render_conf_filename = File.join(options[:project_dir], CONFIG_FILENAME)
+  exists = File.exist?(render_conf_filename)
+  File.open(render_conf_filename, exists ? 'r+' : 'w') do |render_conf_file|
+    video_filenames = Dir.glob("#{options[:project_dir]}#{File::SEPARATOR}0*.mp4").sort
+    if exists
+      # skip all clips listed in the config (including commented ones),
+      # don't write already removed subclips
+      last_line = render_conf_file.readlines.last
+      first_column = last_line.split("\t")[0]
+      last_recorded_filename = first_column.split('#').last.strip
+      last_recorded_clip = filename_to_clip(last_recorded_filename)
+      print("last_recorded_clip = #{last_recorded_clip}\n")
+      skip_clips = video_filenames.filter { |i| filename_to_clip(i) <= last_recorded_clip }.length
+      video_filenames = video_filenames.drop(skip_clips)
+    else
+      write_columns(render_conf_file, ["#(vlog-toolset-#{app_version})filename", 'speed', 'start', 'end', 'text'])
+    end
+
+    sound_with_single_channel_filenames = video_filenames.map { |i| prepare_for_vad(i) }
+    if sound_with_single_channel_filenames.empty?
+      print("nothing to transcribe\n")
+    else
+      command = [
+        './main',
+        '--output-json'
+      ] + [options[:whisper_cpp_args]] + sound_with_single_channel_filenames
+      Dir.chdir options[:whisper_cpp_dir] do
+        print("#{command}\n")
+        system command.shelljoin_wrapped
+      end
+    end
+
+    # TODO: jsons and vad.wavs are supposed to be in tmp
+    for i, sound_with_single_channel_filename in video_filenames.zip(sound_with_single_channel_filenames)
+      FileUtils.rm_f sound_with_single_channel_filename
+
+      transcribed_json = "#{sound_with_single_channel_filename}.json"
+      for transcription in JSON.parse(File.read(transcribed_json))['transcription']
+        offsets = transcription['offsets']
+        text = transcription['text'].strip
+        filename_prefix = banlist.any? { |i| i.match?(text) } ? '#' : '' # FIXME
+        line = [
+          filename_prefix + File.basename(i),
+          RENDER_DEFAULT_SPEED,
+          ms_to_sec(offsets['from']),
+          ms_to_sec(offsets['to']),
+          text
+        ]
+        write_columns(render_conf_file, line)
+      end
+
+      FileUtils.rm_f transcribed_json
+    end
+  end
+
+  exists
+end
+
+def write_columns(file, columns)
+  file.write(columns.join("\t") + "\n")
+end
+
+def ms_to_sec(ms)
+  ms.to_f / 1000.0
+end
+
+def checksum(filename)
+  Digest::CRC32.file(filename).hexdigest
+end
+
+def output_postfix(options)
+  options[:preview] ? '_preview' : ''
+end
+
+def dirs(options)
+  output_dir = File.join(options[:project_dir], 'output')
+  temp_dir = File.join(options[:project_dir], 'tmp')
+  [output_dir, temp_dir]
+end
+
+def parse_options!(options, args)
+  parser = OptionParser.new do |opts|
+    opts.set_banner('Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]')
+    opts.set_summary_indent('  ')
+    opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
+    opts.on('-P', '--preview <true|false>',
+            "Preview mode. It will also start a video player by a given position (default: #{options[:preview]})") do |p|
+      options[:preview] = p == 'true'
+    end
+    opts.on('-n', '--tmux-nvim <true|false>',
+            "Plain text video editing: (during preview mode or when #{CONFIG_FILENAME} was just generated) open #{CONFIG_FILENAME} in Neovim via Tmux if they are available (default: #{options[:tmux_nvim]})") do |i|
+      options[:tmux_nvim] = i == 'true'
+    end
+    opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f }
+    opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
+    opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}\")") do |v|
+      options[:video_filters] = v
+    end
+    opts.on('-c', '--cleanup <true|false>',
+            "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
+      options[:cleanup] = c == 'true'
+    end
+    opts.on('-w', '--whisper-cpp-dir <dir>', 'whisper.cpp directory') do |w|
+      options[:whisper_cpp_dir] = w
+    end
+    opts.on('-W', '--whisper-cpp-args <dir>',
+            "Additional whisper.cpp arguments (default: \"#{options[:whisper_cpp_args]}\")") do |w|
+      options[:whisper_cpp_args] += " #{w}"
+    end
+    opts.on('-y', '--youtube <true|false>',
+            "Additionally optimize for YouTube (default: #{options[:youtube]})") do |y|
+      options[:youtube] = y == 'true'
+    end
+    opts.on('-I', '--ios <true|false>',
+            "Additionally optimize for iOS video editors (default: #{options[:ios]})") do |i|
+      options[:ios] = i == 'true'
+    end
+  end
+
+  parser.parse!(args)
+
+  return unless options[:project_dir].nil?
+
+  print(parser.help)
+  exit 1
+end
+
+def get_current_window_id
+  `xdotool getactivewindow`
+end
+
+def switch_to_window(window_id)
+  command = ['xdotool', 'windowfocus', window_id]
+  system command.shelljoin_wrapped
+end
+
+def verify_terminal(window_id)
+  command = "xdotool getwindowname #{window_id}"
+  window_name = `#{command}`.strip
+  # print("window_name='#{window_name}'")
+  return if window_name == command || window_name == 'wezterm'
+
+  raise "please run #{$PROGRAM_NAME} when its terminal window focused"
 end
 
 def main(argv)
