@@ -71,44 +71,6 @@ def parse_config(filename, options)
   end
 end
 
-def apply_delays(segments, video_durations)
-  print("computing delays\n")
-
-  delay_time = 1.0
-
-  start_correction = 0.3
-  end_correction = 0.3
-
-  segments_and_delays =
-    segments
-    .reverse
-    .inject([0, []]) do |(delays, acc), seg|
-      if seg[:empty] then [delays + 1, acc]
-      else
-        [0, acc + [[seg, delays]]] end
-    end[1]
-    .reverse
-    .reject { |(seg, _delays)| seg[:empty] }
-    .to_a
-
-  video_filenames = segments_and_delays.map { |(seg, _)| seg[:video_filename] }.to_set
-  new_video_durations = video_durations.merge(
-    Parallel.map(video_filenames.reject { |i| video_durations.include?(i) }) do |i|
-      [i, get_duration(i)]
-    end.to_h
-  )
-
-  new_segments = segments_and_delays.map do |(seg, delays)|
-    duration = new_video_durations[seg[:video_filename]]
-    new_start_position = [seg[:start_position] - start_correction, 0.0].max
-    new_end_position = [seg[:end_position] + delays * delay_time + end_correction, duration].min
-    seg.merge(start_position: new_start_position)
-    seg.merge(end_position: new_end_position)
-  end
-
-  [new_segments, new_video_durations]
-end
-
 def in_segment?(position, segment)
   (segment[:start_position]..segment[:end_position]).cover? position
 end
@@ -496,7 +458,8 @@ class Renderer
     @output_filename = File.join(@options[:project_dir], "output#{output_postfix(@options)}#{rerender_postfix}.mp4")
 
     min_pause_between_shots = 0.1 # FIXME: should be in @options, but -P is already used?
-    @segments, @video_durations = apply_delays(parse_config(@config_filename, @options), @video_durations) # TODO
+    @segments = parse_config(@config_filename, @options)
+    apply_delays
     @segments = merge_small_pauses(@segments, min_pause_between_shots) # TODO
 
     raise 'Empty video?' if @segments.empty?
@@ -516,6 +479,42 @@ class Renderer
     print("average words per second = #{words_per_second}\n")
 
     @output_filename
+  end
+
+  def apply_delays
+    print("computing delays\n")
+
+    delay_time = 1.0
+
+    start_correction = 0.3
+    end_correction = 0.3
+
+    segments_and_delays =
+      @segments
+      .reverse
+      .inject([0, []]) do |(delays, acc), seg|
+        if seg[:empty] then [delays + 1, acc]
+        else
+          [0, acc + [[seg, delays]]] end
+      end[1]
+      .reverse
+      .reject { |(seg, _delays)| seg[:empty] }
+      .to_a
+
+    video_filenames = segments_and_delays.map { |(seg, _)| seg[:video_filename] }.to_set
+    @video_durations = @video_durations.merge(
+      Parallel.map(video_filenames.reject { |i| @video_durations.include?(i) }) do |i|
+        [i, get_duration(i)]
+      end.to_h
+    )
+
+    @segments = segments_and_delays.map do |(seg, delays)|
+      duration = @video_durations[seg[:video_filename]]
+      new_start_position = [seg[:start_position] - start_correction, 0.0].max
+      new_end_position = [seg[:end_position] + delays * delay_time + end_correction, duration].min
+      seg.merge(start_position: new_start_position)
+      seg.merge(end_position: new_end_position)
+    end
   end
 
   def run_preview_loop
@@ -600,7 +599,8 @@ class Renderer
         if rewritten_config
           new_output_filename = render(rerender = true)
           new_mpv_speed = mpv.get_property('speed')
-          print("mpv speed was #{new_mpv_speed}\n")
+          @mpv_speed = new_mpv_speed unless new_mpv_speed.nil?
+          print("mpv speed was #{@mpv_speed}\n")
           @restart_mpv =
             if checksum(new_output_filename) == output_crc32
               print("no changes in the rendered output, skipping\n")
@@ -619,8 +619,7 @@ class Renderer
         end
       end
     rescue StandardError => e
-      puts e
-      print("closing player due to error\n")
+      print("closing player due to error: #{e} #{e.backtrace}\n")
       mpv.quit! unless mpv.nil?
     end
     @restart_mpv = false
@@ -816,7 +815,10 @@ class Renderer
     window = nvim_context.window
     buffer = nvim_context.buffer
 
-    new_nvim_cursor_position = [compute_line_in_config(mpv.get_property('time-pos')), 0]
+    player_position = mpv.get_property('time-pos')
+    return if player_position.nil?
+
+    new_nvim_cursor_position = [compute_line_in_config(player_position), 0]
 
     unless get_current_window_id == @terminal_window_id
       is_playing = !mpv.get_property('pause')
