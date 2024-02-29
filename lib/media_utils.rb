@@ -164,3 +164,29 @@ def get_output_filename(clip_num, subclip_num, rotation, project_dir)
     "#{prefix}_#{rotation}.mp4"
   end
 end
+
+def nvenc_supported?(encoder)
+  command = FFMPEG + ['--help', "encoder=#{encoder}"]
+  if `#{command.shelljoin_wrapped}`.include?('is not recognized')
+    print("ffmpeg was built without #{encoder} support\n")
+    false
+  else
+    nvidia_cuda_ready?
+  end
+end
+
+def h264_video_codec
+  if nvenc_supported?('h264_nvenc')
+    'h264_nvenc -preset slow -cq 18'
+  else
+    'libx264 -preset ultrafast -crf 18'
+  end
+end
+
+def h265_video_codec
+  if nvenc_supported?('hevc_nvenc')
+    'hevc_nvenc -preset p1 -cq 18 -qp 18'
+  else
+    'libx265 -preset ultrafast -crf 18'
+  end
+end

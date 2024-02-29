@@ -227,15 +227,9 @@ class Renderer
   end
 
   def process_and_split_videos(output_dir, temp_dir)
-    is_nvenc_supported = nvenc_supported?('hevc_nvenc')
-    video_codec =
-      if is_nvenc_supported
-        'hevc_nvenc -preset p1 -cq 18 -qp 18'
-      else
-        'libx265 -preset ultrafast -crf 18'
-      end
+    video_codec = h265_video_codec
     preview_width =
-      if is_nvenc_supported
+      if video_codec.include?('_nvenc')
         480
       else
         320
@@ -245,6 +239,8 @@ class Renderer
 
     fps = @options[:fps]
     preview = @options[:preview]
+
+    print("preview_width=#{preview_width}\n") if preview
 
     processed_segments = 0
     processed_segments_mutex = Mutex.new
@@ -542,13 +538,6 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   temp_youtube_wav_filename = File.join(temp_dir, "#{output_basename_no_ext}.wav")
   output_youtube_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mp4")
 
-  video_codec =
-    if nvenc_supported?('h264_nvenc')
-      'h264_nvenc -preset slow -cq 18'
-    else
-      'libx264 -preset ultrafast -crf 18'
-    end
-
   print("reencoding for YouTube\n")
   command =
     FFMPEG + [
@@ -557,7 +546,7 @@ def optimize_for_youtube(output_filename, options, temp_dir)
       '-i', output_filename,
       '-vsync', 'cfr',
       '-af', 'aresample=async=1,asetpts=PTS-STARTPTS',
-      '-vcodec', video_codec,
+      '-vcodec', h264_video_codec,
       '-acodec', 'flac',
       '-pix_fmt', 'yuv420p',
       '-movflags', 'faststart',
@@ -611,13 +600,6 @@ def optimize_for_ios(output_filename, options)
                                             File.extname(output_filename))}.CFR_#{options[:fps].to_f.pretty_fps}FPS.iOS"
   output_ios_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mov")
 
-  video_codec =
-    if nvenc_supported?('h264_nvenc')
-      'h264_nvenc -preset slow -cq 18' # TODO: extract
-    else
-      'libx264 -preset ultrafast -crf 18'
-    end
-
   print("reencoding for iOS video editors\n")
   command =
     FFMPEG + [
@@ -626,7 +608,7 @@ def optimize_for_ios(output_filename, options)
       '-i', output_filename,
       '-vsync', 'cfr',
       '-af', 'aresample=async=1,asetpts=PTS-STARTPTS',
-      '-vcodec', video_codec,
+      '-vcodec', h264_video_codec,
       '-acodec', 'alac',
       '-pix_fmt', 'yuv420p',
       '-movflags', 'faststart',
@@ -648,16 +630,6 @@ def nvidia_cuda_ready?
     false
   else
     true
-  end
-end
-
-def nvenc_supported?(encoder)
-  command = FFMPEG + ['--help', "encoder=#{encoder}"]
-  if `#{command.shelljoin_wrapped}`.include?('is not recognized')
-    print("ffmpeg was built without #{encoder} support\n")
-    false
-  else
-    nvidia_cuda_ready?
   end
 end
 
