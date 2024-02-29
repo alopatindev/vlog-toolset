@@ -116,10 +116,8 @@ class Renderer
     end
   end
 
-  def run_preview_loop
-    nvim = nil
+  def run_preview_loop(nvim)
     if @config_in_nvim
-      nvim = Neovim.attach_unix(@nvim_socket)
       buffer = nvim.current.buffer
 
       toggle_fullscreen = prepare_mpv_command(%w[cycle fullscreen])
@@ -837,10 +835,28 @@ def main(argv)
   tmux_is_active = !ENV['TMUX'].nil?
   nvim_socket = File.join(project_dir, 'nvim.sock')
 
+  tmux_pane_id = nil
+  nvim = nil
   config_in_nvim = (!old_config || options[:preview]) && options[:tmux_nvim] && tmux_is_active && File.file?('/usr/bin/nvim')
-  if config_in_nvim && !File.socket?(nvim_socket)
-    command = ['tmux', 'split-window', '-b', '-l', '30', '-v', "nvim --listen #{nvim_socket} #{config_filename}"]
-    system(command.shelljoin_wrapped)
+  if config_in_nvim
+    if File.socket?(nvim_socket)
+      nvim = Neovim.attach_unix(nvim_socket)
+      tmux_pane_id = nvim.eval('g:tmux_pane_id').strip
+
+      command = ['tmux', 'select-pane', '-t', tmux_pane_id]
+      print('switch pane: ' + command.shelljoin_wrapped + "\n")
+      system(command.shelljoin_wrapped)
+    else
+      command = ['tmux', 'split-window', '-b', '-l', '30', '-v', "nvim --listen #{nvim_socket} #{config_filename}"]
+      system(command.shelljoin_wrapped)
+
+      sleep 0.2
+      tmux_pane_id = `tmux display-message -p '\#{pane_id}'`.strip
+      nvim = Neovim.attach_unix(nvim_socket)
+      nvim.command("let g:tmux_pane_id = '#{tmux_pane_id}'")
+    end
+
+    print("tmux_pane_id=#{tmux_pane_id}\n")
   end
 
   unless old_config
@@ -858,7 +874,7 @@ def main(argv)
   output_filename = preview.render
 
   if options[:preview]
-    preview.run_preview_loop
+    preview.run_preview_loop(nvim)
   else
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
