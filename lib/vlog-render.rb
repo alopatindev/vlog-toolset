@@ -450,30 +450,30 @@ def parse_config(filename, options)
      .reject { |line, _line_in_config| line.start_with?('#') || line.strip.empty? }
      .map { |line, line_in_config| [line.split("\t"), line_in_config] }
      .map do |cols, line_in_config|
-      if cols[0] == "\n" then { line_in_config: line_in_config, empty: true }
-      else
-        video_filename, speed, start_position, end_position, text = cols
-        text = text.sub(/#.*$/, '')
-        words = text.split(' ').length
+       if cols[0] == "\n" then { line_in_config: line_in_config, empty: true }
+       else
+         video_filename, speed, start_position, end_position, text = cols
+         text = text.sub(/#.*$/, '')
+         words = text.split(' ').length
 
-        final_speed = clamp_speed(speed.to_f * options[:speed])
-        min_speed = 1.0 # FIXME: set min speed to 44.1/48?
-        if final_speed < min_speed
-          print("segment #{video_filename} has speed #{final_speed} < 1; forcing speed #{min_speed}\n")
-          final_speed = min_speed
-        end
+         final_speed = clamp_speed(speed.to_f * options[:speed])
+         min_speed = 1.0 # FIXME: set min speed to 44.1/48?
+         if final_speed < min_speed
+           print("segment #{video_filename} has speed #{final_speed} < 1; forcing speed #{min_speed}\n")
+           final_speed = min_speed
+         end
 
-        {
-          line_in_config: line_in_config,
-          video_filename: video_filename,
-          speed: final_speed,
-          start_position: start_position.to_f,
-          end_position: end_position.to_f,
-          words: words,
-          empty: false
-        }
-      end
-    end
+         {
+           line_in_config: line_in_config,
+           video_filename: video_filename,
+           speed: final_speed,
+           start_position: start_position.to_f,
+           end_position: end_position.to_f,
+           words: words,
+           empty: false
+         }
+       end
+     end
   end
 end
 
