@@ -558,35 +558,6 @@ def checksum(filename)
   Digest::CRC32.file(filename).hexdigest
 end
 
-def render(options, config_filename, video_durations, rerender = false)
-  print("rendering\n")
-  project_dir = options[:project_dir]
-  rerender_postfix = rerender ? '_rerender' : ''
-  output_filename = File.join(project_dir, "output#{output_postfix(options)}#{rerender_postfix}.mp4")
-
-  min_pause_between_shots = 0.1 # FIXME: should be in options, but -P is already used?
-  segments, new_video_durations = apply_delays(parse_config(config_filename, options), video_durations)
-  new_segments = merge_small_pauses(segments, min_pause_between_shots)
-
-  raise 'Empty video?' if segments.empty?
-
-  output_dir, temp_dir = dirs(options)
-
-  temp_videos = process_and_split_videos(new_segments, options, output_dir, temp_dir)
-  concat_videos(temp_videos, output_filename)
-
-  words_per_second = new_segments.map do |seg|
-    dt = seg[:end_position] - seg[:start_position]
-    duration = dt / seg[:speed]
-    seg[:words] / duration
-  end.sum / new_segments.length
-
-  print("finished rendering\n")
-  print("average words per second = #{words_per_second}\n")
-
-  [output_filename, new_segments, new_video_durations]
-end
-
 def output_postfix(options)
   options[:preview] ? '_preview' : ''
 end
@@ -662,18 +633,48 @@ def verify_terminal(window_id)
   raise "please run #{$PROGRAM_NAME} when its terminal window focused"
 end
 
+# TODO: rename to Renderer
+# TODO: move to module
 class Preview
-  def initialize(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations,
-                 terminal_window_id)
+  def initialize(config_filename, config_in_nvim, nvim_socket, options, terminal_window_id)
     @config_filename = config_filename
-    @output_filename = output_filename
     @config_in_nvim = config_in_nvim
     @nvim_socket = nvim_socket
-    @segments = segments
+    @segments = []
     @options = options
-    @video_durations = video_durations
+    @video_durations = {}
     @terminal_window_id = terminal_window_id
     @mpv_socket = File.join(@options[:project_dir], 'mpv.sock')
+    @output_filename = nil
+  end
+
+  def render(rerender = false)
+    print("rendering\n")
+
+    rerender_postfix = rerender ? '_rerender' : ''
+    @output_filename = File.join(@options[:project_dir], "output#{output_postfix(@options)}#{rerender_postfix}.mp4")
+
+    min_pause_between_shots = 0.1 # FIXME: should be in @options, but -P is already used?
+    @segments, new_video_durations = apply_delays(parse_config(@config_filename, @options), @video_durations)
+    new_segments = merge_small_pauses(@segments, min_pause_between_shots)
+
+    raise 'Empty video?' if @segments.empty?
+
+    output_dir, temp_dir = dirs(@options)
+
+    temp_videos = process_and_split_videos(new_segments, @options, output_dir, temp_dir)
+    concat_videos(temp_videos, @output_filename)
+
+    words_per_second = new_segments.map do |seg|
+      dt = seg[:end_position] - seg[:start_position]
+      duration = dt / seg[:speed]
+      seg[:words] / duration
+    end.sum / new_segments.length
+
+    print("finished rendering\n")
+    print("average words per second = #{words_per_second}\n")
+
+    [@output_filename, new_segments, new_video_durations]
   end
 
   def run_preview_loop
@@ -756,8 +757,7 @@ class Preview
         update_mpv_playback(mpv, nvim, rewritten_config)
 
         if rewritten_config
-          new_output_filename, new_segments, new_video_durations = render(@options, @config_filename, @video_durations,
-                                                                          rerender = true)
+          new_output_filename, new_segments, new_video_durations = render(rerender = true)
           new_mpv_speed = mpv.get_property('speed')
           print("mpv speed was #{new_mpv_speed}\n")
           restart_mpv =
@@ -769,7 +769,7 @@ class Preview
             else
               print("restarting player\n")
               mpv.quit!
-              File.rename(new_output_filename, output_filename)
+              File.rename(new_output_filename, @output_filename)
               true
             end
           return [restart_mpv, new_mpv_speed, new_segments, new_video_durations]
@@ -893,12 +893,11 @@ def main(argv)
   output_dir, temp_dir = dirs(options)
   FileUtils.mkdir_p [output_dir, temp_dir]
 
-  output_filename, segments, video_durations = render(options, config_filename, video_durations = {})
+  preview = Preview.new(config_filename, config_in_nvim, nvim_socket, options, terminal_window_id)
+  output_filename, segments, video_durations = preview.render
 
   if options[:preview]
-    Preview.new(config_filename, output_filename, config_in_nvim, nvim_socket, segments, options, video_durations,
-                terminal_window_id)
-           .run_preview_loop
+    preview.run_preview_loop
   else
     output_youtube_filename = optimize_for_youtube(output_filename, options, temp_dir) if options[:youtube]
     output_ios_filename = optimize_for_ios(output_filename, options) if options[:ios]
