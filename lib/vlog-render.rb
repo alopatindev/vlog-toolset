@@ -166,164 +166,6 @@ def remove_file_if_empty(filename)
   File.delete(filename)
 end
 
-def process_and_split_videos(segments, options, output_dir, temp_dir)
-  is_nvenc_supported = nvenc_supported?('hevc_nvenc')
-  video_codec =
-    if is_nvenc_supported
-      'hevc_nvenc -preset p1 -cq 18 -qp 18'
-    else
-      'libx265 -preset ultrafast -crf 18'
-    end
-  preview_width =
-    if is_nvenc_supported
-      480
-    else
-      320
-    end
-
-  print("processing video clips (applying filters, etc.)\n")
-
-  fps = options[:fps]
-  preview = options[:preview]
-
-  processed_segments = 0
-  processed_segments_mutex = Mutex.new
-
-  media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
-
-  temp_videos = segments.map do |seg|
-    # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
-    ext = '.mp4'
-    line_in_config = seg[:line_in_config]
-    basename = File.basename seg[:video_filename]
-
-    base_output_filename = (seg.reject { |key|
-      key == :line_in_config
-    }.values.map(&:to_s) + [preview.to_s]).join('_')
-    output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
-    temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
-
-    # TODO: split using -f segment -segment_time 10 ?
-
-    remove_file_if_empty(temp_cut_output_filename)
-    remove_file_if_empty(output_filename)
-
-    unless File.exist?(output_filename)
-      media_thread_pool.post do
-        audio_filters = "atempo=#{seg[:speed]},asetpts=PTS-STARTPTS"
-        video_filters = [
-          rotation_filter(basename),
-          options[:video_filters],
-          "fps=#{fps}",
-          "setpts=(1/#{seg[:speed]})*PTS" # TODO: is it correct?
-        ].reject { |i| i.empty? }.join(',')
-        if preview
-          video_filters = [
-            "scale=#{preview_width}:-1",
-            "#{video_filters}"
-            # "drawtext=fontcolor=white:fontsize=#{preview_width / 24}:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
-          ].join(',')
-        end
-
-        # -filter_complex '[0:a]showvolume=rate=60:p=1,scale=1920/5:1080/36[vv];[0:v][vv]overlay=x=(W-w)/2:y=h/2[v]' -map '[v]' -map '0:a'
-
-        # TODO: do second audio sync for individually cut fragments to avoid audio drift? best moment for that
-
-        # might be uneeded step anymore,
-        # but still might be useful for NLE video editors
-        dt = seg[:end_position] - seg[:start_position]
-        command = FFMPEG_NO_OVERWRITE + [
-          '-threads', Concurrent.processor_count,
-          '-fflags', '+genpts+igndts',
-          '-ss', seg[:start_position],
-          '-i', seg[:video_filename],
-          '-to', dt,
-          '-codec', 'copy',
-          '-movflags', 'faststart',
-          '-strict', '-2',
-          temp_cut_output_filename
-        ]
-        system command.shelljoin_wrapped
-
-        command = FFMPEG_NO_OVERWRITE + [
-          '-threads', Concurrent.processor_count,
-          '-fflags', '+genpts+igndts',
-          '-i', temp_cut_output_filename,
-          '-vsync', 'cfr',
-          '-vcodec', video_codec,
-          '-vf', video_filters,
-          '-af', audio_filters,
-          '-acodec', 'flac',
-          '-movflags', 'faststart',
-          '-strict', '-2',
-          output_filename
-        ]
-        system command.shelljoin_wrapped
-
-        FileUtils.rm_f temp_cut_output_filename if options[:cleanup]
-
-        processed_segments_value = processed_segments_mutex.synchronize do
-          processed_segments += 1
-          processed_segments
-        end
-        progress = ((processed_segments_value.to_f / segments.length.to_f) * 100.0).round(1)
-        print("#{basename} (#{progress}%)\n")
-      rescue StandardError => e
-        print("exception for segment #{seg}: #{e} #{e.backtrace}\n")
-      end
-    end
-
-    output_filename
-  end
-
-  media_thread_pool.shutdown
-  media_thread_pool.wait_for_termination
-
-  unless preview
-    outdated_temp_files = (Dir.glob("#{output_dir}#{File::SEPARATOR}0*.mp4").to_set - temp_videos.to_set).to_a
-    print("#{outdated_temp_files.length} outdated_temp_files: #{outdated_temp_files}\n")
-    if options[:cleanup]
-      print("removing them\n")
-      FileUtils.rm_f outdated_temp_files
-    else
-      print("skipping removal\n")
-    end
-  end
-
-  temp_videos
-end
-
-def concat_videos(temp_videos, output_filename)
-  print("concatenate #{output_filename}\n")
-
-  parts = temp_videos.map { |f| "file 'file:#{f}'" }
-                     .join "\n"
-
-  command = FFMPEG + [
-    # '-async', '1', # NOTE: does nothing for ffmpeg 4.4.4?
-    '-fflags', '+genpts+igndts',
-    '-f', 'concat',
-    '-segment_time_metadata', '1',
-    '-safe', '0',
-    '-protocol_whitelist', 'file,pipe',
-    '-i', '-',
-    # '-af', 'aselect=concatdec_select,aresample=async=1', # FIXME: adds sound gaps resulting in clicking sounds
-    # '-vcodec', 'copy',
-    # '-acodec', 'flac',
-    '-codec', 'copy',
-    '-movflags', 'faststart',
-    '-strict', '-2',
-    output_filename
-  ]
-
-  IO.popen(command.shelljoin_wrapped, 'w') do |f|
-    f.puts parts
-    f.close_write
-  end
-
-  print("done\n")
-end
-
 def optimize_for_youtube(output_filename, options, temp_dir)
   output_basename_no_ext = "#{File.basename(output_filename,
                                             File.extname(output_filename))}.CFR_#{options[:fps]}FPS.youtube"
@@ -633,9 +475,8 @@ def verify_terminal(window_id)
   raise "please run #{$PROGRAM_NAME} when its terminal window focused"
 end
 
-# TODO: rename to Renderer
 # TODO: move to module
-class Preview
+class Renderer
   def initialize(config_filename, config_in_nvim, nvim_socket, options, terminal_window_id)
     @config_filename = config_filename
     @config_in_nvim = config_in_nvim
@@ -655,26 +496,26 @@ class Preview
     @output_filename = File.join(@options[:project_dir], "output#{output_postfix(@options)}#{rerender_postfix}.mp4")
 
     min_pause_between_shots = 0.1 # FIXME: should be in @options, but -P is already used?
-    @segments, new_video_durations = apply_delays(parse_config(@config_filename, @options), @video_durations)
-    new_segments = merge_small_pauses(@segments, min_pause_between_shots)
+    @segments, @video_durations = apply_delays(parse_config(@config_filename, @options), @video_durations) # TODO
+    @segments = merge_small_pauses(@segments, min_pause_between_shots) # TODO
 
     raise 'Empty video?' if @segments.empty?
 
     output_dir, temp_dir = dirs(@options)
 
-    temp_videos = process_and_split_videos(new_segments, @options, output_dir, temp_dir)
+    temp_videos = process_and_split_videos(output_dir, temp_dir)
     concat_videos(temp_videos, @output_filename)
 
-    words_per_second = new_segments.map do |seg|
+    words_per_second = @segments.map do |seg|
       dt = seg[:end_position] - seg[:start_position]
       duration = dt / seg[:speed]
       seg[:words] / duration
-    end.sum / new_segments.length
+    end.sum / @segments.length
 
     print("finished rendering\n")
     print("average words per second = #{words_per_second}\n")
 
-    [@output_filename, new_segments, new_video_durations]
+    @output_filename
   end
 
   def run_preview_loop
@@ -698,8 +539,8 @@ class Preview
       end
     end
 
-    restart_mpv = true
-    mpv_speed = 1.0
+    @restart_mpv = true
+    @mpv_speed = 1.0
     loop do
       if @config_in_nvim
         line_in_config = buffer.line_number
@@ -712,12 +553,12 @@ class Preview
       player_position = compute_player_position(@options[:line_in_config])
       print("player_position = #{player_position}\n")
 
-      if restart_mpv
+      if @restart_mpv
         command = MPV_COMMAND + [
           '--pause',
           "--start=#{player_position}",
           "--input-ipc-server=#{@mpv_socket}",
-          "--speed=#{mpv_speed}",
+          "--speed=#{@mpv_speed}",
           '--volume=130',
           '--no-fs',
           '--geometry=30%+0+0',
@@ -730,11 +571,11 @@ class Preview
 
       sleep 0.5
 
-      switch_to_window(@terminal_window_id) if restart_mpv
+      switch_to_window(@terminal_window_id) if @restart_mpv
 
       break unless @config_in_nvim && File.socket?(@nvim_socket) && File.socket?(@mpv_socket)
 
-      restart_mpv, mpv_speed, @segments, @video_durations = run_mpv_loop(nvim)
+      run_mpv_loop(nvim)
       break if @segments.empty?
     end
   end
@@ -757,10 +598,10 @@ class Preview
         update_mpv_playback(mpv, nvim, rewritten_config)
 
         if rewritten_config
-          new_output_filename, new_segments, new_video_durations = render(rerender = true)
+          new_output_filename = render(rerender = true)
           new_mpv_speed = mpv.get_property('speed')
           print("mpv speed was #{new_mpv_speed}\n")
-          restart_mpv =
+          @restart_mpv =
             if checksum(new_output_filename) == output_crc32
               print("no changes in the rendered output, skipping\n")
               FileUtils.rm_f new_output_filename
@@ -772,7 +613,7 @@ class Preview
               File.rename(new_output_filename, @output_filename)
               true
             end
-          return [restart_mpv, new_mpv_speed, new_segments, new_video_durations]
+          return
         else
           sleep 0.1
         end
@@ -780,10 +621,169 @@ class Preview
     rescue StandardError => e
       puts e
       print("closing player due to error\n")
-      mpv_speed = 1.0
       mpv.quit! unless mpv.nil?
     end
-    [false, mpv_speed, [], {}]
+    @restart_mpv = false
+    @segments = []
+    @video_durations = {}
+  end
+
+  def process_and_split_videos(output_dir, temp_dir)
+    is_nvenc_supported = nvenc_supported?('hevc_nvenc')
+    video_codec =
+      if is_nvenc_supported
+        'hevc_nvenc -preset p1 -cq 18 -qp 18'
+      else
+        'libx265 -preset ultrafast -crf 18'
+      end
+    preview_width =
+      if is_nvenc_supported
+        480
+      else
+        320
+      end
+
+    print("processing video clips (applying filters, etc.)\n")
+
+    fps = @options[:fps]
+    preview = @options[:preview]
+
+    processed_segments = 0
+    processed_segments_mutex = Mutex.new
+
+    media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
+
+    temp_videos = @segments.map do |seg|
+      # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
+      ext = '.mp4'
+      line_in_config = seg[:line_in_config]
+      basename = File.basename seg[:video_filename]
+
+      base_output_filename = (seg.reject { |key|
+        key == :line_in_config
+      }.values.map(&:to_s) + [preview.to_s]).join('_')
+      output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
+      temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
+
+      # TODO: split using -f segment -segment_time 10 ?
+
+      remove_file_if_empty(temp_cut_output_filename)
+      remove_file_if_empty(output_filename)
+
+      unless File.exist?(output_filename)
+        media_thread_pool.post do
+          audio_filters = "atempo=#{seg[:speed]},asetpts=PTS-STARTPTS"
+          video_filters = [
+            rotation_filter(basename),
+            @options[:video_filters],
+            "fps=#{fps}",
+            "setpts=(1/#{seg[:speed]})*PTS" # TODO: is it correct?
+          ].reject { |i| i.empty? }.join(',')
+          if preview
+            video_filters = [
+              "scale=#{preview_width}:-1",
+              "#{video_filters}"
+              # "drawtext=fontcolor=white:fontsize=#{preview_width / 24}:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
+            ].join(',')
+          end
+
+          # -filter_complex '[0:a]showvolume=rate=60:p=1,scale=1920/5:1080/36[vv];[0:v][vv]overlay=x=(W-w)/2:y=h/2[v]' -map '[v]' -map '0:a'
+
+          # TODO: do second audio sync for individually cut fragments to avoid audio drift? best moment for that
+
+          # might be uneeded step anymore,
+          # but still might be useful for NLE video editors
+          dt = seg[:end_position] - seg[:start_position]
+          command = FFMPEG_NO_OVERWRITE + [
+            '-threads', Concurrent.processor_count,
+            '-fflags', '+genpts+igndts',
+            '-ss', seg[:start_position],
+            '-i', seg[:video_filename],
+            '-to', dt,
+            '-codec', 'copy',
+            '-movflags', 'faststart',
+            '-strict', '-2',
+            temp_cut_output_filename
+          ]
+          system command.shelljoin_wrapped
+
+          command = FFMPEG_NO_OVERWRITE + [
+            '-threads', Concurrent.processor_count,
+            '-fflags', '+genpts+igndts',
+            '-i', temp_cut_output_filename,
+            '-vsync', 'cfr',
+            '-vcodec', video_codec,
+            '-vf', video_filters,
+            '-af', audio_filters,
+            '-acodec', 'flac',
+            '-movflags', 'faststart',
+            '-strict', '-2',
+            output_filename
+          ]
+          system command.shelljoin_wrapped
+
+          FileUtils.rm_f temp_cut_output_filename if @options[:cleanup]
+
+          processed_segments_value = processed_segments_mutex.synchronize do
+            processed_segments += 1
+            processed_segments
+          end
+          progress = ((processed_segments_value.to_f / @segments.length.to_f) * 100.0).round(1)
+          print("#{basename} (#{progress}%)\n")
+        rescue StandardError => e
+          print("exception for segment #{seg}: #{e} #{e.backtrace}\n")
+        end
+      end
+
+      output_filename
+    end
+
+    media_thread_pool.shutdown
+    media_thread_pool.wait_for_termination
+
+    unless preview
+      outdated_temp_files = (Dir.glob("#{output_dir}#{File::SEPARATOR}0*.mp4").to_set - temp_videos.to_set).to_a
+      print("#{outdated_temp_files.length} outdated_temp_files: #{outdated_temp_files}\n")
+      if @options[:cleanup]
+        print("removing them\n")
+        FileUtils.rm_f outdated_temp_files
+      else
+        print("skipping removal\n")
+      end
+    end
+
+    temp_videos
+  end
+
+  def concat_videos(temp_videos, output_filename)
+    print("concatenate #{output_filename}\n")
+
+    parts = temp_videos.map { |f| "file 'file:#{f}'" }
+                       .join "\n"
+
+    command = FFMPEG + [
+      # '-async', '1', # NOTE: does nothing for ffmpeg 4.4.4?
+      '-fflags', '+genpts+igndts',
+      '-f', 'concat',
+      '-segment_time_metadata', '1',
+      '-safe', '0',
+      '-protocol_whitelist', 'file,pipe',
+      '-i', '-',
+      # '-af', 'aselect=concatdec_select,aresample=async=1', # FIXME: adds sound gaps resulting in clicking sounds
+      # '-vcodec', 'copy',
+      # '-acodec', 'flac',
+      '-codec', 'copy',
+      '-movflags', 'faststart',
+      '-strict', '-2',
+      output_filename
+    ]
+
+    IO.popen(command.shelljoin_wrapped, 'w') do |f|
+      f.puts parts
+      f.close_write
+    end
+
+    print("done\n")
   end
 
   def prepare_mpv_command(command)
@@ -893,8 +893,8 @@ def main(argv)
   output_dir, temp_dir = dirs(options)
   FileUtils.mkdir_p [output_dir, temp_dir]
 
-  preview = Preview.new(config_filename, config_in_nvim, nvim_socket, options, terminal_window_id)
-  output_filename, segments, video_durations = preview.render
+  preview = Renderer.new(config_filename, config_in_nvim, nvim_socket, options, terminal_window_id)
+  output_filename = preview.render
 
   if options[:preview]
     preview.run_preview_loop
