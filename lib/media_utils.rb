@@ -165,6 +165,18 @@ def get_output_filename(clip_num, subclip_num, rotation, project_dir)
   end
 end
 
+def nvidia_cuda_ready?
+  if (find_executable 'nvcc').nil?
+    print("nvidia-cuda-toolkit is not installed\n")
+    false
+  elsif !File.exist?('/dev/nvidia0')
+    print("nvidia module is not loaded\n")
+    false
+  else
+    true
+  end
+end
+
 def nvenc_supported?(encoder)
   command = FFMPEG + ['--help', "encoder=#{encoder}"]
   if `#{command.shelljoin_wrapped}`.include?('is not recognized')

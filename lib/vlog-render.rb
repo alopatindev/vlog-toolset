@@ -473,14 +473,6 @@ def parse_config(filename, options)
   end
 end
 
-def in_segment?(position, segment)
-  (segment[:start_position]..segment[:end_position]).cover? position
-end
-
-def segments_overlap?(a, b)
-  in_segment?(a[:start_position], b) || in_segment?(a[:end_position], b)
-end
-
 def merge_small_pauses(segments, min_pause_between_shots)
   segments.inject([]) do |acc, seg|
     if acc.empty?
@@ -522,12 +514,6 @@ def rotation_filter(basename)
   else
     raise 'unexpected rotation'
   end
-end
-
-def remove_file_if_empty(filename)
-  return unless File.exist?(filename) && File.size(filename) == 0
-
-  File.delete(filename)
 end
 
 def optimize_for_youtube(output_filename, options, temp_dir)
@@ -590,11 +576,6 @@ def optimize_for_youtube(output_filename, options, temp_dir)
   output_youtube_filename
 end
 
-def verify_constant_framerate(filename, _options)
-  framerate = get_framerate(filename)
-  raise "Unexpected framerate mode #{framerate[:mode]} for #{filename}" unless framerate[:mode] == 'CFR'
-end
-
 def optimize_for_ios(output_filename, options)
   output_basename_no_ext = "#{File.basename(output_filename,
                                             File.extname(output_filename))}.CFR_#{options[:fps].to_f.pretty_fps}FPS.iOS"
@@ -621,16 +602,23 @@ def optimize_for_ios(output_filename, options)
   output_ios_filename
 end
 
-def nvidia_cuda_ready?
-  if (find_executable 'nvcc').nil?
-    print("nvidia-cuda-toolkit is not installed\n")
-    false
-  elsif !File.exist?('/dev/nvidia0')
-    print("nvidia module is not loaded\n")
-    false
-  else
-    true
-  end
+def in_segment?(position, segment)
+  (segment[:start_position]..segment[:end_position]).cover? position
+end
+
+def segments_overlap?(a, b)
+  in_segment?(a[:start_position], b) || in_segment?(a[:end_position], b)
+end
+
+def remove_file_if_empty(filename)
+  return unless File.exist?(filename) && File.size(filename) == 0
+
+  File.delete(filename)
+end
+
+def verify_constant_framerate(filename, _options)
+  framerate = get_framerate(filename)
+  raise "Unexpected framerate mode #{framerate[:mode]} for #{filename}" unless framerate[:mode] == 'CFR'
 end
 
 # FIXME: move tests to some proper place
