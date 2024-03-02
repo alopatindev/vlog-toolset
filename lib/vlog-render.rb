@@ -51,7 +51,7 @@ class Renderer
   end
 
   def render(rerender = false)
-    print("rendering\n")
+    print("rendering#{@options[:preview] ? '' : ' FINAL OUTPUT'}\n")
 
     rerender_postfix = rerender ? '_rerender' : ''
     @output_filename = File.join(@options[:project_dir], "output#{output_postfix(@options)}#{rerender_postfix}.mp4")
@@ -252,11 +252,21 @@ class Renderer
       line_in_config = seg[:line_in_config]
       basename = File.basename seg[:video_filename]
 
-      base_output_filename = (seg.reject { |key|
+      hash_key = (seg.reject { |key|
         key == :line_in_config
       }.values.map(&:to_s) + [preview.to_s]).join('_')
+      hash_value = Digest::SHA256.hexdigest(hash_key)
+
+      temp_cut_output_filename = File.join(temp_dir, hash_value + ext)
+      base_output_filename = "#{line_in_config.with_leading_zeros}_#{hash_value}"
+
       output_filename = File.join(preview ? temp_dir : output_dir, base_output_filename + ext)
-      temp_cut_output_filename = File.join(temp_dir, base_output_filename + '.cut' + ext)
+
+      old_output_filename = Dir.glob("#{preview ? temp_dir : output_dir}#{File::SEPARATOR}0*_#{hash_value}#{ext}").first
+      if !old_output_filename.nil? && output_filename != old_output_filename
+        print("renaming #{old_output_filename} => #{output_filename}\n")
+        File.rename(old_output_filename, output_filename)
+      end
 
       # TODO: split using -f segment -segment_time 10 ?
 
@@ -276,7 +286,6 @@ class Renderer
             video_filters = [
               "scale=#{preview_width}:-1",
               "#{video_filters}"
-              # "drawtext=fontcolor=white:fontsize=#{preview_width / 24}:x=#{preview_width / 3}:text=#{basename}/L#{line_in_config}"
             ].join(',')
           end
 
