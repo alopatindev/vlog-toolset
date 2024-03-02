@@ -247,6 +247,7 @@ class Renderer
 
     temp_videos = @segments.map do |seg|
       # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
+      #        output dir: line in file + (clip/subclip?) + hash, always identify by hash, rename the line
       ext = '.mp4'
       line_in_config = seg[:line_in_config]
       basename = File.basename seg[:video_filename]
@@ -579,6 +580,8 @@ def optimize_for_ios(output_filename, options)
                                             File.extname(output_filename))}.CFR_#{options[:fps].to_f.pretty_fps}FPS.iOS"
   output_ios_filename = File.join(options[:project_dir], "#{output_basename_no_ext}.mov")
 
+  # TODO: also render mov files to output/ ?
+
   print("reencoding for iOS video editors\n")
   command =
     FFMPEG + [
@@ -599,6 +602,8 @@ def optimize_for_ios(output_filename, options)
   verify_constant_framerate(output_ios_filename, options)
   output_ios_filename
 end
+
+# TODO: DaVinci Resolve: ffmpeg -i input.mp4 -c:v dnxhd -profile:v dnxhr_hq -pix_fmt yuv422p -c:a pcm_s16le -f mov out.mov
 
 def in_segment?(position, segment)
   (segment[:start_position]..segment[:end_position]).cover? position
