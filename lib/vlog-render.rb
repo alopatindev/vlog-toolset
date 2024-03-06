@@ -246,6 +246,8 @@ class Renderer
 
     media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
+    colorspace_filter = 'colorspace=all=bt709:format=yuv444p10' # TODO: --full-color-range true
+
     temp_videos = @segments.map do |seg|
       # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
       #        output dir: line in file + (clip/subclip?) + hash, always identify by hash, rename the line
@@ -275,20 +277,21 @@ class Renderer
       remove_file_if_empty(output_filename)
 
       unless File.exist?(output_filename)
-        # TODO: threshold?
-        brightness_filter =
-          if desired_brightness > 0.0
-            mean_color = get_mean_color(seg[:video_filename])
-            delta_brightness = desired_brightness - get_luminance(mean_color)
-            delta_saturation = 1.0 - get_saturation(mean_color)
-            "eq=brightness=#{delta_brightness}:saturation=#{delta_saturation}"
-          else
-            ''
-          end
         media_thread_pool.post do
+          brightness_filter =
+            if desired_brightness > 0.0
+              mean_color = get_mean_color(seg[:video_filename])
+              delta_brightness = desired_brightness - get_luminance(mean_color)
+              delta_saturation = 1.0 - get_saturation(mean_color)
+              "eq=brightness=#{delta_brightness}:saturation=#{delta_saturation}"
+            else
+              ''
+            end
+
           audio_filters = "atempo=#{seg[:speed]},asetpts=PTS-STARTPTS"
           video_filters = [
             rotation_filter(basename),
+            colorspace_filter,
             brightness_filter,
             @options[:video_filters],
             "fps=#{fps}",
@@ -330,6 +333,7 @@ class Renderer
             '-vf', video_filters,
             '-af', audio_filters,
             '-acodec', 'flac',
+            # '-pix_fmt', 'yuv422p', # TODO: optional?
             '-movflags', 'faststart',
             '-strict', '-2',
             output_filename
