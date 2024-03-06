@@ -45,6 +45,40 @@ def get_framerate(filename)
   { fps: track['FrameRate'], mode: track['FrameRate_Mode'] }
 end
 
+def get_mean_color(filename)
+  command = [
+    'ffmpeg',
+    '-i',
+    filename,
+    '-vf',
+    'scale=1:1,pad=1:1:0:0:color=white',
+    '-pix_fmt',
+    'rgb24',
+    '-vframes',
+    '1',
+    '-f',
+    'rawvideo',
+    '-'
+  ]
+
+  `#{command.shelljoin_wrapped} 2>>/dev/null`
+    .unpack('C*')[0..2]
+    .map { |i| i.to_f / 255.0 }
+end
+
+def get_luminance(color)
+  r, g, b = color
+  0.2126 * r + 0.7152 * g + 0.0722 * b
+end
+
+def get_saturation(color)
+  (color.max - color.min) / color.max
+end
+
+# def compute_gamma(luminance)
+#  Math.log(luminance + 0.01) / Math.log(0.5)
+# end
+
 def prepare_for_vad(filename)
   output_filename = "#{filename}.vad.wav"
   command = FFMPEG + [

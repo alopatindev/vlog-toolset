@@ -237,6 +237,7 @@ class Renderer
 
     fps = @options[:fps]
     preview = @options[:preview]
+    desired_brightness = @options[:desired_brightness]
 
     print("preview_width=#{preview_width}\n") if preview
 
@@ -274,10 +275,21 @@ class Renderer
       remove_file_if_empty(output_filename)
 
       unless File.exist?(output_filename)
+        # TODO: threshold?
+        brightness_filter =
+          if desired_brightness > 0.0
+            mean_color = get_mean_color(seg[:video_filename])
+            delta_brightness = desired_brightness - get_luminance(mean_color)
+            delta_saturation = 1.0 - get_saturation(mean_color)
+            "eq=brightness=#{delta_brightness}:saturation=#{delta_saturation}"
+          else
+            ''
+          end
         media_thread_pool.post do
           audio_filters = "atempo=#{seg[:speed]},asetpts=PTS-STARTPTS"
           video_filters = [
             rotation_filter(basename),
+            brightness_filter,
             @options[:video_filters],
             "fps=#{fps}",
             "setpts=(1/#{seg[:speed]})*PTS" # TODO: is it correct?
@@ -765,6 +777,10 @@ def parse_options!(options, args)
     end
     opts.on('-f', '--fps <num>', "Constant frame rate (default: #{options[:fps]})") { |f| options[:fps] = f }
     opts.on('-S', '--speed <num>', "Speed factor (default: #{options[:speed]})") { |s| options[:speed] = s.to_f }
+    opts.on('-b', '--desired-brightness <num>',
+            "Correct brightness (supported values range [0, 1], -1.0 means disabled, default: #{options[:desired_brightness]})") do |s|
+      options[:desired_brightness] = s.to_f
+    end
     opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}\")") do |v|
       options[:video_filters] = v
     end
@@ -827,6 +843,7 @@ def main(argv)
   options = {
     fps: '30',
     speed: 1.2,
+    desired_brightness: -1.0,
     video_filters: 'hqdn3d,hflip,vignette',
     preview: true,
     line_in_config: 1,
