@@ -246,7 +246,8 @@ class Renderer
 
     media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
-    colorspace_filter = 'colorspace=all=bt709:format=yuv444p10' # TODO: --full-color-range true
+    colorspace_filter = 'colorspace=all=bt709:itrc=srgb:fast=0:format=yuv444p10'
+    # colorspace_filter = 'colorspace=all=bt2020:iall=bt709:format=yuv444p10' # TODO: --hdr true https://support.google.com/youtube/answer/7126552#zippy=%2Chdr-video-file-encoding%2Cupload-requirements
 
     temp_videos = @segments.map do |seg|
       # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
@@ -374,7 +375,7 @@ class Renderer
   end
 
   def concat_videos(temp_videos, output_filename)
-    print("concatenate #{output_filename}\n")
+    print("concatenating output\n")
 
     parts = temp_videos.map { |f| "file 'file:#{f}'" }
                        .join "\n"
