@@ -226,12 +226,18 @@ class Renderer
 
   def process_and_split_videos(output_dir, temp_dir)
     video_codec = h265_video_codec
+    nv_hw_accelerated = video_codec.include?('_nvenc')
     preview_width =
-      if video_codec.include?('_nvenc')
+      if nvidia_hw_accelerated
         480
       else
         320
       end
+
+    scale_filter = nv_hw_accelerated ? "hwupload_cuda,scale_cuda=#{preview_width}:-2" : "scale=#{preview_width}:-2"
+
+    colorspace_filter = 'colorspace=all=bt709:itrc=srgb:fast=0:format=yuv444p10'
+    # colorspace_filter = 'colorspace=all=bt2020:iall=bt709:format=yuv444p10' # TODO: --hdr true https://support.google.com/youtube/answer/7126552#zippy=%2Chdr-video-file-encoding%2Cupload-requirements
 
     print("processing video clips (applying filters, etc.)\n")
 
@@ -245,9 +251,6 @@ class Renderer
     processed_segments_mutex = Mutex.new
 
     media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
-
-    colorspace_filter = 'colorspace=all=bt709:itrc=srgb:fast=0:format=yuv444p10'
-    # colorspace_filter = 'colorspace=all=bt2020:iall=bt709:format=yuv444p10' # TODO: --hdr true https://support.google.com/youtube/answer/7126552#zippy=%2Chdr-video-file-encoding%2Cupload-requirements
 
     temp_videos = @segments.map do |seg|
       # FIXME: make less confusing paths, perhaps with hashing, also .cache extension
@@ -300,7 +303,7 @@ class Renderer
           ].reject { |i| i.empty? }.join(',')
           if preview
             video_filters = [
-              "scale=#{preview_width}:-1",
+              scale_filter,
               "#{video_filters}"
             ].join(',')
           end
