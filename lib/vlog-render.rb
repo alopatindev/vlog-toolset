@@ -236,8 +236,8 @@ class Renderer
 
     scale_filter = nv_hw_accelerated ? "hwupload_cuda,scale_cuda=#{preview_width}:-2" : "scale=#{preview_width}:-2"
 
-    colorspace_filter = 'colorspace=all=bt709:itrc=srgb:fast=0:format=yuv444p10'
-    # colorspace_filter = 'colorspace=all=bt2020:iall=bt709:format=yuv444p10' # TODO: --hdr true https://support.google.com/youtube/answer/7126552#zippy=%2Chdr-video-file-encoding%2Cupload-requirements
+    # TODO: do not degrate colorspace if input is bt2020: 'colorspace=all=bt2020:iall=bt709:format=yuv444p10'
+    colorspace_filter = @options[:force_colorspace] ? ['colorspace=all=bt709:itrc=srgb:fast=0:format=yuv444p10'] : []
 
     print("processing video clips (applying filters, etc.)\n")
 
@@ -287,16 +287,15 @@ class Renderer
               mean_color = get_mean_color(seg[:video_filename])
               delta_brightness = desired_brightness - get_luminance(mean_color)
               delta_saturation = 1.0 - get_saturation(mean_color)
-              "eq=brightness=#{delta_brightness}:saturation=#{delta_saturation}"
+              ["eq=brightness=#{delta_brightness}:saturation=#{delta_saturation}"]
             else
-              ''
+              []
             end
 
           audio_filters = "atempo=#{seg[:speed]},asetpts=PTS-STARTPTS"
           video_filters = [
-            rotation_filter(basename),
-            colorspace_filter,
-            brightness_filter,
+            rotation_filter(basename)
+          ] + colorspace_filter + brightness_filter + [
             @options[:video_filters],
             "fps=#{fps}",
             "setpts=(1/#{seg[:speed]})*PTS" # TODO: is it correct?
@@ -792,6 +791,10 @@ def parse_options!(options, args)
     opts.on('-V', '--video-filters <filters>', "ffmpeg video filters (default: \"#{options[:video_filters]}\")") do |v|
       options[:video_filters] = v
     end
+    opts.on('-C', '--force-colorspace <true|false>',
+            "Apply adequate recent colorspace (default: #{options[:force_colorspace]})") do |c|
+      options[:force_colorspace] = c == 'true'
+    end
     opts.on('-c', '--cleanup <true|false>',
             "Remove temporary files, instead of reusing them in future (default: #{options[:cleanup]})") do |c|
       options[:cleanup] = c == 'true'
@@ -853,6 +856,7 @@ def main(argv)
     speed: 1.2,
     desired_brightness: -1.0,
     video_filters: 'hqdn3d,hflip,vignette',
+    force_colorspace: true,
     preview: true,
     line_in_config: 1,
     tmux_nvim: true,
