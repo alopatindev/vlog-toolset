@@ -230,7 +230,7 @@ class Renderer
     video_codec = h265_video_codec
     nv_hw_accelerated = video_codec.include?('_nvenc')
     preview_width =
-      if nvidia_hw_accelerated
+      if nv_hw_accelerated
         480
       else
         320
@@ -242,6 +242,7 @@ class Renderer
                         .map { |seg| seg[:video_filename] }
                         .to_set
                         .map { |filename| get_color_info(filename) }
+                        .to_set
                         .to_a
 
     print "colors: #{video_color_infos}\n"
@@ -249,11 +250,11 @@ class Renderer
     raise 'no color infos' if video_color_infos.empty?
 
     colorspace_filter =
-      if video_color_infos.length > 1 || (@options[:force_colorspace] && SUPPORTED_COLOR_STANDARDS.any do |standard|
-                                            video_color_infos[0][:standard].contains?(standard)
+      if video_color_infos.length > 1 || (@options[:force_colorspace] && SUPPORTED_COLOR_STANDARDS.any? do |standard|
+                                            video_color_infos[0][:standard].include?(standard)
                                           end)
         standard =
-          if video_color_infos.any { |info| info[:standard].contains?('BT.2020') }
+          if video_color_infos.any? { |info| info[:standard].include?('BT.2020') }
             'bt2020'
           else
             'bt709'
@@ -325,13 +326,10 @@ class Renderer
             @options[:video_filters],
             "fps=#{fps}",
             "setpts=(1/#{seg[:speed]})*PTS" # TODO: is it correct?
-          ].reject { |i| i.empty? }.join(',')
-          if preview
-            video_filters = [
-              scale_filter,
-              "#{video_filters}"
-            ].join(',')
-          end
+          ]
+          video_filters = [scale_filter] + video_filters if preview
+
+          video_filters = video_filters.reject { |i| i.empty? }.join(',')
 
           # -filter_complex '[0:a]showvolume=rate=60:p=1,scale=1920/5:1080/36[vv];[0:v][vv]overlay=x=(W-w)/2:y=h/2[v]' -map '[v]' -map '0:a'
 

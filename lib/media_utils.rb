@@ -46,7 +46,7 @@ def get_color_info(filename)
   format = 'ChromaSubsampling'
   colorspace = 'ColorSpace'
   properties = video_properties([standard, format, colorspace], filename)
-  [standard: properties[standard], format: properties[format], colorspace: properties[colorspace]]
+  { standard: properties[standard], format: properties[format], colorspace: properties[colorspace] }
 end
 
 def video_properties(properties, filename)
