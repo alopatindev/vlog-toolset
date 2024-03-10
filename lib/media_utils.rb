@@ -35,14 +35,29 @@ def get_duration(filename)
 end
 
 def get_framerate(filename)
+  fps = 'FrameRate'
+  mode = 'FrameRate_Mode'
+  properties = video_properties([fps, mode], filename)
+  { fps: properties[fps], mode: properties[mode] }
+end
+
+def get_color_info(filename)
+  standard = 'colour_primaries'
+  format = 'ChromaSubsampling'
+  colorspace = 'ColorSpace'
+  properties = video_properties([standard, format, colorspace], filename)
+  [standard: properties[standard], format: properties[format], colorspace: properties[colorspace]]
+end
+
+def video_properties(properties, filename)
   command = ['mediainfo', '--Output=JSON', filename]
   tracks = JSON.parse(`#{command.shelljoin_wrapped}`)['media']['track'].filter do |i|
-    i['@type'] == 'Video' && !i['FrameRate_Mode'].nil?
+    i['@type'] == 'Video' && properties.all? { |property| !i[property].nil? }
   end
   raise 'Unexpected number of video tracks' unless tracks.length == 1
 
   track = tracks[0]
-  { fps: track['FrameRate'], mode: track['FrameRate_Mode'] }
+  properties.map { |i| [i, track[i]] }.to_h
 end
 
 def get_mean_color(filename)

@@ -37,6 +37,8 @@ RENDER_DEFAULT_SPEED = '1.00'
 
 AMPLITUDE_METER = '--lavfi-complex=[aid1]asplit[ao][a];[a]showvolume=rate=30:p=1:w=100:h=18:t=0:m=p:f=0:dm=0:dmc=yellow:v=0:ds=log:b=5:p=0.5:s=1,scale=iw/3:-1[vv];[vid1][vv]overlay=x=(W-w)/2:y=(H-h)*0.88[vo]'
 
+SUPPORTED_COLOR_STANDARDS = ['BT.709', 'BT.2020']
+
 class Renderer
   def initialize(config_filename, config_in_nvim, nvim_socket, options, terminal_window_id)
     @config_filename = config_filename
@@ -236,8 +238,32 @@ class Renderer
 
     scale_filter = nv_hw_accelerated ? "hwupload_cuda,scale_cuda=#{preview_width}:-2" : "scale=#{preview_width}:-2"
 
-    # TODO: do not degrate colorspace if input is bt2020: 'colorspace=all=bt2020:iall=bt709:format=yuv444p10'
-    colorspace_filter = @options[:force_colorspace] ? ['colorspace=all=bt709:itrc=srgb:fast=0:format=yuv444p10'] : []
+    video_color_infos = @segments
+                        .map { |seg| seg[:video_filename] }
+                        .to_set
+                        .map { |filename| get_color_info(filename) }
+                        .to_a
+
+    print "colors: #{video_color_infos}\n"
+
+    raise 'no color infos' if video_color_infos.empty?
+
+    colorspace_filter =
+      if video_color_infos.length > 1 || (@options[:force_colorspace] && SUPPORTED_COLOR_STANDARDS.any do |standard|
+                                            video_color_infos[0][:standard].contains?(standard)
+                                          end)
+        standard =
+          if video_color_infos.any { |info| info[:standard].contains?('BT.2020') }
+            'bt2020'
+          else
+            'bt709'
+          end
+        print("forcing colorspace #{standard}\n")
+        ["colorspace=all=#{standard}:itrc=srgb:fast=0:format=yuv444p10"]
+      else
+        print("using the same colorspace\n")
+        []
+      end
 
     print("processing video clips (applying filters, etc.)\n")
 
