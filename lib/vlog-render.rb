@@ -356,6 +356,7 @@ class Renderer
             '-fflags', '+genpts+igndts',
             '-i', temp_cut_output_filename,
             '-vsync', 'cfr',
+            '-sample_fmt', FLAC_SAMPLING_FORMAT,
             '-vcodec', video_codec,
             '-vf', video_filters,
             '-af', audio_filters,

@@ -23,6 +23,8 @@ FFMPEG_NO_OVERWRITE = ['ffmpeg', '-n', '-hide_banner', '-loglevel', 'panic']
 EXTRACT_LEFT_CHANNEL_FILTER = 'pan=mono|c0=c0' # TODO: https://trac.ffmpeg.org/wiki/AudioChannelManipulation#Chooseaspecificchannel
 VAD_SAMPLING_RATE = 16_000
 
+FLAC_SAMPLING_FORMAT = 's16'
+
 MIN_SHOT_SIZE = 1.0
 
 MPV_COMMAND = ['mpv', '--really-quiet', '--no-resume-playback', '--af=scaletempo2', '--fs', '--speed=1',
@@ -145,7 +147,7 @@ def process_sound(sync_sound_filename, segments)
 
     ffmpeg_cut_args = ['-ss', start_position, '-i', sync_sound_filename, '-to', end_position - start_position,
                        '-codec', 'copy']
-    ffmpeg_output_args = ['-af', "#{audio_filters.join(',')}", '-acodec', 'flac']
+    ffmpeg_output_args = ['-sample_fmt', FLAC_SAMPLING_FORMAT, '-af', "#{audio_filters.join(',')}", '-acodec', 'flac']
 
     temp_filename = "#{sync_sound_filename}_#{subclip_num}.cut.wav"
 
