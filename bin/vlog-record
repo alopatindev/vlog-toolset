@@ -19,4 +19,4 @@ BINDIR="$(dirname $0)"
 cd "${BINDIR}/.."
 export RUBYOPT="-I${BINDIR}/../lib"
 
-ruby lib/vlog-splitter.rb "$@"
+ruby lib/vlog-record.rb "$@"

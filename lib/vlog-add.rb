@@ -31,12 +31,11 @@ require 'logger'
 require 'optparse'
 require 'set'
 
-# TODO: vlog-splitter => vlog-add, vlog-recorder => vlog-record
 # TODO: voice_input_000001.mp4, other_input_000001.mp4
 
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
-    opts.set_banner("Usage: vlog-splitter -p project_dir/ [other options]\nProject directory must contain input_000001.mp4, input_000002.mp4 ... as input files (also optionally input_000001.wav, input_000002.wav ...)")
+    opts.set_banner("Usage: vlog-add -p project_dir/ [other options]\nProject directory must contain input_000001.mp4, input_000002.mp4 ... as input files (also optionally input_000001.wav, input_000002.wav ...)")
     opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-P', '--pause-between-shots <seconds>',

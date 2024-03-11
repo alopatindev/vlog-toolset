@@ -8,8 +8,8 @@ I [use it](https://alopatindev.github.io/2019/02/05/video-recording-with-automat
 Currently can keep functioning well even if you experience temporary [USB phone connection failure](https://android.stackexchange.com/questions/193637/how-can-i-adb-pull-a-large-file-when-the-usb-connection-breaks-continuously).
 
 Two possible pipelines:
-- record with `vlog-recorder`, apply `vlog-render`
-- record normally, without any additional software, apply `vlog-splitter` and `vlog-render`
+- record with `vlog-record`, apply `vlog-render`
+- record normally, without any additional software, apply `vlog-add` and `vlog-render`
 
 ## Installation
 
@@ -40,7 +40,7 @@ Two possible pipelines:
 ### Android device
 - Open Camera (from [F-Droid](https://f-droid.org/en/packages/net.sourceforge.opencamera/) or [Google Play](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera)) (tested with 1.51.1)
 
-## vlog-recorder
+## vlog-record
 - records video
     - using camera of Android-based device
 - records audio
@@ -59,8 +59,8 @@ Two possible pipelines:
 ```
 cd vlog-toolset
 
-./bin/vlog-recorder -h
-Usage: vlog-recorder -p project_dir/ [other options]
+./bin/vlog-record -h
+Usage: vlog-record -p project_dir/ [other options]
   -p, --project <dir>              Project directory
   -t, --trim <duration>            Trim duration of beginning and ending of each clip (default: 0.2)
   -s <arecord-args>,               Additional arecord arguments (default: "--device=default --format=dat")
@@ -75,7 +75,7 @@ Usage: vlog-recorder -p project_dir/ [other options]
   -a, --aggressiveness <0..1>      How aggressively to filter out non-speech (default: 0.4)
   -d, --debug <true|false>         Show debug messages (default: false)
 
-./bin/vlog-recorder -p ~/video/new-cool-video-project
+./bin/vlog-record -p ~/video/new-cool-video-project
 ...
 ----------------------------------------------------------------------
         R - (RE)START clip recording (loses unsaved clip)
@@ -140,9 +140,9 @@ Usage: vlog-render -p project_dir/ -w path/to/whisper.cpp/ [other options]
 vi ~/video/new-cool-video-project/render.conf
 ```
 
-## vlog-splitter
+## vlog-add
 ```
-Usage: vlog-splitter -p project_dir/ [other options]
+Usage: vlog-add -p project_dir/ [other options]
 Project directory must contain input_000001.mp4, input_000002.mp4 ... as input files (also optionally input_000001.wav, input_000002.wav ...)
   -p, --project <dir>              Project directory
   -P <seconds>,                    Minimum pause between shots for auto trimming (default: 2.0)

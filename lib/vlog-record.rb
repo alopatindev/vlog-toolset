@@ -526,7 +526,7 @@ end
 
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
-    opts.set_banner('Usage: vlog-recorder -p project_dir/ [other options]')
+    opts.set_banner('Usage: vlog-record -p project_dir/ [other options]')
     opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-t', '--trim <duration>',
