@@ -20,9 +20,14 @@ class Array
     shelljoin.gsub('\=', '=').gsub('\\ ', ' ') # https://github.com/ruby/shellwords/issues/1
   end
 
-  # TODO: move?
+  # TODO: move
   def argmax
     index(max)
+  end
+
+  # TODO: move
+  def has_non_unique_items?
+    uniq.length != length
   end
 end
 

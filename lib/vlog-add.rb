@@ -31,11 +31,9 @@ require 'logger'
 require 'optparse'
 require 'set'
 
-# TODO: voice_input_000001.mp4, other_input_000001.mp4
-
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
-    opts.set_banner("Usage: vlog-add -p project_dir/ [other options]\nProject directory must contain input_000001.mp4, input_000002.mp4 ... as input files (also optionally input_000001.wav, input_000002.wav ...)")
+    opts.set_banner("Usage: vlog-add -p project_dir/ [other options]\nProject directory must contain input_voice_000001.mp4, input_other_000002.mp4 ... as input files (also optionally input_voice_000001.wav, input_other_000002.wav ... with highest audio quality)")
     opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-P', '--pause-between-shots <seconds>',
@@ -76,6 +74,8 @@ def detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
 
   start_position = [0.0, sync_offset.abs].max
   end_position = duration
+
+  return [[start_position, end_position]] if File.basename(camera_filename).start_with?('input_other_0')
 
   segments = []
 
@@ -146,13 +146,22 @@ def main(argv)
 
   media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
-  camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_0*.mp4").sort
+  camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_{voice,other}_0*.mp4").sort
   processed_clips = Dir.glob("#{project_dir}#{File::SEPARATOR}0*.mp4").map { |i| filename_to_clip(i) }.to_set
-  unprocessed_items = camera_filenames.filter_map do |camera_filename|
+
+  clip_nums_and_camera_filenames = camera_filenames.map do |camera_filename|
     clip_num = File.basename(camera_filename).split('_')[1].to_i
-    [clip_num, camera_filename] unless processed_clips.include?(clip_num)
+    [clip_num, camera_filename]
   end
-  print("splitting #{unprocessed_items.length} inputs (total inputs: #{camera_filenames.length})\n")
+
+  if clip_nums_and_camera_filenames.map { |clip_num, _camera_filename| clip_num }.has_non_unique_items?
+    raise 'input files contain non-unique clip numbers'
+  end
+
+  unprocessed_items = clip_nums_and_camera_filenames.filter do |clip_num, _camera_filename|
+    !processed_clips.include?(clip_num)
+  end
+  print("adding #{unprocessed_items.length} inputs (total inputs: #{camera_filenames.length})\n")
 
   unprocessed_items.each do |i|
     clip_num, camera_filename = i
