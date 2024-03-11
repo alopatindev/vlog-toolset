@@ -26,8 +26,8 @@ class Array
   end
 
   # TODO: move
-  def has_non_unique_items?
-    uniq.length != length
+  def unique_items?
+    uniq.length == length
   end
 end
 

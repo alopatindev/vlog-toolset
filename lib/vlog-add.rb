@@ -33,7 +33,7 @@ require 'set'
 
 def parse_options!(options, args)
   parser = OptionParser.new do |opts|
-    opts.set_banner("Usage: vlog-add -p project_dir/ [other options]\nProject directory must contain input_voice_000001.mp4, input_other_000002.mp4 ... as input files (also optionally input_voice_000001.wav, input_other_000002.wav ... with highest audio quality)")
+    opts.set_banner("Usage: vlog-add -p project_dir/ [other options]\nProject directory must contain inputvoice_000001.mp4, inputother_000002.mp4 ... as input files (also optionally inputvoice_000001.wav, inputother_000002.wav ... with highest audio quality)")
     opts.set_summary_indent('  ')
     opts.on('-p', '--project <dir>', 'Project directory') { |p| options[:project_dir] = p }
     opts.on('-P', '--pause-between-shots <seconds>',
@@ -68,14 +68,13 @@ def prepare_sync_sound(camera_filename)
   [sync_offset, sync_sound_filename]
 end
 
-def detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
+# TODO: ~identical to vlog-record implementation
+def detect_segments(sync_sound_filename, camera_filename, sync_offset, options, trim_noise)
   sync_sound_duration = get_duration(sync_sound_filename)
   duration = [get_duration(camera_filename), sync_sound_duration].min
 
   start_position = [0.0, sync_offset.abs].max
   end_position = duration
-
-  return [[start_position, end_position]] if File.basename(camera_filename).start_with?('input_other_0')
 
   segments = []
 
@@ -85,18 +84,20 @@ def detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
     return segments
   end
 
-  voice_segments = detect_voice(sync_sound_filename, MIN_SHOT_SIZE, options[:min_pause_between_shots],
-                                options[:aggressiveness])
-  print("voice segments: #{voice_segments.join(',')} (aggressiveness=#{options[:aggressiveness]})\n")
+  if trim_noise
+    voice_segments = detect_voice(sync_sound_filename, MIN_SHOT_SIZE, options[:min_pause_between_shots],
+                                  options[:aggressiveness])
+    print("voice segments: #{voice_segments.join(',')} (aggressiveness=#{options[:aggressiveness]})\n")
 
-  unless voice_segments.empty?
-    segments = voice_segments
+    unless voice_segments.empty?
+      segments = voice_segments
 
-    segments[0][0] = [start_position, segments[0][0]].max
-    last = segments.length - 1
-    segments[last][1] = [end_position, segments[last][1]].min
+      segments[0][0] = [start_position, segments[0][0]].max
+      last = segments.length - 1
+      segments[last][1] = [end_position, segments[last][1]].min
 
-    segments = segments.filter { |r| r[0] < r[1] }
+      segments = segments.filter { |r| r[0] < r[1] }
+    end
   end
 
   segments = [[start_position, end_position]] if segments.empty?
@@ -111,7 +112,9 @@ def process_clip(clip_num, camera_filename, options)
   print("clip_num=#{clip_num} preparing sync sound\n")
   sync_offset, sync_sound_filename = prepare_sync_sound(camera_filename)
   print("clip_num=#{clip_num} sync_offset=#{sync_offset}\n")
-  segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, options)
+  trim_noise = File.basename(camera_filename).start_with?('inputvoice_0')
+  print("clip_num=#{clip_num} trim_noise=#{trim_noise}\n")
+  segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, options, trim_noise)
   print("clip_num=#{clip_num} segments=#{segments}\n")
   processed_sound_filenames = process_sound(sync_sound_filename, segments)
   print("clip_num=#{clip_num} processed_sound_filenames=#{processed_sound_filenames}\n")
@@ -146,7 +149,7 @@ def main(argv)
 
   media_thread_pool = Concurrent::FixedThreadPool.new(Concurrent.processor_count)
 
-  camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input_{voice,other}_0*.mp4").sort
+  camera_filenames = Dir.glob("#{project_dir}#{File::SEPARATOR}input{voice,other}_0*.mp4")
   processed_clips = Dir.glob("#{project_dir}#{File::SEPARATOR}0*.mp4").map { |i| filename_to_clip(i) }.to_set
 
   clip_nums_and_camera_filenames = camera_filenames.map do |camera_filename|
@@ -154,7 +157,7 @@ def main(argv)
     [clip_num, camera_filename]
   end
 
-  if clip_nums_and_camera_filenames.map { |clip_num, _camera_filename| clip_num }.has_non_unique_items?
+  unless clip_nums_and_camera_filenames.map { |clip_num, _camera_filename| clip_num }.unique_items?
     raise 'input files contain non-unique clip numbers'
   end
 

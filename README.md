@@ -143,7 +143,7 @@ vi ~/video/new-cool-video-project/render.conf
 ## vlog-add
 ```
 Usage: vlog-add -p project_dir/ [other options]
-Project directory must contain input_voice_000001.mp4, input_other_000002.mp4 ... as input files (also optionally input_voice_000001.wav, input_other_000002.wav ... with highest audio quality)
+Project directory must contain inputvoice_000001.mp4, inputother_000002.mp4 ... as input files (also optionally inputvoice_000001.wav, inputother_000002.wav ... with highest audio quality)
   -p, --project <dir>              Project directory
   -P <seconds>,                    Minimum pause between shots for auto trimming (default: 2.0)
       --pause-between-shots
