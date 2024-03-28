@@ -1,3 +1,12 @@
+<div align="center">
+I've gained wisdom from commercial proprietary challenges since 2012<br>
+and switched entirely to my <a href="https://codonaft.com/sponsor" rel="noopener noreferrer" target="_blank">personal projects</a>.<br>
+Free and Open Source Software is my passion.<br>
+I believe it's the shortest way to <del>enlightenment</del> <strong>healthier</strong> products for society ♡
+</div>
+
+---
+
 # vlog-toolset
 Video and audio recording toolset for vloggers🎙️📹🎬
 
@@ -180,6 +189,15 @@ Project directory must contain inputvoice_000001.mp4, inputother_000002.mp4 ... 
 - [adb](https://github.com/kpcyrd/forensic-adb/blob/736f7c43d116b6334af3c1d8c4a41f9ae06ff812/src/lib.rs#L754)
     - `pull` performance comparing `android-tools`? for USB 2 and 3
 
+## Support
+I'm currently investing [all my time](https://codonaft.com/why) in personal projects and no longer making any income from proprietary commercial projects owned by third-party businesses.
+
+If you found this repo useful and you want to support me, please
+- ⭐ it
+- check [here](https://codonaft.com/sponsor)
+
+Thank you for your support! ❤️ (◕‿◕)
+
 ## License
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -190,4 +208,4 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions; read LICENSE.txt for details.
 
-Copyright (C) 2018—∞  Alexander Lopatin <alopatindev ät gmail dot com>
+Copyright (C) 2018—∞  Alexander Lopatin <alopatindev ät codonaft dot com>
