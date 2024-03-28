@@ -16,23 +16,23 @@ Two possible pipelines:
 ### GNU/Linux
 1. Install dependencies
 - ruby (tested with 3.1.4)
-- python3 (tested with 3.11.5)
-- pip (tested with 23.2.1)
-- ffmpeg (tested with 4.4.4)
+- python3 (tested with 3.11.8)
+- pip (tested with 24)
+- ffmpeg (tested with 6.1.1)
 - sox (tested with 14.4.2)
 - mediainfo (tested with 23.04)
 - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
-- alsa-utils (tested with 1.2.9)
+- alsa-utils (tested with 1.2.10)
 - xdotool (tested with 3.20211022.1)
 - socat (tested with 1.7.4.4)
-- mpv (tested with 0.36.0)
+- mpv (tested with 0.37.0)
 - whisper.cpp (tested with `641f2f4`)
     - build for
         - [NVIDIA proprietary](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#nvidia-gpu-support) driver
         - or [other GPUs](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#opencl-gpu-support-via-clblast)
         - or [CPU](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#blas-cpu-support-via-openblas)
     - download [model(s)](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#quick-start) (`base` and/or `medium` are recommended)
-- android-tools (tested with 34.0.0, adb version is 1.0.41)
+- android-tools (tested with 34.0.1, adb version is 1.0.41)
     - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
 
 2. `git clone git@github.com:alopatindev/vlog-toolset.git && cd vlog-toolset && ./configure`
@@ -180,6 +180,15 @@ Project directory must contain inputvoice_000001.mp4, inputother_000002.mp4 ... 
 - [adb](https://github.com/kpcyrd/forensic-adb/blob/736f7c43d116b6334af3c1d8c4a41f9ae06ff812/src/lib.rs#L754)
     - `pull` performance comparing `android-tools`? for USB 2 and 3
 
+## Support
+I'm currently investing [all my time](https://codonaft.com/why) in FOSS projects.
+
+If you found this repo useful and you want to support me, please
+- ⭐ it
+- check ⚡ [here](https://codonaft.com/sponsor)
+
+Your support keeps me going ❤️ (◕‿◕)
+
 ## License
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -190,4 +199,4 @@ This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions; read LICENSE.txt for details.
 
-Copyright (C) 2018—∞  Alexander Lopatin <alopatindev ät gmail dot com>
+Copyright (C) 2018—∞  Alexander Lopatin <alopatindev ät codonaft dot com>
