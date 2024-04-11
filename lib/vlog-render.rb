@@ -413,7 +413,7 @@ class Renderer
       '-f', 'concat',
       '-segment_time_metadata', '1',
       '-safe', '0',
-      '-protocol_whitelist', 'file,pipe',
+      '-protocol_whitelist', 'file,pipe,fd',
       '-i', '-',
       # '-af', 'aselect=concatdec_select,aresample=async=1', # FIXME: adds sound gaps resulting in clicking sounds
       # '-vcodec', 'copy',
@@ -868,11 +868,6 @@ def verify_terminal(window_id)
 end
 
 def main(argv)
-  raise 'unsupported window system' unless ENV.include?('DISPLAY')
-
-  terminal_window_id = get_current_window_id
-  verify_terminal(terminal_window_id)
-
   test_merge_small_pauses
   test_segments_overlap
 
@@ -894,6 +889,14 @@ def main(argv)
   # TODO: option to render all sound channels?
 
   parse_options!(options, argv)
+
+  terminal_window_id = nil
+  if options[:preview]
+    raise 'unsupported window system' unless ENV.include?('DISPLAY')
+
+    terminal_window_id = get_current_window_id
+    verify_terminal(terminal_window_id)
+  end
 
   project_dir = options[:project_dir]
   config_filename = File.join(File.realpath(project_dir), CONFIG_FILENAME)

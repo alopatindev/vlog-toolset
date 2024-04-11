@@ -25,23 +25,23 @@ Two possible pipelines:
 ### GNU/Linux
 1. Install dependencies
 - ruby (tested with 3.1.4)
-- python3 (tested with 3.11.5)
-- pip (tested with 23.2.1)
-- ffmpeg (tested with 4.4.4)
+- python3 (tested with 3.11.8)
+- pip (tested with 24)
+- ffmpeg (tested with 6.1.1)
 - sox (tested with 14.4.2)
 - mediainfo (tested with 23.04)
 - [sync-audio-tracks](https://github.com/alopatindev/sync-audio-tracks) (should be in your PATH environment variable)
-- alsa-utils (tested with 1.2.9)
+- alsa-utils (tested with 1.2.10)
 - xdotool (tested with 3.20211022.1)
 - socat (tested with 1.7.4.4)
-- mpv (tested with 0.36.0)
+- mpv (tested with 0.37.0)
 - whisper.cpp (tested with `641f2f4`)
     - build for
         - [NVIDIA proprietary](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#nvidia-gpu-support) driver
         - or [other GPUs](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#opencl-gpu-support-via-clblast)
         - or [CPU](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#blas-cpu-support-via-openblas)
     - download [model(s)](https://github.com/ggerganov/whisper.cpp/tree/641f2f42823affb6e5c471b63317deefb0b6e3e9#quick-start) (`base` and/or `medium` are recommended)
-- android-tools (tested with 34.0.0, adb version is 1.0.41)
+- android-tools (tested with 34.0.1, adb version is 1.0.41)
     - USB Debugging should be [enabled](https://github.com/alopatindev/qdevicemonitor/blob/master/TROUBLESHOOTING.md#android-devices-are-not-recognized)
 
 2. `git clone git@github.com:alopatindev/vlog-toolset.git && cd vlog-toolset && ./configure`
