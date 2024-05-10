@@ -143,6 +143,8 @@ class Phone
   def tap(x, y)
     update_app_bounds!
 
+    @logger.debug "tap x=#{x} y=#{y}"
+
     width = @right - @left
     height = @bottom - @top
     if @rotation == PORTRAIT
@@ -242,11 +244,17 @@ class Phone
 
   def lock_exposure
     @logger.debug 'lock_exposure'
-    tap 0.08, 0.92
+    x =
+      if @rotation == 180
+        0.035 # NOTE: holy crap, just this button alone moved here in a single rotation mode
+      else
+        0.08
+      end
+    tap x, 0.927
   end
 
   def update_app_bounds!
-    unless adb_shell('dumpsys window') =~ /mAppBounds=Rect\(([0-9]*),\s([0-9]*)\s-\s([0-9]*),\s([0-9]*)\).*mRotation=ROTATION_([0-9]*)/
+    unless adb_shell('dumpsys window') =~ /mAppBounds=Rect\(([0-9]*),\s([0-9]*)\s-\s([0-9]*),\s([0-9]*)\) mMaxBounds=Rect\(([0-9]*),\s([0-9]*)\s-\s([0-9]*),\s([0-9]*)\).*mRotation=ROTATION_([0-9]*)/
       raise 'Failed to fetch display size'
     end
 
@@ -254,9 +262,20 @@ class Phone
     @top = Regexp.last_match(2).to_i
     @right = Regexp.last_match(3).to_i
     @bottom = Regexp.last_match(4).to_i
-    @rotation = Regexp.last_match(5).to_i
 
-    @logger.debug "device left=#{@left}, right=#{@right}, top=#{@top}, bottom=#{@bottom}"
+    max_left = Regexp.last_match(5).to_i
+    max_top = Regexp.last_match(6).to_i
+    max_right = Regexp.last_match(7).to_i
+    max_bottom = Regexp.last_match(8).to_i
+
+    @rotation = Regexp.last_match(9).to_i
+
+    @logger.debug "device rotation=#{@rotation}, left=#{@left}, right=#{@right}, top=#{@top}, bottom=#{@bottom}, max_left=#{max_left}, max_right=#{max_right}, max_top=#{max_top}, max_bottom=#{max_bottom}"
+
+    @left = [@left, max_left].min if @rotation == 90
+    @right = [@right, max_right].max if @rotation == 270
+    @top = [@top, max_top].min if @rotation == 0
+    # @bottom = [@bottom, max_bottom].max if @rotation == 180
   end
 
   def get_brightness
