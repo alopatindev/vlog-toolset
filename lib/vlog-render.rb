@@ -250,9 +250,10 @@ class Renderer
     raise 'no color infos' if video_color_infos.empty?
 
     colorspace_filter =
-      if video_color_infos.length > 1 || (@options[:force_colorspace] && SUPPORTED_COLOR_STANDARDS.any? do |standard|
-                                            video_color_infos[0][:standard].include?(standard)
-                                          end)
+      if @options[:force_colorspace]
+        #      if video_color_infos.length > 1 || (@options[:force_colorspace] && SUPPORTED_COLOR_STANDARDS.any? do |standard|
+        #                                            video_color_infos[0][:standard].include?(standard)
+        #                                          end)
         standard =
           if video_color_infos.any? { |info| info[:standard].include?('BT.2020') }
             'bt2020'
