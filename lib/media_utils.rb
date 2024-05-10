@@ -248,7 +248,8 @@ end
 
 def h265_video_codec
   if nvenc_supported?('hevc_nvenc')
-    'hevc_nvenc -preset p1 -cq 18 -qp 18'
+    # 'hevc_nvenc -preset p1 -rc vbr -cq 18 -qmin 18 -qmax 18 -b:v 0'
+    'hevc_nvenc -preset p1 -cq 18 -qp 18 -b:v 0'
   else
     'libx265 -preset ultrafast -crf 18'
   end
