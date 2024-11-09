@@ -245,7 +245,7 @@ class Renderer
                         .to_set
                         .to_a
 
-    print "colors: #{video_color_infos}\n"
+    print("colors: #{video_color_infos}\n")
 
     raise 'no color infos' if video_color_infos.empty?
 
@@ -336,11 +336,13 @@ class Renderer
 
           # TODO: do second audio sync for individually cut fragments to avoid audio drift? best moment for that
 
+          threads = [0, Concurrent.processor_count - @segments.length].max + 1
+          dt = seg[:end_position] - seg[:start_position]
+
           # might be uneeded step anymore,
           # but still might be useful for NLE video editors
-          dt = seg[:end_position] - seg[:start_position]
           command = FFMPEG_NO_OVERWRITE + [
-            '-threads', Concurrent.processor_count,
+            '-threads', threads,
             '-fflags', '+genpts+igndts',
             '-ss', seg[:start_position],
             '-i', seg[:video_filename],
@@ -353,7 +355,7 @@ class Renderer
           system command.shelljoin_wrapped
 
           command = FFMPEG_NO_OVERWRITE + [
-            '-threads', Concurrent.processor_count,
+            '-threads', threads,
             '-fflags', '+genpts+igndts',
             '-i', temp_cut_output_filename,
             '-vsync', 'cfr',
@@ -511,6 +513,8 @@ def parse_config(filename, options)
            print("segment #{video_filename} has speed #{final_speed} < 1; forcing speed #{min_speed}\n")
            final_speed = min_speed
          end
+
+         raise 'parse failure' if end_position.to_f == 0.0
 
          {
            line_in_config: line_in_config,

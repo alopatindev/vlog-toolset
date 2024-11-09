@@ -122,7 +122,7 @@ def process_clip(clip_num, camera_filename, options)
   processed_video_filenames = process_video(camera_filename, segments)
   print("clip_num=#{clip_num} processed_video_filenames=#{processed_video_filenames}\n")
 
-  output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, options[:rotation],
+  output_filenames = merge_media(processed_sound_filenames, processed_video_filenames, clip_num, options[:rotation],
                                  options[:project_dir])
   print("clip_num=#{clip_num} output_filenames=#{output_filenames}\n")
 

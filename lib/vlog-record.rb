@@ -353,12 +353,15 @@ class DevicesController
         @logger.debug "save_clip: sync_offset=#{sync_offset}"
 
         segments = detect_segments(sync_sound_filename, camera_filename, sync_offset, trim_noise)
+        @logger.debug 'save_clip: detected segments'
         processed_sound_filenames = process_sound(sync_sound_filename, segments)
         @logger.debug "save_clip: processed_sound_filenames=#{processed_sound_filenames}"
 
         processed_video_filenames = process_video(camera_filename, segments)
-        output_filenames = merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation,
+        @logger.debug 'save_clip: processed video'
+        output_filenames = merge_media(processed_sound_filenames, processed_video_filenames, clip_num, rotation,
                                        @project_dir)
+        @logger.debug 'save_clip: merged media'
         remove_files (if @keep_originals
                         []
                       else

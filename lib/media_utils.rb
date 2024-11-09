@@ -188,7 +188,7 @@ def process_video(camera_filename, segments)
   end
 end
 
-def merge_files(processed_sound_filenames, processed_video_filenames, clip_num, rotation, project_dir)
+def merge_media(processed_sound_filenames, processed_video_filenames, clip_num, rotation, project_dir)
   processed_sound_filenames
     .zip(processed_video_filenames)
     .each_with_index
